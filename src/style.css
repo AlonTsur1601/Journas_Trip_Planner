@@ -941,6 +941,7 @@ textarea {
   color: var(--accent);
 }
 .auth-page {
+  --auth-divider: #b8a7d4;
   --auth-backdrop: radial-gradient(ellipse at 85% 15%, #d9cff4 0%, transparent 60%), linear-gradient(145deg, #f1edfb, #e7e0f5);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 38%);
@@ -957,7 +958,7 @@ textarea {
   color: var(--ink);
   min-height: 0;
 
-  border-right: 1px solid var(--line);
+  border-right: 2px solid var(--auth-divider);
 }
 .auth-art .brand,
 .auth-form .mobile-brand {
@@ -1112,6 +1113,7 @@ textarea {
   color: var(--ink);
 }
 [data-theme="dark"] .auth-page {
+  --auth-divider: #77618d;
   --auth-backdrop: radial-gradient(ellipse at 85% 15%, #44305d 0%, transparent 60%), linear-gradient(145deg, #292035, #231d30);
 }
 [data-theme="dark"] .auth-art {

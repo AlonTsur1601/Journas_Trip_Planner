@@ -1005,7 +1005,7 @@ textarea {
 }
 .art-badges {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   margin-top: 16px;
   flex-wrap: wrap;
 }
@@ -1013,8 +1013,13 @@ textarea {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 11px;
-  color: #7d699b;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--auth-divider);
+  border-radius: 4px;
+  padding: 6px 8px;
 }
 .auth-form {
   padding: 28px;
@@ -1342,3 +1347,18 @@ textarea {
   .auth-form { min-height: 100dvh; max-width: 450px; padding: 24px 20px; }
   .mobile-brand { display: flex; margin-bottom: 18px; }
 }
+
+.art-badges svg { color: var(--accent); flex-shrink: 0; }
+.mobile-features { display: none; }
+@media (max-width: 900px) {
+  .mobile-features { display: flex; margin: 0 0 16px; }
+}
+button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 65%, transparent);
+    filter: brightness(0.94);
+  }
+  .text-button:not(:disabled):hover { text-decoration: underline; text-underline-offset: 3px; }
+}
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }

@@ -130,6 +130,16 @@ function Modal({ title, children, onClose }: any) {
     </div>
   );
 }
+function TripFeatures({ className = "" }: { className?: string }) {
+  return (
+    <div className={"art-badges " + className}>
+      <span><Map size={16} /> Map pins</span>
+      <span><Clock3 size={16} /> Daily schedule</span>
+      <span><CheckSquare size={16} /> Linked tasks</span>
+    </div>
+  );
+}
+
 function AuthScreen({ onError }: { onError: (s: string) => void }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -167,17 +177,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
             Share a trip to plan with others in real time. Each traveler keeps
             their own workspace layout.
           </p>
-          <div className="art-badges">
-            <span>
-              <Map size={16} /> Map pins
-            </span>
-            <span>
-              <Clock3 size={16} /> Daily schedule
-            </span>
-            <span>
-              <CheckSquare size={16} /> Linked tasks
-            </span>
-          </div>
+          <TripFeatures />
         </div>
       </div>
       <section className="auth-form">
@@ -191,6 +191,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
           Plan each day with a map, schedule, and task list. Sign in to save your
           trips and collaborate on shared itineraries.
         </p>
+        <TripFeatures className="mobile-features" />
         {!configured ? (
           <div className="setup-message">
             <h3>Connect your travel workspace</h3>

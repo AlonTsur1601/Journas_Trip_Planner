@@ -1341,8 +1341,13 @@ textarea {
   color: #ae98e5;
 }
 [data-theme="dark"] .orbit { opacity: 0.25; }
+.auth-mobile-background { display: none; }
 @media (max-width: 900px) {
-  .auth-page { display: block; }
+  .auth-page { display: block; position: relative; isolation: isolate; background: #eeebf9; }
+  .auth-mobile-background { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+  [data-theme="dark"] .auth-page { background: #292035; }
+  .modal .auth-page { background: var(--surface); }
+  .modal .auth-mobile-background { display: none; }
   .auth-art { display: none; }
   .auth-form { min-height: 100dvh; max-width: 450px; padding: 24px 20px; }
   .mobile-brand { display: flex; margin-bottom: 18px; }

@@ -147,6 +147,10 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
   }
   return (
     <main className="auth-page">
+      <div className="auth-mobile-background" aria-hidden="true">
+        <div className="orbit orbit-one" />
+        <div className="orbit orbit-two" />
+      </div>
       <div className="auth-art">
         <div className="brand">
           <Compass />

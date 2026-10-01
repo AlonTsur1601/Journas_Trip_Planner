@@ -1014,9 +1014,8 @@ textarea {
   gap: 6px;
   align-items: center;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--ink);
-  text-shadow: 0 0 5px var(--bg);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 76%, var(--muted));
 }
 .auth-form {
   padding: 28px;

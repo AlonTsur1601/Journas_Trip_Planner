@@ -6,13 +6,13 @@ Built with React, TypeScript, Vite, Firebase Authentication, Firestore, MapLibre
 
 Google's sign-in logo comes from its [official branding assets](https://developers.google.com/identity/branding-guidelines) and retains Google's trademark rights.
 
-The rename preserves the existing Firebase accounts and shared data. The Firebase project ID is an immutable infrastructure identifier; its display name is Journas. Legacy local-storage prefixes are read only to migrate pending drafts and layouts safely. Existing share tokens are unchanged; links use the new site hostname.
+The production site connects to the Firebase project `journas-trip-planner`. Earlier projects are separate; their accounts and trips are not automatically transferred by changing the app configuration. Legacy local-storage prefixes are read only to migrate pending drafts and layouts safely. Existing share tokens are unchanged; links use the new site hostname.
 
 **Website:** [journas-trip-planner.vercel.app](https://journas-trip-planner.vercel.app). See [verification evidence](docs/verification.md) for the distinction between production checks, emulator checks, and remaining creator actions.
 
-![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.jpg)
+![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
 
-[Open the full-size 2,560 × 1,440 production screenshot](devpost/assets/planner-desktop.jpg).
+[Open the original 1,920 × 919 PNG captured directly in Chrome](devpost/assets/planner-desktop.png).
 
 The [submission guide](devpost/submission-guide.md) maps every returned Devpost field to prepared copy and the six checked images. The [DemoMotion guide](devpost/demomotion-guide.md) provides exact inputs and a 2:30 recording sequence. Personal reflections, survey answers, eligibility and the final public video remain creator actions.
 

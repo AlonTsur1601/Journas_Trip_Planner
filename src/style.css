@@ -941,6 +941,7 @@ textarea {
   color: var(--accent);
 }
 .auth-page {
+  --auth-backdrop: radial-gradient(ellipse at 85% 15%, #d9cff4 0%, transparent 60%), linear-gradient(145deg, #f1edfb, #e7e0f5);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 38%);
   width: 100%;
@@ -949,7 +950,7 @@ textarea {
   background: var(--surface);
 }
 .auth-art {
-  background: #eeebf9;
+  background: var(--auth-backdrop);
   position: relative;
   overflow: hidden;
   padding: 28px;
@@ -1109,8 +1110,11 @@ textarea {
   background: var(--bg);
   color: var(--ink);
 }
+[data-theme="dark"] .auth-page {
+  --auth-backdrop: radial-gradient(ellipse at 85% 15%, #44305d 0%, transparent 60%), linear-gradient(145deg, #292035, #231d30);
+}
 [data-theme="dark"] .auth-art {
-  background: #292035;
+  background: var(--auth-backdrop);
   color: var(--ink);
 }
 [data-theme="dark"] .auth-art .brand {
@@ -1340,12 +1344,20 @@ textarea {
   left: 120px;
   color: #ae98e5;
 }
-[data-theme="dark"] .orbit { opacity: 0.25; }
+.auth-art::before, .auth-art::after,
+.auth-mobile-background::before, .auth-mobile-background::after {
+  content: "✦";
+  position: absolute;
+  color: #ae98e5;
+}
+.auth-art::before, .auth-mobile-background::before { font-size: 26px; right: 6%; top: 10%; opacity: 0.65; }
+.auth-art::after, .auth-mobile-background::after { font-size: 34px; left: 12%; bottom: 12%; opacity: 0.8; }
+[data-theme="dark"] .orbit { opacity: 0.4; }
 .auth-mobile-background { display: none; }
 @media (max-width: 900px) {
-  .auth-page { display: block; position: relative; isolation: isolate; background: #eeebf9; }
+  .auth-page { display: block; position: relative; isolation: isolate; background: var(--auth-backdrop); }
   .auth-mobile-background { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
-  [data-theme="dark"] .auth-page { background: #292035; }
+  [data-theme="dark"] .auth-page { background: var(--auth-backdrop); }
   .modal .auth-page { background: var(--surface); }
   .modal .auth-mobile-background { display: none; }
   .auth-art { display: none; }

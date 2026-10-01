@@ -12,7 +12,7 @@ The production site connects to the Firebase project `journas-trip-planner`. Ear
 
 ![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
 
-[Open the original 1,920 × 919 PNG captured directly in Chrome](devpost/assets/planner-desktop.png).
+[Open the original 1,920 × 989 PNG captured directly in Chrome](devpost/assets/planner-desktop.png).
 
 The [submission guide](devpost/submission-guide.md) maps every returned Devpost field to prepared copy and the six checked images. The [DemoMotion guide](devpost/demomotion-guide.md) provides exact inputs and a 2:30 recording sequence. Personal reflections, survey answers, eligibility and the final public video remain creator actions.
 

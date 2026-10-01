@@ -62,6 +62,9 @@ export type Settings = {
   retentionDays: number;
   displayName?: string;
   photoURL?: string;
+  mapStart: "current" | "custom" | "world";
+  mapCenter: [number, number];
+  mapZoom: number;
 };
 export type Layout = {
   map: boolean;
@@ -91,8 +94,8 @@ export const defaultLayout = (): Layout => ({
   todoY: 100,
   todoWidth: 340,
   todoHeight: 380,
-  center: [12.49, 41.89],
-  zoom: 12,
+  center: [0, 0],
+  zoom: 0,
   scroll: 400,
 });
 export const defaultSettings: Settings = {
@@ -102,4 +105,7 @@ export const defaultSettings: Settings = {
   timezone: "",
   autoDelete: true,
   retentionDays: 365,
+  mapStart: "current",
+  mapCenter: [0, 0],
+  mapZoom: 12,
 };

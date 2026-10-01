@@ -615,31 +615,13 @@ textarea {
   margin-left: 14px;
   color: #aaa5b5;
 }
-.empty-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 16px 20px;
-  background: var(--surface);
-  box-shadow: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  text-align: center;
-  max-width: 430px;
-  width: 90%;
-  z-index: 6;
-}
-.empty-overlay > svg {
+button.create-trip-glow {
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
 }
-.empty-overlay h2 {
-  font: 700 17px/1.4 Manrope, sans-serif;
-}
-.empty-overlay p {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 12px;
+button.create-trip-glow:not(:disabled):hover {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .modal-shade {
   position: fixed;
@@ -1054,7 +1036,8 @@ textarea {
   align-items: center;
   gap: 12px;
   font-size: 10px;
-  color: var(--muted);
+  font-weight: 700;
+  color: var(--ink);
   margin: 14px 0;
 }
 .divider:before,
@@ -1062,7 +1045,7 @@ textarea {
   content: "";
   height: 1px;
   flex: 1;
-  background: var(--line);
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
 }
 .auth-form > .text-button {
   align-self: flex-end;

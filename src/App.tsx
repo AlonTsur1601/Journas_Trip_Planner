@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
+import { startingLayout } from "./map-start";
 const MapPanel = lazy(() => import("./MapPanel"));
 import {
   defaultLayout,
@@ -366,8 +367,11 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     Promise.all([refresh(), api<{ settings: Settings }>("settings.get")])
-      .then(([list, r]) => {
-        setSettings({ ...defaultSettings, ...r.settings });
+      .then(async ([list, r]) => {
+        const preferences = { ...defaultSettings, ...r.settings };
+        setSettings(preferences);
+        if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
+          setLayout(await startingLayout(preferences));
         if (!token)
           setTrip(
             list.find((t) => t.startDate <= today() && t.endDate >= today()) ??
@@ -410,14 +414,16 @@ export default function App() {
       token,
       date,
     })
-      .then((r) => {
+      .then(async (r) => {
         if (cancelled) return;
         setDay(r.day);
         setPublicMode(r.mode);
         const local = localStorage.getItem(
           `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
-        setLayout({ ...defaultLayout(), ...(local ? JSON.parse(local) : {}) });
+        const nextLayout = local ? JSON.parse(local) : await startingLayout(settings);
+        if (cancelled) return;
+        setLayout({ ...defaultLayout(), ...nextLayout });
       })
       .catch((e) => {
         if (!cancelled) {
@@ -444,14 +450,16 @@ export default function App() {
       tripId: trip.id,
       date,
     })
-      .then((r) => {
+      .then(async (r) => {
         if (cancelled) return;
         setDay(r.day);
         const local = localStorage.getItem(
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
-        setLayout({ ...defaultLayout(), ...(restored ?? {}) });
+        const nextLayout = restored ?? await startingLayout(settings);
+        if (cancelled) return;
+        setLayout({ ...defaultLayout(), ...nextLayout });
         dirty.current = Boolean(local);
         const draft = localStorage.getItem(
           `journas-drafts:${user.uid}:${trip.id}:${date}`,
@@ -630,6 +638,10 @@ export default function App() {
     setDay(emptyDay());
     setLayout(defaultLayout());
     setCalendar(false);
+    if (!trip || value < trip.startDate || value > trip.endDate) {
+      const initial = await startingLayout(settings);
+      if (dateRef.current === value) setLayout(initial);
+    }
   }
   const readonly =
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
@@ -819,6 +831,7 @@ export default function App() {
     try {
       await api("settings.save", { settings: next });
       setSettings(next);
+      if (!trip) setLayout(await startingLayout(next));
       setMessage("Preferences saved.");
     } catch (e: any) {
       setMessage(e.message);
@@ -870,6 +883,7 @@ export default function App() {
                 setDate(selected.startDate);
               setDay(emptyDay());
               setLayout(defaultLayout());
+              if (!selected) setLayout(await startingLayout(settings));
             }}
           >
             <option value="">Choose a trip</option>
@@ -883,7 +897,7 @@ export default function App() {
             ))}
           </select>
           <button
-            className="icon"
+            className={`icon${!trip ? " create-trip-glow" : ""}`}
             title="Create trip"
             aria-label="Create trip"
             onClick={() => setModal("new-trip")}
@@ -1436,19 +1450,7 @@ export default function App() {
             />
           </section>
         )}
-        {!trip && (
-          <div className="empty-overlay">
-            <Compass size={38} />
-            <h2>A good trip starts with a little inspiration.</h2>
-            <p>Create a trip, pick a day, and make it yours.</p>
-            <button
-              className="button primary"
-              onClick={() => setModal("new-trip")}
-            >
-              <Plus size={17} /> Plan a trip
-            </button>
-          </div>
-        )}
+
       </div>
       <footer className="status-bar">
         <span>
@@ -2302,6 +2304,28 @@ export default function App() {
                 }
               />
             </div>
+            <Select
+              label="Starting map view"
+              value={settings.mapStart}
+              onChange={(e: any) => setSettings({ ...settings, mapStart: e.target.value })}
+            >
+              <option value="current">My current location</option>
+              <option value="custom">A place I choose</option>
+              <option value="world">World map</option>
+            </Select>
+            {settings.mapStart === "custom" && (
+              <>
+                <button type="button" className="button" onClick={() => setSettings({ ...settings, mapCenter: [...layout.center], mapZoom: layout.zoom })}>
+                  Use current map view
+                </button>
+                <p className="form-note">Pan and zoom the map to your preferred place, then use its view here.</p>
+                <div className="form-row">
+                  <Input label="Latitude" type="number" min={-85} max={85} step="any" value={settings.mapCenter[1]} onChange={(e: any) => setSettings({ ...settings, mapCenter: [settings.mapCenter[0], Number(e.target.value)] })} />
+                  <Input label="Longitude" type="number" min={-180} max={180} step="any" value={settings.mapCenter[0]} onChange={(e: any) => setSettings({ ...settings, mapCenter: [Number(e.target.value), settings.mapCenter[1]] })} />
+                </div>
+              </>
+            )}
+            <p className="form-note">Used for days without a saved map view. If location access is unavailable, the world map opens instead.</p>
             <Select
               label="Clock"
               value={settings.clock}

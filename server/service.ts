@@ -37,12 +37,18 @@ function validTimezone(value: unknown) {
     }
 }
 function validateSettings(value: Data) {
-    const allowed = ['theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL'];
+    const allowed = ['theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL', 'mapStart', 'mapCenter', 'mapZoom'];
     for (const key of Object.keys(value))
         if (!allowed.includes(key))
             fail(400, 'INVALID_SETTINGS', `Unknown setting ${key}`);
     if (value.theme !== undefined && !['light', 'dark', 'system'].includes(String(value.theme)))
         fail(400, 'INVALID_SETTINGS', 'Invalid theme');
+    if (value.mapStart !== undefined && !['current', 'custom', 'world'].includes(String(value.mapStart)))
+        fail(400, 'INVALID_SETTINGS', 'Invalid map start');
+    if (value.mapCenter !== undefined && (!Array.isArray(value.mapCenter) || value.mapCenter.length !== 2 || !finite(value.mapCenter[0], -180, 180) || !finite(value.mapCenter[1], -85, 85)))
+        fail(400, 'INVALID_SETTINGS', 'Invalid map center');
+    if (value.mapZoom !== undefined && !finite(value.mapZoom, 0, 22))
+        fail(400, 'INVALID_SETTINGS', 'Invalid map zoom');
     if (value.accent !== undefined && !isColor(value.accent))
         fail(400, 'INVALID_SETTINGS', 'Invalid accent');
     if (value.clock !== undefined && !['local', 'destination', 'utc'].includes(String(value.clock)))

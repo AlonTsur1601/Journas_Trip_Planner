@@ -147,17 +147,12 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
   }
   return (
     <main className="auth-page">
-      <div className="auth-mobile-background" aria-hidden="true">
-        <div className="orbit orbit-one" />
-        <div className="orbit orbit-two" />
-      </div>
+      <div className="auth-map-background" aria-hidden="true" />
       <div className="auth-art">
         <div className="brand">
           <Compass />
           <strong>Journas</strong>
         </div>
-        <div className="orbit orbit-one" aria-hidden="true" />
-        <div className="orbit orbit-two" aria-hidden="true" />
         <div className="art-copy">
           <span className="eyebrow">
             COLLABORATIVE TRIP PLANNER

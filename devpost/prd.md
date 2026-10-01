@@ -3,7 +3,7 @@ doc: prd
 status: approved
 ---
 
-# Origin — Product Requirements
+# Tevel — Product Requirements
 
 Source: `scope.md > The Unique Kernel`, `The Core Loop`, and `The POC Boundary`.
 

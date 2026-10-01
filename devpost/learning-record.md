@@ -11,7 +11,7 @@ Codex implemented and verified the product using skills `1-start` through `6-shi
 ## Follow an actual edit
 
 1. In `src/App.tsx`, an editor calls `mutate` with only changed fields and their baseline versions.
-2. `src/firebase.ts` attaches the signed-in account's Firebase ID token to `/api/origin`.
+2. `src/firebase.ts` attaches the signed-in account's Firebase ID token to `/api/tevel`.
 3. `server/http.ts` verifies the identity and email status and limits request size/rate.
 4. `server/service.ts` checks active trip membership, validates links and performs a transaction with field-version comparisons.
 5. `server/store.ts` commits the buffered mutations. Authorised Firestore snapshots deliver them to participants' interfaces.

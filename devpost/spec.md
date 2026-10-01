@@ -3,7 +3,7 @@ doc: spec
 status: approved
 ---
 
-# Origin — Technical Specification
+# Tevel — Technical Specification
 
 ## How This Works, In Plain Language
 
@@ -11,7 +11,7 @@ The browser displays a trip's places, time blocks, and tasks. Firebase identifie
 
 ## Where It Runs and How Someone Tries It
 
-React/TypeScript/Vite frontend, Vercel server functions, Firebase Authentication and Firestore Spark, MapLibre/OpenFreeMap. See the canonical [setup guide](../README.md) for executable commands, emulator operation, and Firebase/Vercel configuration. Target repository: https://github.com/AlonTsur1601/Origin_Trip_Planner. Target Vercel project name: `origin-trip-planner`; deployment status must be verified rather than inferred from that name.
+React/TypeScript/Vite frontend, Vercel server functions, Firebase Authentication and Firestore Spark, MapLibre/OpenFreeMap. See the canonical [setup guide](../README.md) for executable commands, emulator operation, and Firebase/Vercel configuration. Target repository: https://github.com/AlonTsur1601/Tevel_Trip_Planner. Target Vercel project name: `tevel-trip-planner`; deployment status must be verified rather than inferred from that name.
 
 ## Components
 

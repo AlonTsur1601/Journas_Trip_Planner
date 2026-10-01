@@ -1,12 +1,16 @@
-# Origin
+# Tevel
 
-Origin is a collaborative travel planner that connects a map, a vertical schedule, and a checklist for each day of a trip. Each traveller keeps their own workspace layout while editing a shared itinerary.
+Tevel is a collaborative travel planner that connects a map, a vertical schedule, and a checklist for each day of a trip. Each traveller keeps their own workspace layout while editing a shared itinerary.
 
 Built with React, TypeScript, Vite, Firebase Authentication, Firestore, MapLibre, OpenFreeMap, and Vercel. Project-specific code is licensed under [MIT](LICENSE); third-party packages and map data retain their own licences and attribution.
 
-**Website:** [origin-trip-planner.vercel.app](https://origin-trip-planner.vercel.app). See [verification evidence](docs/verification.md) for the distinction between production checks, emulator checks, and remaining creator actions.
+Google's sign-in logo comes from its [official branding assets](https://developers.google.com/identity/branding-guidelines) and retains Google's trademark rights.
 
-![Origin's actual production daily planner with fictional trip data](devpost/assets/planner-desktop.jpg)
+The rename preserves the existing Firebase accounts and shared data. The Firebase project ID is an immutable infrastructure identifier; its display name is Tevel. Legacy local-storage prefixes are read only to migrate pending drafts and layouts safely. Existing share tokens are unchanged; links use the new site hostname.
+
+**Website:** [tevel-trip-planner.vercel.app](https://tevel-trip-planner.vercel.app). See [verification evidence](docs/verification.md) for the distinction between production checks, emulator checks, and remaining creator actions.
+
+![Tevel's actual production daily planner with fictional trip data](devpost/assets/planner-desktop.jpg)
 
 The [submission guide](devpost/submission-guide.md) maps every returned Devpost field to prepared copy and the six checked images. The [DemoMotion guide](devpost/demomotion-guide.md) provides exact inputs and a 2:30 recording sequence. Personal reflections, survey answers, eligibility and the final public video remain creator actions.
 
@@ -37,8 +41,8 @@ Each account can save **100 trips, including joined/shared trips**, with a warni
 ## Install and run locally
 
 ```powershell
-git clone https://github.com/AlonTsur1601/Origin_Trip_Planner.git
-Set-Location Origin_Trip_Planner
+git clone https://github.com/AlonTsur1601/Tevel_Trip_Planner.git
+Set-Location Tevel_Trip_Planner
 npm ci
 Copy-Item .env.example .env.local
 ```
@@ -68,8 +72,8 @@ npm run preview
 
 ### 1. Create the project and register the browser app
 
-1. Open [Firebase Console](https://console.firebase.google.com/) and choose **Create a project**. Use a distinct project for Origin and remain on **Spark**. Analytics is optional and unnecessary.
-2. Open **Project settings → General → Your apps**, choose the Web icon, and register an app named Origin. Firebase Hosting is not required because Vercel hosts the website.
+1. Open [Firebase Console](https://console.firebase.google.com/) and choose **Create a project**. Use a distinct project for Tevel and remain on **Spark**. Analytics is optional and unnecessary.
+2. Open **Project settings → General → Your apps**, choose the Web icon, and register an app named Tevel. Firebase Hosting is not required because Vercel hosts the website.
 3. The displayed Firebase Web SDK configuration contains `apiKey`, `authDomain`, `projectId`, and `appId`. Put those into the matching `VITE_FIREBASE_*` variables in `.env.local`.
 4. These identify the browser's Firebase project and appear in the compiled website. Firebase Web API keys are not server administrator credentials; access depends on authentication, authorisation, and appropriate key restrictions. See [Firebase API-key guidance](https://firebase.google.com/docs/projects/api-keys).
 
@@ -96,15 +100,15 @@ npx firebase deploy --only firestore:rules,firestore:indexes --project YOUR_FIRE
 
 ### 4. Configure the private server credentials
 
-1. Open **Project settings → Service accounts → Firebase Admin SDK → Generate new private key**. Download the JSON to a private directory outside the repository, or to the explicitly ignored local file `origin-service-account.json` in the project root. Never stage or upload it.
+1. Open **Project settings → Service accounts → Firebase Admin SDK → Generate new private key**. Download the JSON to a private directory outside the repository, or to the explicitly ignored local file `tevel-service-account.json` in the project root. Never stage or upload it.
 2. Locally, copy its `project_id`, `client_email`, and `private_key` into the non-`VITE_` variables `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` in `.env.local`.
-3. Use a quoted key with literal `\n` separators; the server expands them. Alternatively, set `GOOGLE_APPLICATION_CREDENTIALS=./origin-service-account.json` locally (or point it to your private directory), with `FIREBASE_PROJECT_ID` set and the split email/key variables unset. The server uses application-default credentials. Never commit that file or copy it into the public app; Vercel uses the split variables.
+3. Use a quoted key with literal `\n` separators; the server expands them. Alternatively, set `GOOGLE_APPLICATION_CREDENTIALS=./tevel-service-account.json` locally (or point it to your private directory), with `FIREBASE_PROJECT_ID` set and the split email/key variables unset. The server uses application-default credentials. Never commit that file or copy it into the public app; Vercel uses the split variables.
 4. A service-account key authorises server administration and bypasses Firestore client rules. It is **private**: do not put it in browser variables, source, README examples, screenshots, logs, or chat. If exposed, revoke it and replace it before continuing.
 5. Generate a long random `CRON_SECRET` locally and store it as a server-only secret. It protects daily cleanup. Use a secret manager/password tool; do not publish the generated value.
 
 ## Run without production credentials: Firebase emulators
 
-Use a separate `.env.local` for emulator mode. Set both project IDs to `demo-origin`, `VITE_FIREBASE_API_KEY=demo-key`, `VITE_FIREBASE_AUTH_DOMAIN=demo-origin.firebaseapp.com`, `VITE_FIREBASE_APP_ID=demo-origin`, `VITE_USE_EMULATORS=true`, `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, and `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099`. Private Admin email/key are not needed when both emulators are configured. Set a local placeholder cron secret for cleanup tests only.
+Use a separate `.env.local` for emulator mode. Set both project IDs to `demo-tevel`, `VITE_FIREBASE_API_KEY=demo-key`, `VITE_FIREBASE_AUTH_DOMAIN=demo-tevel.firebaseapp.com`, `VITE_FIREBASE_APP_ID=demo-tevel`, `VITE_USE_EMULATORS=true`, `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, and `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099`. Private Admin email/key are not needed when both emulators are configured. Set a local placeholder cron secret for cleanup tests only.
 
 Start three terminals:
 
@@ -124,7 +128,7 @@ Emulator accounts/data are separate from production and can be discarded. Use em
 
 ## Deploy to your Vercel account
 
-1. Open [Vercel](https://vercel.com/), stay on **Hobby**, and import `AlonTsur1601/Origin_Trip_Planner` with the GitHub integration. Project root is the repository root; choose name `origin-trip-planner`, or a close available variant.
+1. Open [Vercel](https://vercel.com/), stay on **Hobby**, and import `AlonTsur1601/Tevel_Trip_Planner` with the GitHub integration. Project root is the repository root; choose name `tevel-trip-planner`, or a close available variant.
 2. Use Vite framework preset, install `npm ci`, build `npm run build`, output directory `dist`. Repository `api/` functions provide the backend.
 3. Add the four `VITE_FIREBASE_*` values and server-only `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `CRON_SECRET` in **Project → Settings → Environment Variables**. Use the actual project's values, select intended environments, and store private values through Vercel's secret entry interface. No emulator variables or local credential paths belong in Vercel.
 4. Deploy. Add the resulting exact production hostname to Firebase Authentication's authorised domains. Redeploy whenever build-time `VITE_` configuration changes; changing server values also requires a new deployment to take effect.
@@ -144,7 +148,7 @@ The rules suite requires Firestore Emulator/Java and denies foreign access indep
 
 ## Free-tier operation and privacy
 
-[Firestore's documented free quota](https://firebase.google.com/docs/firestore/quotas), checked 1 October 2026, includes 1 GiB storage, 50,000 reads/day, 20,000 writes/day, 20,000 deletes/day, and 10 GiB outbound transfer/month. These are **project-wide**, not per-user. Automatic billed TTL deletion is not part of the free allocation; Origin uses its own daily retention handler. Vercel function/bandwidth limits and Firebase Auth email quotas also apply. A 100-trip personal limit does not guarantee unlimited hosting capacity: monitor the console, keep listeners bounded, and show quota failures honestly rather than upgrading billing automatically.
+[Firestore's documented free quota](https://firebase.google.com/docs/firestore/quotas), checked 1 October 2026, includes 1 GiB storage, 50,000 reads/day, 20,000 writes/day, 20,000 deletes/day, and 10 GiB outbound transfer/month. These are **project-wide**, not per-user. Automatic billed TTL deletion is not part of the free allocation; Tevel uses its own daily retention handler. Vercel function/bandwidth limits and Firebase Auth email quotas also apply. A 100-trip personal limit does not guarantee unlimited hosting capacity: monitor the console, keep listeners bounded, and show quota failures honestly rather than upgrading billing automatically.
 
 Trip content is shared only with retained participants and holders of a valid scoped share link. Personal layouts/preferences belong to the account. Local pending drafts may persist in the browser until resolved; avoid using a shared device/browser profile for private planning. Canceling/revoking a share grant invalidates future use. Server-only credentials must never appear in the client build. User text is treated as text, not executable markup.
 

@@ -1,14 +1,14 @@
-# Origin — English project-description draft
+# Tevel — English project-description draft
 
 Prepared at the creator's request. This is a feature-description draft; verify every present-tense claim against final evidence before pasting. The personal-learning paragraph is intentionally left for the creator and prevents treating this as submission-ready copy.
 
 ## Inspiration
 
-A holiday itinerary includes more than a list of destinations: it also needs times, notes, and things to remember. Origin brings those pieces into one daily workspace so travellers can organise the same trip together.
+A holiday itinerary includes more than a list of destinations: it also needs times, notes, and things to remember. Tevel brings those pieces into one daily workspace so travellers can organise the same trip together.
 
 ## What it does
 
-Origin connects a map, a vertical schedule, and a checklist for each date of a trip. Map pins have a colour, symbol, and note. Connecting pins draws a line or arrow with a colour gradient. Scheduling a visit carries the place's identity and notes into a time block, while independent blocks support activities that do not need a location. Tasks can link to places, scheduled activities, both, or neither.
+Tevel connects a map, a vertical schedule, and a checklist for each date of a trip. Map pins have a colour, symbol, and note. Connecting pins draws a line or arrow with a colour gradient. Scheduling a visit carries the place's identity and notes into a time block, while independent blocks support activities that do not need a location. Tasks can link to places, scheduled activities, both, or neither.
 
 Travellers can show the panels they need, resize the map/schedule split, and move the floating checklist. Each person's workspace is saved separately. A month calendar helps find trips, and the app opens on today's date.
 
@@ -20,11 +20,11 @@ The project uses React and TypeScript for the interface, Firebase Authentication
 
 ## Challenges and design choices
 
-Shared planning and personal views need different ownership boundaries. Origin keeps one shared itinerary while storing each participant's membership and workspace separately. That distinction also makes personal retention possible without deleting another traveller's trip. Sparse day storage avoids creating empty records just because someone opened a date. Field-version checks make concurrent-edit conflicts explicit.
+Shared planning and personal views need different ownership boundaries. Tevel keeps one shared itinerary while storing each participant's membership and workspace separately. That distinction also makes personal retention possible without deleting another traveller's trip. Sparse day storage avoids creating empty records just because someone opened a date. Field-version checks make concurrent-edit conflicts explicit.
 
 ## Accomplishments
 
-Origin is deployed on Vercel with an authenticated Firebase backend. Two-account production API checks verified joining, shared edits, conflict detection, personal removal and global owner deletion. An expired-trip production check verified that automatic removal preserves another participant's access and ownership metadata, then purges data after the final participant leaves. The connected map, visits and checked tasks were exercised through the deployed browser interface. Automated permission, domain and daylight-saving checks complement the real-product verification.
+Tevel is deployed on Vercel with an authenticated Firebase backend. Two-account production API checks verified joining, shared edits, conflict detection, personal removal and global owner deletion. An expired-trip production check verified that automatic removal preserves another participant's access and ownership metadata, then purges data after the final participant leaves. The connected map, visits and checked tasks were exercised through the deployed browser interface. Automated permission, domain and daylight-saving checks complement the real-product verification.
 
 ## What I learned
 

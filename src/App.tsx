@@ -150,10 +150,8 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
       <div className="auth-art">
         <div className="brand">
           <Compass />
-          <strong>origin</strong>
+          <strong>Tevel</strong>
         </div>
-        <div className="orbit orbit-one" />
-        <div className="orbit orbit-two" />
         <div className="art-copy">
           <span className="eyebrow">
             COLLABORATIVE TRIP PLANNER
@@ -184,10 +182,10 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
       <section className="auth-form">
         <div className="brand mobile-brand">
           <Compass />
-          <strong>origin</strong>
+          <strong>Tevel</strong>
         </div>
-        <span className="eyebrow">YOUR ORIGIN ACCOUNT</span>
-        <h2>{register ? "Create an account" : "Sign in to Origin"}</h2>
+        <span className="eyebrow">YOUR TEVEL ACCOUNT</span>
+        <h2>{register ? "Create an account" : "Sign in to Tevel"}</h2>
         <p>
           Plan each day with a map, schedule, and task list. Sign in to save your
           trips and collaborate on shared itineraries.
@@ -210,7 +208,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 run(() => signInWithPopup(auth!, new GoogleAuthProvider()))
               }
             >
-              <b>G</b> Continue with Google
+              <img className="google-logo" src="/google-logo.png" alt="" width="20" height="20" /> Continue with Google
             </button>
             <div className="divider">or continue with email</div>
             <form
@@ -271,7 +269,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
               Forgot password?
             </button>
             <p className="auth-switch">
-              {register ? "Already have an account?" : "New to Origin?"}{" "}
+              {register ? "Already have an account?" : "New to Tevel?"}{" "}
               <button
                 className="text-button"
                 onClick={() => setRegister(!register)}
@@ -415,7 +413,7 @@ export default function App() {
         setDay(r.day);
         setPublicMode(r.mode);
         const local = localStorage.getItem(
-          `origin-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
+          `tevel-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
         setLayout({ ...defaultLayout(), ...(local ? JSON.parse(local) : {}) });
       })
@@ -448,13 +446,13 @@ export default function App() {
         if (cancelled) return;
         setDay(r.day);
         const local = localStorage.getItem(
-          `origin-layout:${user.uid}:${trip.id}:${date}`,
+          `tevel-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
         setLayout({ ...defaultLayout(), ...(restored ?? {}) });
         dirty.current = Boolean(local);
         const draft = localStorage.getItem(
-          `origin-drafts:${user.uid}:${trip.id}:${date}`,
+          `tevel-drafts:${user.uid}:${trip.id}:${date}`,
         );
         if (draft) {
           const pending = Object.values(JSON.parse(draft)) as Edit[];
@@ -548,7 +546,7 @@ export default function App() {
     if (!dirty.current || !tripRef.current) return;
     if (shareTrip) {
       localStorage.setItem(
-        `origin-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
+        `tevel-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
         JSON.stringify(layoutRef.current),
       );
       dirty.current = false;
@@ -565,7 +563,7 @@ export default function App() {
       });
       dirty.current = false;
       localStorage.removeItem(
-        `origin-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,
+        `tevel-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,
       );
       setStatus("All changes saved");
     } catch (e: any) {
@@ -578,7 +576,7 @@ export default function App() {
     await saveLayout();
     if (user && trip && !readonly) {
       const pending = localStorage.getItem(
-        `origin-drafts:${user.uid}:${trip.id}:${date}`,
+        `tevel-drafts:${user.uid}:${trip.id}:${date}`,
       );
       if (pending) {
         for (const draft of Object.values(JSON.parse(pending)) as Edit[])
@@ -608,12 +606,12 @@ export default function App() {
     setLayout((l) => ({ ...l, ...patch }));
     if (shareTrip && trip)
       localStorage.setItem(
-        `origin-viewlayout:${user?.uid ?? "guest"}:${trip.id}:${date}`,
+        `tevel-viewlayout:${user?.uid ?? "guest"}:${trip.id}:${date}`,
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
     else if (user && trip)
       localStorage.setItem(
-        `origin-layout:${user.uid}:${trip.id}:${date}`,
+        `tevel-layout:${user.uid}:${trip.id}:${date}`,
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
   }
@@ -713,7 +711,7 @@ export default function App() {
       return;
     }
     const draft: Edit = { kind: kind as Edit["kind"], item, base: original };
-    const draftKey = `origin-drafts:${user?.uid}:${trip.id}:${date}`;
+    const draftKey = `tevel-drafts:${user?.uid}:${trip.id}:${date}`;
     const drafts = JSON.parse(localStorage.getItem(draftKey) ?? "{}");
     localStorage.setItem(draftKey, JSON.stringify({ ...drafts, [id]: draft }));
     try {
@@ -849,7 +847,7 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="/">
           <Compass />
-          <strong>origin</strong>
+          <strong>Tevel</strong>
           <span>TRIP PLANNER</span>
         </a>
         <div className="trip-selector">
@@ -1459,7 +1457,7 @@ export default function App() {
           {trip
             ? `${day.pins.length} places · ${day.blocks.length} moments · ${day.tasks.length} tasks`
             : "A world of possibilities"}{" "}
-          <span className="footer-version">Origin v1.0.0</span>
+          <span className="footer-version">Tevel v1.0.0</span>
         </span>
       </footer>
       {calendar && (
@@ -2361,7 +2359,7 @@ export default function App() {
             </button>
             <div className="settings-footer">
               <small>
-                Origin · Version 1.0.0 · {trips.length}/100 saved trips
+                Tevel · Version 1.0.0 · {trips.length}/100 saved trips
               </small>
               {user && (
                 <button
@@ -2450,7 +2448,7 @@ export default function App() {
             <button
               className="button"
               onClick={() => {
-                const draftKey = `origin-drafts:${user?.uid}:${trip?.id}:${date}`;
+                const draftKey = `tevel-drafts:${user?.uid}:${trip?.id}:${date}`;
                 const pending = JSON.parse(
                   localStorage.getItem(draftKey) ?? "{}",
                 );

@@ -5,7 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import assert from "node:assert/strict";
 const credential = JSON.parse(await readFile(process.argv[2], "utf8"));
 const auth = getAuth(initializeApp({ credential: cert(credential) }));
-const base = "https://origin-trip-planner.vercel.app";
+const base = "https://tevel-trip-planner.vercel.app";
 const suffix = Date.now();
 const accounts = [];
 let previous = [];
@@ -14,8 +14,8 @@ try {
 } catch {}
 for (const role of ["owner", "member"]) {
   const saved = previous.find((account) => account.role === role);
-  const email = `origin-qa-${role}-${suffix}@example.test`;
-  const password = "Origin-QA-only-2026!";
+  const email = `tevel-qa-${role}-${suffix}@example.test`;
+  const password = "Tevel-QA-only-2026!";
   const user = saved
     ? await auth.getUser(saved.uid)
     : await auth.createUser({
@@ -51,7 +51,7 @@ await writeFile(
   JSON.stringify(accounts.map(({ token, ...account }) => account)),
 );
 async function call(payload, account = accounts[0], expected = 200) {
-  const response = await fetch(base + "/api/origin", {
+  const response = await fetch(base + "/api/tevel", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

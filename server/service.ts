@@ -131,7 +131,7 @@ function bump(item: Item, patch: Data): Item {
         next.versions[key] = (next.versions[key] ?? 0) + 1;
     return next;
 }
-export class OriginService {
+export class TevelService {
     constructor(private store: Store, private now: () => number = Date.now) { }
     private async member(tx: Transaction, id: string, uid: string): Promise<Trip> {
         const trip = await tx.get(tripPath(id)) as Trip | undefined;

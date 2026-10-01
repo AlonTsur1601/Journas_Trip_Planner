@@ -39,3 +39,13 @@ The actual planner was exercised with email/password authentication, trip creati
 Google login with the creator's real Google account, delivery of real verification/reset emails, personal learning/survey answers and eligibility confirmation require the creator. Synthetic test accounts verify the server's verified-email gate, not delivery to a real mailbox. The final video must be exported and published to YouTube/Vimeo by the creator. No Devpost submission has been made.
 
 The actual production cleanup endpoint was invoked with its secret: an already-expired synthetic trip lost its owner's membership while the other participant retained access and original ownership metadata. After the last participant removed it, cleanup purged the trip. Unauthorized cleanup was rejected. The next automatic scheduled invocation has not been observed; a manual authenticated invocation does not prove scheduler delivery.
+
+## Tevel rename verification
+
+The active project is now in the Tevel directory, with the renamed public GitHub repository and production domain. The previous directory remains until the creator removes it after this task releases its processes, as requested by the creator. All 38,827 remaining source files were compared byte-for-byte after transfer. The Firebase display name changed to Tevel; its immutable project ID and stored accounts/trips are preserved.
+
+After the rename, 36 tests passed: 13 emulator integration/rules/HTTP tests, 18 domain tests, 3 DST checks and 2 draft/layout migration checks. TypeScript/Vite build passed. The complete two-account production API verification passed at the new `/api/tevel` endpoint. Native email sign-in and the enlarged Tevel/Google-logo account screen were verified on the deployed site. Gallery captures were replaced with actual Tevel production images.
+
+## Compact interface verification
+
+The deployed interface uses square controls and panels, flat borders, and no ornamental orbit artwork or card shadows. The desktop top bar is 48px and panel headings are 38px; workspace margins are zero. Native map, schedule, checklist, calendar and settings interactions were checked. Mobile width is 390px with no horizontal overflow. Production gallery captures reflect this compact interface.

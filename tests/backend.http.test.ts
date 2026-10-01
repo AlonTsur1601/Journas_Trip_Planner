@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { adminAuth, adminApp, purgeExpiredRateLimits } from '../server/store.js';
 import { getFirestore } from 'firebase-admin/firestore';
-import { originHandler, cleanupHandler } from '../server/http.js';
+import { tevelHandler, cleanupHandler } from '../server/http.js';
 const enabled = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 describe.skipIf(!enabled)('HTTP API with real Firebase Auth emulator', () => {
     let server: Server, base: string, verified: string, unverified: string;
@@ -20,13 +20,13 @@ describe.skipIf(!enabled)('HTTP API with real Firebase Auth emulator', () => {
         return data.idToken as string;
     }
     beforeAll(async () => {
-        process.env.FIREBASE_PROJECT_ID = 'demo-origin';
+        process.env.FIREBASE_PROJECT_ID = 'demo-tevel';
         verified = await account(true);
         unverified = await account(false);
         server = createServer((req, res) => { if (req.url === '/api/cleanup')
             void cleanupHandler(req, res);
         else
-            void originHandler(req, res); });
+            void tevelHandler(req, res); });
         await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
         const address = server.address();
         if (!address || typeof address === 'string')
@@ -35,7 +35,7 @@ describe.skipIf(!enabled)('HTTP API with real Firebase Auth emulator', () => {
     });
     afterAll(async () => { await new Promise<void>(resolve => server?.close(() => resolve())); for (const uid of ids)
         await adminAuth().deleteUser(uid); });
-    const post = (payload: unknown, token?: string) => fetch(base + '/api/origin', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) });
+    const post = (payload: unknown, token?: string) => fetch(base + '/api/tevel', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) });
     it('requires server-verified identity and verified email', async () => {
         expect((await post({ action: 'trip.list' })).status).toBe(401);
         expect((await post({ action: 'trip.list' }, 'forged-token')).status).toBe(401);
@@ -47,8 +47,8 @@ describe.skipIf(!enabled)('HTTP API with real Firebase Auth emulator', () => {
     it('allows validated public previews only and rejects oversized or wrong-format input', async () => {
         expect((await post({ action: 'share.read', token: 'invalid' })).status).toBe(404);
         expect((await post({ action: 'settings.save', settings: { displayName: 'x'.repeat(100001) } }, verified)).status).toBe(413);
-        expect((await fetch(base + '/api/origin', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status).toBe(415);
-        expect((await fetch(base + '/api/origin')).status).toBe(405);
+        expect((await fetch(base + '/api/tevel', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status).toBe(415);
+        expect((await fetch(base + '/api/tevel')).status).toBe(405);
     });
     it('creates and removes a trip through the authenticated HTTP path', async () => {
         const response = await post({ action: 'trip.create', name: 'HTTP trip', startDate: '2026-10-01', endDate: '2026-10-01', clientTimezone: 'UTC' }, verified);

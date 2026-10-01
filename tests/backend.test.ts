@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OriginService } from "../server/service.js";
+import { TevelService } from "../server/service.js";
 import {
   defaultSettings,
   type Data,
@@ -114,7 +114,7 @@ const layout = {
 async function setup() {
   const store = new MemoryStore();
   let now = Date.parse(day + "T12:00:00Z");
-  const service = new OriginService(store, () => now);
+  const service = new TevelService(store, () => now);
   const { trip } = await service.execute("alice", {
     action: "trip.create",
     name: "Paris",
@@ -147,7 +147,7 @@ async function setup() {
     },
   };
 }
-async function join(service: OriginService, id: string, uid = "bob") {
+async function join(service: TevelService, id: string, uid = "bob") {
   const { token } = await service.execute("alice", {
     action: "share.create",
     tripId: id,
@@ -156,7 +156,7 @@ async function join(service: OriginService, id: string, uid = "bob") {
   await service.execute(uid, { action: "share.join", token });
   return token;
 }
-describe("Origin server contract", () => {
+describe("Tevel server contract", () => {
   it("defaults to personal auto-deletion after365 days", () => {
     expect(defaultSettings.autoDelete).toBe(true);
     expect(defaultSettings.retentionDays).toBe(365);

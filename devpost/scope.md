@@ -3,7 +3,7 @@ doc: scope
 status: approved
 ---
 
-# Origin
+# Tevel
 
 A shared travel planner that connects places, time, and tasks for each day of a trip.
 

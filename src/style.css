@@ -77,7 +77,7 @@ textarea {
 }
 .brand strong {
   font-family: Manrope, sans-serif;
-  font-size: 27px;
+  font-size: 23px;
   font-weight: 800;
   letter-spacing: -1.3px;
 }
@@ -91,12 +91,12 @@ textarea {
   padding-left: 15px;
 }
 .topbar {
-  min-height: 76px;
+  min-height: 48px;
   background: var(--surface);
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 0 28px;
+  gap: 12px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--line);
   z-index: 10;
 }
@@ -105,7 +105,7 @@ textarea {
   align-items: center;
   background: var(--subtle);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 0;
   padding-left: 8px;
 }
 .trip-selector select {
@@ -113,8 +113,8 @@ textarea {
   border: 0;
   background: none;
   font-weight: 600;
-  padding: 9px 6px;
-  font-size: 13px;
+  padding: 6px;
+  font-size: 12px;
 }
 .icon {
   display: inline-flex;
@@ -122,7 +122,7 @@ textarea {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 7px;
+  border-radius: 0;
 }
 .icon:hover {
   background: var(--subtle);
@@ -157,15 +157,15 @@ textarea {
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 8px;
-  padding: 11px 15px;
+  border-radius: 0;
+  padding: 7px 10px;
   font-size: 13px;
   font-weight: 600;
   border: 1px solid var(--line);
@@ -175,18 +175,18 @@ textarea {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
-  box-shadow: 0 3px 8px color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: none;
 }
 .button.primary:hover {
   filter: brightness(1.06);
 }
 .button.subtle {
-  padding: 9px 12px;
+  padding: 6px 9px;
   background: var(--subtle);
   font-size: 12px;
 }
 .avatar {
-  border-radius: 50%;
+  border-radius: 0;
   height: 34px;
   width: 34px;
   background: color-mix(in srgb, var(--accent) 13%, var(--surface));
@@ -208,34 +208,36 @@ textarea {
   color: var(--muted);
 }
 .workspace-toolbar {
-  padding: 23px 28px 20px;
+  padding: 6px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+
+  min-height: 44px;
 }
 .workspace-toolbar h1 {
   font-family: Manrope, sans-serif;
-  font-size: 23px;
+  font-size: 16px;
   font-weight: 800;
-  margin: 5px 0 0;
+  margin: 2px 0 0;
   letter-spacing: -0.6px;
 }
 .view-controls {
   display: flex;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 0;
   background: var(--surface);
-  padding: 4px;
-  gap: 2px;
+  padding: 0;
+  gap: 0;
 }
 .view-controls button {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border-radius: 0;
   color: var(--muted);
 }
 .view-controls button.active {
@@ -247,18 +249,18 @@ textarea {
   display: grid;
   flex: 1;
   min-height: 0;
-  margin: 0 28px 18px;
+  margin: 0;
   gap: 0;
   position: relative;
 }
 .panel {
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   background: var(--surface);
   min-width: 0;
   min-height: 0;
-  box-shadow: 0 2px 3px #27213703;
+  box-shadow: none;
 }
 .map-panel,
 .schedule-panel {
@@ -266,12 +268,12 @@ textarea {
   flex-direction: column;
 }
 .panel-heading {
-  min-height: 55px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 0 17px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -294,7 +296,7 @@ textarea {
   background: var(--subtle);
   border: 1px solid var(--line);
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: 0;
   color: var(--muted);
 }
 .map-wrapper {
@@ -308,14 +310,14 @@ textarea {
 }
 .map-hint {
   position: absolute;
-  top: 12px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--surface);
-  box-shadow: 0 3px 12px #27213712;
+  box-shadow: none;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 0;
+  padding: 5px 8px;
   white-space: nowrap;
   font-size: 11px;
   color: var(--muted);
@@ -324,9 +326,9 @@ textarea {
 .map-pin {
   width: 34px;
   height: 34px;
-  border-radius: 50% 50% 50% 5px;
+  border-radius: 0;
   border: 3px solid white;
-  box-shadow: 0 3px 10px #26223255;
+  box-shadow: none;
   color: white;
   font-size: 17px;
 }
@@ -335,10 +337,10 @@ textarea {
   filter: drop-shadow(0 1px 2px white);
 }
 .places-strip {
-  min-height: 48px;
-  padding: 10px 15px;
+  min-height: 34px;
+  padding: 4px 8px;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   overflow-x: auto;
   align-items: center;
   border-top: 1px solid var(--line);
@@ -352,7 +354,7 @@ textarea {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 0;
   white-space: nowrap;
   padding: 5px 8px;
   font-size: 11px;
@@ -361,13 +363,15 @@ textarea {
   cursor: col-resize;
   position: relative;
   touch-action: none;
+
+  background: var(--line);
 }
 .splitter:after {
   content: "";
   position: absolute;
   width: 2px;
   height: 36px;
-  border-radius: 4px;
+  border-radius: 0;
   background: #cfcadf;
   top: 50%;
   left: 2px;
@@ -377,7 +381,7 @@ textarea {
   justify-content: space-between;
   gap: 8px;
   font-size: 10px;
-  padding: 12px 17px;
+  padding: 6px 10px;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
@@ -385,13 +389,13 @@ textarea {
   overflow: auto;
   flex: 1;
   min-height: 0;
-  padding-top: 18px;
+  padding-top: 10px;
   scrollbar-width: thin;
 }
 .timeline-grid {
   height: 1536px;
   position: relative;
-  margin-right: 15px;
+  margin-right: 8px;
 }
 .hour {
   position: absolute;
@@ -419,8 +423,8 @@ textarea {
   left: 64px;
   right: 0;
   text-align: left;
-  padding: 7px 11px;
-  border-radius: 6px;
+  padding: 5px 8px;
+  border-radius: 0;
   border-left: 3px solid var(--accent);
   overflow: hidden;
   display: flex;
@@ -453,7 +457,7 @@ textarea {
   position: absolute;
   left: -3px;
   top: -3px;
-  border-radius: 50%;
+  border-radius: 0;
   width: 8px;
   height: 8px;
   background: #e86673;
@@ -463,7 +467,9 @@ textarea {
   z-index: 5;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 45px #24203a20;
+  box-shadow: none;
+
+  border: 1px solid var(--line);
 }
 .todo-drag {
   cursor: move;
@@ -472,13 +478,13 @@ textarea {
 .task-list {
   flex: 1;
   overflow: auto;
-  padding: 7px 16px;
+  padding: 0 10px;
 }
 .task-row {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  padding: 12px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
 .task-row input {
@@ -504,7 +510,7 @@ textarea {
   color: var(--muted);
 }
 .todo-add {
-  padding: 13px 17px;
+  padding: 8px 10px;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -555,7 +561,7 @@ textarea {
   flex-direction: column;
   text-align: center;
   color: var(--muted);
-  padding: 42px 20px;
+  padding: 20px 12px;
 }
 .empty-tasks svg {
   color: var(--accent);
@@ -571,13 +577,19 @@ textarea {
   line-height: 1.6;
 }
 .status-bar {
-  height: 30px;
-  padding: 0 28px 10px;
+  height: 24px;
+  padding: 0 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: var(--muted);
   font-size: 10px;
+
+  border-top: 1px solid var(--line);
+
+  background: var(--surface);
+
+  flex-shrink: 0;
 }
 .status-bar > span:first-child {
   display: flex;
@@ -587,7 +599,7 @@ textarea {
 .status-bar i {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: 0;
 }
 .saved {
   background: #70ad8d;
@@ -604,11 +616,11 @@ textarea {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  padding: 30px 40px;
+  padding: 16px 20px;
   background: var(--surface);
-  box-shadow: 0 12px 70px #27213e25;
+  box-shadow: none;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 0;
   text-align: center;
   max-width: 430px;
   width: 90%;
@@ -618,53 +630,49 @@ textarea {
   color: var(--accent);
 }
 .empty-overlay h2 {
-  font:
-    700 21px/1.5 Manrope,
-    sans-serif;
+  font: 700 17px/1.4 Manrope, sans-serif;
 }
 .empty-overlay p {
   font-size: 13px;
   color: var(--muted);
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 .modal-shade {
   position: fixed;
   inset: 0;
   background: #19132762;
-  backdrop-filter: blur(4px);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 12px;
   z-index: 30;
 }
 .modal {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 25px 100px #18102540;
+  border-radius: 0;
+  box-shadow: none;
   width: 460px;
   max-width: 100%;
   max-height: 90dvh;
   overflow: auto;
-  padding: 24px;
+  padding: 16px;
 }
 .modal > header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 21px;
+  margin-bottom: 12px;
 }
 .modal h2 {
-  font:
-    800 20px Manrope,
-    sans-serif;
+  font: 700 18px Manrope, sans-serif;
   margin: 0;
   letter-spacing: -0.4px;
 }
 .modal h3 {
   font-size: 13px;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 .modal p {
   font-size: 12px;
@@ -674,8 +682,8 @@ textarea {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin: 0 0 16px;
+  gap: 4px;
+  margin: 0 0 10px;
   min-width: 0;
 }
 .field > span {
@@ -688,18 +696,18 @@ textarea {
 .field textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 0;
   background: var(--subtle);
-  padding: 11px 12px;
+  padding: 7px 9px;
   outline: none;
   font-size: 12px;
-  min-height: 40px;
+  min-height: 34px;
 }
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: none;
 }
 .field input[type="color"] {
   padding: 5px;
@@ -711,7 +719,7 @@ textarea {
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 13px;
+  gap: 8px;
 }
 .modal fieldset {
   padding: 0;
@@ -722,8 +730,8 @@ textarea {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 12px;
 }
 .modal-actions .danger {
   margin-right: auto;
@@ -772,7 +780,7 @@ textarea {
   min-width: 0;
   flex: 1;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 0;
   background: var(--subtle);
   padding: 8px;
   font-size: 11px;
@@ -793,8 +801,8 @@ textarea {
 }
 .settings-footer {
   border-top: 1px solid var(--line);
-  margin-top: 22px;
-  padding-top: 14px;
+  margin-top: 14px;
+  padding-top: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -819,14 +827,14 @@ textarea {
   color: var(--surface);
   font-size: 12px;
   line-height: 1.5;
-  border-radius: 9px;
+  border-radius: 0;
   padding: 12px 15px;
   z-index: 80;
   display: flex;
   align-items: center;
   gap: 15px;
   max-width: 90vw;
-  box-shadow: 0 7px 30px #22183030;
+  box-shadow: none;
 }
 .toast button {
   display: flex;
@@ -847,15 +855,15 @@ textarea {
 }
 .calendar-popover {
   position: fixed;
-  top: 68px;
+  top: 48px;
   right: 200px;
   width: 320px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 12px;
-  padding: 15px;
+  border-radius: 0;
+  padding: 10px;
   z-index: 20;
-  box-shadow: 0 15px 45px #24183c22;
+  box-shadow: none;
 }
 .calendar-popover header {
   display: flex;
@@ -877,7 +885,7 @@ textarea {
 }
 .calendar-grid button {
   height: 37px;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 11px;
 }
 .calendar-grid button:hover {
@@ -898,7 +906,7 @@ textarea {
   width: 4px;
   height: 4px;
   background: var(--accent);
-  border-radius: 50%;
+  border-radius: 0;
   display: block;
 }
 .calendar-grid .selected i {
@@ -930,49 +938,67 @@ textarea {
 }
 .auth-page {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  width: min(100%, 960px);
+  margin: 0 auto;
+  border-bottom: 1px solid var(--line);
   min-height: 100dvh;
   background: var(--surface);
 }
 .auth-art {
-  background: #eeebf9;
+  background: var(--surface);
   position: relative;
   overflow: hidden;
-  padding: 38px 50px;
-  color: #302441;
-  min-height: 650px;
+  padding: 28px;
+  color: var(--ink);
+  min-height: 0;
+
+  border-right: 1px solid var(--line);
 }
 .auth-art .brand {
   position: relative;
   z-index: 2;
   color: #7354d7;
 }
+.auth-art .brand strong,
+.auth-form .mobile-brand strong {
+  font-size: clamp(56px, 6vw, 84px);
+  letter-spacing: -3px;
+  line-height: 1.1;
+}
+.auth-art .brand svg,
+.auth-form .mobile-brand svg {
+  width: 48px;
+  height: 48px;
+}
 .art-copy {
-  position: absolute;
-  left: 50px;
-  right: 30px;
-  top: 36%;
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
   z-index: 2;
+
+  margin-top: 32px;
+
+  max-width: 480px;
 }
 .art-copy .eyebrow {
   color: #8c79b0;
 }
 .art-copy h1 {
-  font:
-    800 clamp(32px, 4vw, 56px)/1.22 Manrope,
-    sans-serif;
-  letter-spacing: -2px;
-  margin: 19px 0;
+  font: 700 clamp(24px, 3vw, 36px)/1.25 Manrope, sans-serif;
+  letter-spacing: -1px;
+  margin: 12px 0;
 }
 .art-copy > p {
   font-size: 14px;
-  line-height: 1.9;
-  color: #897a9c;
+  line-height: 1.6;
+  color: var(--muted);
 }
 .art-badges {
   display: flex;
-  gap: 19px;
-  margin-top: 32px;
+  gap: 12px;
+  margin-top: 16px;
   flex-wrap: wrap;
 }
 .art-badges span {
@@ -982,61 +1008,38 @@ textarea {
   font-size: 11px;
   color: #7d699b;
 }
-.orbit {
-  position: absolute;
-  border: 1px solid #cbbfea70;
-  border-radius: 50%;
-  width: 720px;
-  height: 720px;
-  right: -300px;
-  top: -170px;
-  transform: rotate(-25deg);
-}
-.orbit-two {
-  width: 900px;
-  height: 900px;
-  right: -330px;
-  top: -150px;
-  border-color: #ded5ee;
-}
-.orbit-one:after {
-  content: "✦";
-  font-size: 50px;
-  position: absolute;
-  bottom: 100px;
-  left: 120px;
-  color: #ae98e5;
-}
 .auth-form {
-  padding: 65px clamp(30px, 6vw, 95px);
+  padding: 28px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  max-width: 650px;
+  justify-content: flex-start;
+  max-width: 420px;
   margin: 0 auto;
   width: 100%;
 }
 .auth-form h2 {
-  font:
-    800 30px Manrope,
-    sans-serif;
+  font: 700 24px Manrope, sans-serif;
   letter-spacing: -1px;
   margin: 13px 0 8px;
 }
 .auth-form > p {
   font-size: 13px;
   color: var(--muted);
-  line-height: 1.7;
-  margin: 0 0 30px;
+  line-height: 1.5;
+  margin: 0 0 16px;
 }
 .google {
   width: 100%;
   height: 44px;
 }
-.google b {
-  font-size: 18px;
-  color: #4285f4;
-  margin-right: 10px;
+.google-logo {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+  background: #fff;
+  border-radius: 0;
+  object-fit: contain;
 }
 .divider {
   display: flex;
@@ -1044,7 +1047,7 @@ textarea {
   gap: 12px;
   font-size: 10px;
   color: var(--muted);
-  margin: 24px 0;
+  margin: 14px 0;
 }
 .divider:before,
 .divider:after {
@@ -1060,22 +1063,24 @@ textarea {
 .auth-form .auth-switch {
   font-size: 12px;
   text-align: center;
-  margin-top: 25px;
+  margin-top: 16px;
 }
 .auth-form footer {
   text-align: center;
   font-size: 10px;
   color: var(--muted);
-  margin-top: 42px;
+  margin-top: 20px;
 }
 .mobile-brand {
   display: none;
+
+  margin-bottom: 18px;
 }
 .setup-message {
   padding: 20px;
   background: var(--subtle);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   margin-top: 15px;
 }
 .setup-message h3 {
@@ -1103,31 +1108,28 @@ textarea {
   color: var(--ink);
 }
 [data-theme="dark"] .auth-art {
-  background: #292035;
-  color: #e6dcef;
+  background: var(--surface);
+  color: var(--ink);
 }
 [data-theme="dark"] .auth-art .brand {
   color: #b299ee;
 }
-[data-theme="dark"] .orbit {
-  opacity: 0.25;
-}
-[data-theme="dark"] .map-canvas {
+[data-theme="dark"] [data-theme="dark"] .map-canvas {
   filter: brightness(0.82);
 }
 @media (max-width: 1100px) {
   .topbar {
     gap: 14px;
-    padding: 0 20px;
+    padding: 4px 12px;
   }
   .brand > span {
     display: none;
   }
   .workspace-toolbar {
-    padding: 20px;
+    padding: 6px 12px;
   }
   .workspace {
-    margin: 0 20px 15px;
+    margin: 0;
   }
   .top-actions .subtle span {
     display: none;
@@ -1145,9 +1147,9 @@ textarea {
 @media (max-width: 700px) {
   .topbar {
     height: auto;
-    min-height: 105px;
+    min-height: 84px;
     flex-wrap: wrap;
-    padding: 12px 16px;
+    padding: 6px 10px;
     gap: 10px;
   }
   .topbar > .brand {
@@ -1158,7 +1160,7 @@ textarea {
   }
   .trip-selector {
     order: 2;
-    flex: 1;
+    flex: 1 1 calc(100% - 170px);
   }
   .trip-selector select {
     max-width: none;
@@ -1180,12 +1182,15 @@ textarea {
     width: 23px;
   }
   .workspace-toolbar {
-    padding: 17px 16px;
+    padding: 6px 10px;
     align-items: flex-start;
   }
   .workspace-toolbar h1 {
-    font-size: 18px;
-    max-width: 200px;
+    font-size: 14px;
+    max-width: calc(100vw - 140px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .eyebrow {
     font-size: 8px;
@@ -1198,19 +1203,19 @@ textarea {
     display: none;
   }
   .workspace {
-    margin: 0 12px 12px;
+    margin: 0;
     grid-template-columns: 1fr !important;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 1px;
     overflow: auto;
   }
   .map-panel {
-    min-height: 300px;
+    min-height: 240px;
     flex: 1;
   }
   .schedule-panel {
-    min-height: 320px;
+    min-height: 280px;
     flex: 1;
   }
   .splitter {
@@ -1225,14 +1230,14 @@ textarea {
     max-height: 65dvh;
   }
   .status-bar {
-    padding: 0 15px 8px;
+    padding: 0 10px;
     font-size: 9px;
   }
   .footer-version {
     display: none;
   }
   .calendar-popover {
-    top: 102px;
+    top: 84px;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
@@ -1263,12 +1268,12 @@ textarea {
   }
   .auth-form {
     min-height: 100dvh;
-    padding: 45px 28px;
+    padding: 24px 20px;
     max-width: 450px;
   }
   .mobile-brand {
     display: flex;
-    margin-bottom: 50px;
+    margin-bottom: 18px;
   }
   .auth-form h2 {
     font-size: 27px;
@@ -1291,4 +1296,18 @@ textarea {
 }
 .modal .auth-form .mobile-brand {
   display: none;
+}
+
+.maplibregl-ctrl-group,
+.maplibregl-ctrl-group button,
+.maplibregl-popup-content {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 700px) {
+  .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 0; gap: 6px; }
+  .trip-selector { min-width: 0; }
+  .trip-selector select { flex: 1; min-width: 0; width: 0; }
+  .date-picker { justify-content: flex-end; }
 }

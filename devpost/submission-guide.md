@@ -54,7 +54,7 @@ Eligibility statement from the form:
 
 ## Images and exact placement
 
-The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. The six planner JPEG files are real production captures with fictional QA trip data; each is below 5 MB. An additional `assets/sign-in.jpg` shows the Journas account screen with the official Google logo. The cover and collaboration image reuse the desktop capture, where the second account’s inherited edit is visible.
+The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. The six planner JPEG files are real production captures with fictional QA trip data; each is below 5 MB. An additional `assets/sign-in.png` shows the Journas account screen with the official Google logo. The cover and collaboration image reuse the desktop capture, where the second account’s inherited edit is visible.
 
 | File | Size | Placement | Caption |
 |---|---|---|---|

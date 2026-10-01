@@ -156,26 +156,27 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
         <div className="orbit orbit-two" />
         <div className="art-copy">
           <span className="eyebrow">
-            A LITTLE STRUCTURE. A LOT OF POSSIBILITY.
+            COLLABORATIVE TRIP PLANNER
           </span>
           <h1>
-            Your next chapter
+            A daily planner
             <br />
-            starts here.
+            for your trips.
           </h1>
           <p>
-            Places to discover. Days to look forward to.
-            <br />A plan everyone can make their own.
+            Add places to a map, schedule visits, and link tasks for each day.
+            Share a trip to plan with others in real time. Each traveler keeps
+            their own workspace layout.
           </p>
           <div className="art-badges">
             <span>
-              <Map size={16} /> Your places
+              <Map size={16} /> Map pins
             </span>
             <span>
-              <Clock3 size={16} /> Your time
+              <Clock3 size={16} /> Daily schedule
             </span>
             <span>
-              <CheckSquare size={16} /> Together
+              <CheckSquare size={16} /> Linked tasks
             </span>
           </div>
         </div>
@@ -185,9 +186,12 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
           <Compass />
           <strong>origin</strong>
         </div>
-        <span className="eyebrow">YOUR JOURNEY, BEAUTIFULLY ORGANIZED</span>
-        <h2>{register ? "Start something good." : "Welcome to Origin."}</h2>
-        <p>Bring your entire trip into one thoughtful space.</p>
+        <span className="eyebrow">YOUR ORIGIN ACCOUNT</span>
+        <h2>{register ? "Create an account" : "Sign in to Origin"}</h2>
+        <p>
+          Plan each day with a map, schedule, and task list. Sign in to save your
+          trips and collaborate on shared itineraries.
+        </p>
         {!configured ? (
           <div className="setup-message">
             <h3>Connect your travel workspace</h3>
@@ -277,7 +281,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
             </p>
           </>
         )}
-        <footer>Plan with intention. Explore with freedom.</footer>
+        <footer>Your trips and preferences are saved to your account.</footer>
       </section>
     </main>
   );

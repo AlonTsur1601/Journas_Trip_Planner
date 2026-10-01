@@ -79,6 +79,8 @@ export default function MapPanel({
         .setLngLat([pin.lng, pin.lat])
         .addTo(m);
     });
+    const arrowUpdates: (() => void)[] = [];
+    const updateArrows = () => arrowUpdates.forEach((update) => update());
     const draw = () => {
       connections.forEach((connection) => {
         const a = pins.find((x) => x.id === connection.from),
@@ -121,28 +123,54 @@ export default function MapPanel({
           },
         });
         if (connection.arrow) {
-          const mid: [number, number] = [
-            (a.lng + b.lng) / 2,
-            (a.lat + b.lat) / 2,
-          ];
           const el = document.createElement("span");
           el.className = "route-arrow";
-          el.style.color = b.color;
-          el.textContent = "➤";
-          const rotation =
-            (Math.atan2(
-              (a.lat - b.lat) / Math.cos((mid[1] * Math.PI) / 180),
-              b.lng - a.lng,
-            ) *
-              180) /
-            Math.PI;
+          const ns = "http://www.w3.org/2000/svg";
+          const svg = document.createElementNS(ns, "svg");
+          svg.setAttribute("viewBox", "0 0 80 80");
+          svg.setAttribute("width", "80");
+          svg.setAttribute("height", "80");
+          const defs = document.createElementNS(ns, "defs");
+          const gradient = document.createElementNS(ns, "linearGradient");
+          gradient.id = `arrow-gradient-${connection.id}`;
+          gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+          for (const [offset, color] of [["0", a.color], ["1", b.color]]) {
+            const stop = document.createElementNS(ns, "stop");
+            stop.setAttribute("offset", offset);
+            stop.setAttribute("stop-color", color);
+            gradient.append(stop);
+          }
+          defs.append(gradient);
+          const head = document.createElementNS(ns, "polygon");
+          head.setAttribute("fill", `url(#${gradient.id})`);
+          svg.append(defs, head);
+          el.append(svg);
+          const update = () => {
+            const source = m.project([a.lng, a.lat]);
+            const target = m.project([b.lng, b.lat]);
+            const dx = target.x - source.x, dy = target.y - source.y;
+            const distance = Math.hypot(dx, dy);
+            // Leave the arrow tip outside the destination pin's footprint.
+            el.style.visibility = distance < 42 ? "hidden" : "visible";
+            if (distance < 42) return;
+            const ux = dx / distance, uy = dy / distance;
+            const tipX = 40 - ux * 20, tipY = 40 - uy * 20;
+            const baseX = 40 - ux * 33, baseY = 40 - uy * 33;
+            head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
+            gradient.setAttribute("x1", String(40 - dx));
+            gradient.setAttribute("y1", String(40 - dy));
+            gradient.setAttribute("x2", "40");
+            gradient.setAttribute("y2", "40");
+          };
+          arrowUpdates.push(update);
+          update();
           markers.current.push(
             new maplibregl.Marker({
               element: el,
-              rotation,
-              rotationAlignment: "map",
+              rotationAlignment: "viewport",
+              pitchAlignment: "viewport",
             })
-              .setLngLat(mid)
+              .setLngLat([b.lng, b.lat])
               .addTo(m),
           );
         }
@@ -157,8 +185,10 @@ export default function MapPanel({
     };
     if (m.isStyleLoaded()) draw();
     else m.once("load", draw);
+    m.on("move", updateArrows);
     return () => {
       m.off("load", draw);
+      m.off("move", updateArrows);
     };
   }, [pins, connections]);
   useEffect(() => {

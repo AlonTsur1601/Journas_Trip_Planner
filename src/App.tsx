@@ -210,7 +210,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 run(() => signInWithPopup(auth!, new GoogleAuthProvider()))
               }
             >
-              <img className="google-logo" src="/google-logo.png" alt="" width="20" height="20" /> Continue with Google
+              <img className="google-logo" src="/google-logo.svg" alt="" width="20" height="20" /> Continue with Google
             </button>
             <div className="divider">or continue with email</div>
             <form

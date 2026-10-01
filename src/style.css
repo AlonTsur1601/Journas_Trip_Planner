@@ -1039,9 +1039,8 @@ textarea {
   flex: 0 0 auto;
   width: 24px;
   height: 24px;
-  padding: 2px;
+  padding: 0;
   background: transparent;
-  border-radius: 3px;
   object-fit: contain;
 }
 .divider {

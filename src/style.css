@@ -1005,7 +1005,7 @@ textarea {
 }
 .art-badges {
   display: flex;
-  gap: 6px;
+  gap: 12px;
   margin-top: 16px;
   flex-wrap: wrap;
 }
@@ -1014,12 +1014,9 @@ textarea {
   gap: 6px;
   align-items: center;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--auth-divider);
-  border-radius: 4px;
-  padding: 6px 8px;
+  text-shadow: 0 0 5px var(--bg);
 }
 .auth-form {
   padding: 28px;

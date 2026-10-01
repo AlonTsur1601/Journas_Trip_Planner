@@ -208,11 +208,7 @@ export default function MapPanel({
   return (
     <div className="map-wrapper">
       <div ref={container} className="map-canvas" />
-      <div className="map-hint">
-        {readonly
-          ? "Select a place to explore its notes"
-          : "Double-click the map to add a place"}
-      </div>
+
     </div>
   );
 }

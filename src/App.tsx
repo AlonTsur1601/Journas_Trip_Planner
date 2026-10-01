@@ -31,6 +31,7 @@ import {
 import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
 import { startingLayout } from "./map-start";
+import { Dropdown, ColorPicker } from "./Controls";
 const MapPanel = lazy(() => import("./MapPanel"));
 import {
   defaultLayout,
@@ -55,6 +56,7 @@ type Edit = {
   base?: Record<string, any>;
 };
 function Input({ label, ...props }: any) {
+  if (props.type === "color") return <ColorPicker label={label} {...props} />;
   return (
     <label className="field">
       <span>{label}</span>
@@ -63,12 +65,7 @@ function Input({ label, ...props }: any) {
   );
 }
 function Select({ label, children, ...props }: any) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <select {...props}>{children}</select>
-    </label>
-  );
+  return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
 }
 function Modal({ title, children, onClose }: any) {
   const box = useRef<HTMLElement>(null);
@@ -115,7 +112,7 @@ function Modal({ title, children, onClose }: any) {
     >
       <section
         ref={box}
-        className="modal"
+        className={`modal${title === "Your preferences" ? " settings-modal" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -321,6 +318,19 @@ export default function App() {
   dateRef.current = date;
   const dirty = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
+  const calendarBox = useRef<HTMLDivElement>(null);
+  const profilePhoto = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!calendar) return;
+    const outside = (event: PointerEvent) => {
+      const node = event.target as HTMLElement;
+      if (!calendarBox.current?.contains(node) && !node.closest(".date-button")) setCalendar(false);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setCalendar(false); };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
+  }, [calendar]);
   const [time, setTime] = useState(new Date());
   function setEdit(value: Edit | null) {
     if (value && !value.base)
@@ -866,10 +876,10 @@ export default function App() {
           <span>TRIP PLANNER</span>
         </a>
         <div className="trip-selector">
-          <select
+          <Dropdown
             aria-label="Choose trip"
             value={trip?.id ?? ""}
-            onChange={async (e) => {
+            onChange={async (e: any) => {
               await saveLayout();
               setShareTrip(false);
               history.replaceState({}, "", location.pathname);
@@ -895,7 +905,7 @@ export default function App() {
                 {t.name}
               </option>
             ))}
-          </select>
+          </Dropdown>
           <button
             className={`icon${!trip ? " create-trip-glow" : ""}`}
             title="Create trip"
@@ -909,11 +919,14 @@ export default function App() {
         <div className="date-picker">
           <button
             className="icon"
-            aria-label="Previous day"
-            disabled={Boolean(shareTrip && trip && date <= trip.startDate)}
+            aria-label="Next day"
+            disabled={
+              date >= maxDate() ||
+              Boolean(shareTrip && trip && date >= trip.endDate)
+            }
             onClick={() => {
               const d = new Date(`${date}T12:00:00`);
-              d.setDate(d.getDate() - 1);
+              d.setDate(d.getDate() + 1);
               switchDate(d.toLocaleDateString("en-CA"));
             }}
           >
@@ -932,24 +945,13 @@ export default function App() {
               })}
             </span>
           </button>
-          <input
-            aria-label="Planning date"
-            type="date"
-            value={date}
-            min={shareTrip ? trip?.startDate : undefined}
-            max={shareTrip ? trip?.endDate : maxDate()}
-            onChange={(e) => e.target.value && switchDate(e.target.value)}
-          />
           <button
             className="icon"
-            aria-label="Next day"
-            disabled={
-              date >= maxDate() ||
-              Boolean(shareTrip && trip && date >= trip.endDate)
-            }
+            aria-label="Previous day"
+            disabled={Boolean(shareTrip && trip && date <= trip.startDate)}
             onClick={() => {
               const d = new Date(`${date}T12:00:00`);
-              d.setDate(d.getDate() + 1);
+              d.setDate(d.getDate() - 1);
               switchDate(d.toLocaleDateString("en-CA"));
             }}
           >
@@ -957,6 +959,7 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
+          <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           {trip && (
             <button
               className="button subtle"
@@ -1021,11 +1024,10 @@ export default function App() {
         </div>
       )}
       <div className="workspace-toolbar">
-        <div>
-          <span className="eyebrow">
-            {shareTrip ? "SHARED TRIP · VIEW ONLY" : "YOUR DAILY CANVAS"}
-          </span>
-          <h1>{trip?.name ?? "Make room for your next adventure"}</h1>
+        <div className="places-toolbar-heading">
+          <Map size={17} /><h1>Your places</h1><span className="count">{day.pins.length}</span>
+          {shareTrip && <span className="shared-label">View only</span>}
+          {!readonly && <><button className="text-button" onClick={() => newItem("connections")} disabled={day.pins.length < 2}>Connect</button><button className="icon" aria-label="Add place" onClick={() => newItem("pins")}><Plus size={19} /></button></>}
         </div>
         <div className="view-controls">
           {[
@@ -1064,33 +1066,6 @@ export default function App() {
       >
         {layout.map && (
           <section className="panel map-panel">
-            <div className="panel-heading">
-              <div>
-                <Map size={17} />
-                <h2>Your places</h2>
-                <span className="count">{day.pins.length}</span>
-              </div>
-              <div>
-                {!readonly && (
-                  <>
-                    <button
-                      className="text-button"
-                      onClick={() => newItem("connections")}
-                      disabled={day.pins.length < 2}
-                    >
-                      Connect
-                    </button>
-                    <button
-                      className="icon"
-                      aria-label="Add place"
-                      onClick={() => newItem("pins")}
-                    >
-                      <Plus size={19} />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
             <Suspense
               fallback={<div className="loading">Loading your map…</div>}
             >
@@ -1119,7 +1094,7 @@ export default function App() {
                   </button>
                 ))
               ) : (
-                <span>Add the places that make this day yours.</span>
+                null
               )}
             </div>
           </section>
@@ -1452,20 +1427,8 @@ export default function App() {
         )}
 
       </div>
-      <footer className="status-bar">
-        <span>
-          <i className={status.startsWith("All") ? "saved" : "pending"} />
-          {status}
-        </span>
-        <span>
-          {trip
-            ? `${day.pins.length} places · ${day.blocks.length} moments · ${day.tasks.length} tasks`
-            : "A world of possibilities"}{" "}
-          <span className="footer-version">Journas v1.0.0</span>
-        </span>
-      </footer>
       {calendar && (
-        <div className="calendar-popover">
+        <div className="calendar-popover" ref={calendarBox}>
           <header>
             <button
               className="icon"
@@ -1476,7 +1439,7 @@ export default function App() {
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
-              <ChevronLeft size={18} />
+              <ChevronRight size={18} />
             </button>
             <strong>
               {new Date(`${month}-15`).toLocaleDateString("en-US", {
@@ -1493,7 +1456,7 @@ export default function App() {
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
-              <ChevronRight size={18} />
+              <ChevronLeft size={18} />
             </button>
           </header>
           <div className="calendar-grid">
@@ -2252,9 +2215,12 @@ export default function App() {
                 setSettings({ ...settings, displayName: e.target.value })
               }
             />
-            <label className="field">
+            <div className="field photo-field">
               <span>Profile photo</span>
               <input
+                aria-label="Choose profile photo"
+                ref={profilePhoto}
+                hidden
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={async (e) => {
@@ -2279,7 +2245,9 @@ export default function App() {
                   }
                 }}
               />
-            </label>
+              <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
+              <span className="photo-file-note">JPG, PNG or WebP · up to 10 MB</span>
+            </div>
             <div className="form-row">
               <Select
                 label="Appearance"

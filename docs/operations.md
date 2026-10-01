@@ -1,4 +1,4 @@
-# Tevel — operations and verification
+# Journas — operations and verification
 
 ## Configuration ownership
 
@@ -44,7 +44,7 @@ The final checklist should link actual test outputs/browser captures and disting
 - **API unavailable/503:** Check the API process and private credential configuration; do not paste a key into logs or chat. Ensure browser/server project IDs match.
 - **Verification required:** Complete the verification email and refresh the authentication session; emulator success is not proof of email delivery.
 - **Firestore denied:** Confirm membership and published rules. Do not solve it with permissive test rules.
-- **Emulator refused connection:** Start both Auth and Firestore emulators; client and server must explicitly use the same `demo-tevel` project.
+- **Emulator refused connection:** Start both Auth and Firestore emulators; client and server must explicitly use the same `demo-journas` project.
 - **Cleanup denied:** Verify that Vercel has `CRON_SECRET` and that the caller is the authenticated scheduler.
 - **Quota exceeded:** Inspect project-wide usage and retry after the provider's reset. Do not enable billing without a separate creator decision.
 

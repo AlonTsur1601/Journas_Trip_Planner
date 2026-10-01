@@ -1,4 +1,4 @@
-# Tevel — Devpost submission package
+# Journas — Devpost submission package
 
 This is a preparation package, not a submitted entry. Product copy below is drafted at the creator's explicit request. Review it against the final working build before publishing; personal learning, residence, eligibility, and survey answers cannot be supplied by the agent.
 
@@ -14,12 +14,12 @@ The eligibility checkbox confirms age of majority, all teammates' eligibility, a
 
 | Field | Prepared value / action |
 |---|---|
-| Project name (maximum 60 characters) | `Tevel` |
+| Project name (maximum 60 characters) | `Journas` |
 | Elevator pitch / tagline (maximum 200 characters) | `Plan every day of your trip with a connected map, schedule, and checklist. Share the journey and build your itinerary together in real time.` |
 | Full project description (maximum 50,000 characters) | Review the English draft in [submission-copy.md](submission-copy.md); fill the personal learning paragraph yourself. Remove any unverified feature claim. |
 | Built with (maximum 25 tags) | `React`, `TypeScript`, `Vite`, `Firebase`, `Firestore`, `MapLibre`, `OpenFreeMap`, `Vercel`, `Codex` — verify these match the final repository. |
-| Source repository link | `https://github.com/AlonTsur1601/Tevel_Trip_Planner` — verify unauthenticated access before submission. |
-| Website link | `https://tevel-trip-planner.vercel.app` — public production site verified with authenticated planning and collaboration. |
+| Source repository link | `https://github.com/AlonTsur1601/Journas_Trip_Planner` — verify unauthenticated access before submission. |
+| Website link | `https://journas-trip-planner.vercel.app` — public production site verified with authenticated planning and collaboration. |
 | Video URL | Paste the final public YouTube/Vimeo URL; no video has been uploaded by preparing this guide. |
 | Thumbnail | Upload `devpost/assets/cover.jpg`. |
 | Image gallery | Upload the checked production screenshots listed below, in order. |
@@ -27,7 +27,7 @@ The eligibility checkbox confirms age of majority, all teammates' eligibility, a
 
 ### Testing instructions (English copy)
 
-Open https://tevel-trip-planner.vercel.app in a desktop browser. Create a free account using Google or email and password, and verify your email if prompted. Create a trip with a date within the next year. Add two map pins, assign a scheduled visit to one pin, and create a linked task. Switch dates and return to check that your planning and workspace are restored. For collaboration, create a join-enabled share link and open it in a second browser with a separate account. The second account initially views the trip read-only and can explicitly join to edit. An edit should appear in the first browser without reloading. This does not require payment. Use your own disposable test trip; the owner's manual delete removes it for all participants.
+Open https://journas-trip-planner.vercel.app in a desktop browser. Create a free account using Google or email and password, and verify your email if prompted. Create a trip with a date within the next year. Add two map pins, assign a scheduled visit to one pin, and create a linked task. Switch dates and return to check that your planning and workspace are restored. For collaboration, create a join-enabled share link and open it in a second browser with a separate account. The second account initially views the trip read-only and can explicitly join to edit. An edit should appear in the first browser without reloading. This does not require payment. Use your own disposable test trip; the owner's manual delete removes it for all participants.
 
 If the deployed app is restricted at submission time, do not invent access instructions or expose a real personal password: arrange a dedicated reviewer account through the submission's testing-instructions surface as required by the rules, or resolve access first. Public self-service registration should make that unnecessary.
 
@@ -54,11 +54,11 @@ Eligibility statement from the form:
 
 ## Images and exact placement
 
-The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. The six planner JPEG files are real production captures with fictional QA trip data; each is below 5 MB. An additional `assets/sign-in.jpg` shows the Tevel account screen with the official Google logo. The cover and collaboration image reuse the desktop capture, where the second account’s inherited edit is visible.
+The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. The six planner JPEG files are real production captures with fictional QA trip data; each is below 5 MB. An additional `assets/sign-in.jpg` shows the Journas account screen with the official Google logo. The cover and collaboration image reuse the desktop capture, where the second account’s inherited edit is visible.
 
 | File | Size | Placement | Caption |
 |---|---|---|---|
-| `assets/cover.jpg` | 1280 × 720 | Project thumbnail | Tevel — places, time, and tasks in one shared daily workspace. |
+| `assets/cover.jpg` | 1280 × 720 | Project thumbnail | Journas — places, time, and tasks in one shared daily workspace. |
 | `assets/planner-desktop.jpg` | Desktop screenshot | Gallery 1 | Plan a day with map pins, scheduled visits, and linked tasks. |
 | `assets/planner-mobile.jpg` | Mobile screenshot | Gallery 2 | A compact planner that keeps trip controls accessible on a small screen. |
 | `assets/calendar.jpg` | Desktop screenshot | Gallery 3 | Browse overlapping trips in a month-by-month calendar. |

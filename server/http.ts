@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { ApiError, type Data } from './types.js';
 import { adminAuth, firestoreStore, purgeExpiredRateLimits } from './store.js';
-import { TevelService } from './service.js';
+import { JournasService } from './service.js';
 export type Request = IncomingMessage & {
     body?: unknown;
 };
@@ -33,10 +33,10 @@ async function body(req: Request): Promise<Data> {
 function errors(res: ServerResponse, error: unknown) {
     if (error instanceof ApiError)
         return send(res, error.status, { error: { code: error.code, message: error.message, details: error.details } });
-    console.error('Tevel request failed', { type: error instanceof Error ? error.name : 'Unknown' });
+    console.error('Journas request failed', { type: error instanceof Error ? error.name : 'Unknown' });
     send(res, 503, { error: { code: 'UNAVAILABLE', message: 'The service is temporarily unavailable. Please retry.' } });
 }
-export async function tevelHandler(req: Request, res: ServerResponse) {
+export async function journasHandler(req: Request, res: ServerResponse) {
     if (req.method !== 'POST')
         return send(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST' } });
     try {
@@ -80,7 +80,7 @@ export async function tevelHandler(req: Request, res: ServerResponse) {
             tx.set(path, { minute, count, expiresAt: Date.now() + 86400000 });
             return null;
         });
-        send(res, 200, await new TevelService(firestoreStore()).execute(uid, input));
+        send(res, 200, await new JournasService(firestoreStore()).execute(uid, input));
     }
     catch (error) {
         errors(res, error);
@@ -95,7 +95,7 @@ export async function cleanupHandler(req: Request, res: ServerResponse) {
     if (!secret || Buffer.byteLength(supplied) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected)))
         return send(res, 401, { error: { code: 'UNAUTHENTICATED', message: 'Unauthorized' } });
     try {
-        const result = await new TevelService(firestoreStore()).cleanup();
+        const result = await new JournasService(firestoreStore()).cleanup();
         const expiredRateLimits = await purgeExpiredRateLimits();
         send(res, 200, { ...result, expiredRateLimits });
     }

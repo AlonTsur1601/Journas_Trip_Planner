@@ -3,13 +3,13 @@ import { initializeTestEnvironment, assertFails, assertSucceeds, type RulesTestE
 import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { firestoreStore } from '../server/store.js';
-import { TevelService } from '../server/service.js';
+import { JournasService } from '../server/service.js';
 import type { Data, Trip } from '../server/types.js';
 const enabled = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 describe.skipIf(!enabled)('Firestore Admin transactions + protected client Live', () => {
-    let service: TevelService, env: RulesTestEnvironment;
+    let service: JournasService, env: RulesTestEnvironment;
     const day = '2026-10-01';
-    beforeAll(async () => { process.env.FIREBASE_PROJECT_ID = 'demo-tevel'; env = await initializeTestEnvironment({ projectId: 'demo-tevel', firestore: { rules: readFileSync('firestore.rules', 'utf8') } }); service = new TevelService(firestoreStore(), () => Date.parse(day + 'T12:00:00Z')); });
+    beforeAll(async () => { process.env.FIREBASE_PROJECT_ID = 'demo-journas'; env = await initializeTestEnvironment({ projectId: 'demo-journas', firestore: { rules: readFileSync('firestore.rules', 'utf8') } }); service = new JournasService(firestoreStore(), () => Date.parse(day + 'T12:00:00Z')); });
     afterAll(async () => { await env?.cleanup(); });
     it('commits real transactions, distributes Live changes, detects conflicts and revokes access', async () => {
         const { trip } = await service.execute('integrationAlice', { action: 'trip.create', name: 'Live test', startDate: day, endDate: day });
@@ -44,7 +44,7 @@ describe.skipIf(!enabled)('Firestore Admin transactions + protected client Live'
         await service.execute('cleanupBob', { action: 'share.join', token });
         await service.execute('cleanupAlice', { action: 'settings.save', settings: { retentionDays: 30 } });
         await service.execute('cleanupBob', { action: 'settings.save', settings: { autoDelete: false } });
-        const later = new TevelService(firestoreStore(), () => Date.parse('2026-11-03T00:00:00Z'));
+        const later = new JournasService(firestoreStore(), () => Date.parse('2026-11-03T00:00:00Z'));
         const result = await later.cleanup();
         expect(Number(result.removed)).toBeGreaterThanOrEqual(1);
         const kept = (await later.execute('cleanupBob', { action: 'trip.get', tripId: id, date: day })).trip as Trip;

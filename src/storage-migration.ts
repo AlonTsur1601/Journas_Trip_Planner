@@ -6,8 +6,8 @@ export function migratePlannerStorage(storage: Storage) {
       storage.key(i),
     );
     for (const key of keys) {
-      if (!key || !/^origin-(drafts|layout|viewlayout):/.test(key)) continue;
-      const next = key.replace(/^origin-/, "tevel-");
+      if (!key || !/^(origin|tevel)-(drafts|layout|viewlayout):/.test(key)) continue;
+      const next = key.replace(/^(origin|tevel)-/, "journas-");
       const value = storage.getItem(key);
       if (value === null) continue;
       if (storage.getItem(next) === null) storage.setItem(next, value);

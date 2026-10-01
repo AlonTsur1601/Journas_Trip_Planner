@@ -150,7 +150,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
       <div className="auth-art">
         <div className="brand">
           <Compass />
-          <strong>Tevel</strong>
+          <strong>Journas</strong>
         </div>
         <div className="art-copy">
           <span className="eyebrow">
@@ -182,10 +182,10 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
       <section className="auth-form">
         <div className="brand mobile-brand">
           <Compass />
-          <strong>Tevel</strong>
+          <strong>Journas</strong>
         </div>
-        <span className="eyebrow">YOUR TEVEL ACCOUNT</span>
-        <h2>{register ? "Create an account" : "Sign in to Tevel"}</h2>
+        <span className="eyebrow">YOUR JOURNAS ACCOUNT</span>
+        <h2>{register ? "Create an account" : "Sign in to Journas"}</h2>
         <p>
           Plan each day with a map, schedule, and task list. Sign in to save your
           trips and collaborate on shared itineraries.
@@ -269,7 +269,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
               Forgot password?
             </button>
             <p className="auth-switch">
-              {register ? "Already have an account?" : "New to Tevel?"}{" "}
+              {register ? "Already have an account?" : "New to Journas?"}{" "}
               <button
                 className="text-button"
                 onClick={() => setRegister(!register)}
@@ -413,7 +413,7 @@ export default function App() {
         setDay(r.day);
         setPublicMode(r.mode);
         const local = localStorage.getItem(
-          `tevel-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
+          `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
         setLayout({ ...defaultLayout(), ...(local ? JSON.parse(local) : {}) });
       })
@@ -446,13 +446,13 @@ export default function App() {
         if (cancelled) return;
         setDay(r.day);
         const local = localStorage.getItem(
-          `tevel-layout:${user.uid}:${trip.id}:${date}`,
+          `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
         setLayout({ ...defaultLayout(), ...(restored ?? {}) });
         dirty.current = Boolean(local);
         const draft = localStorage.getItem(
-          `tevel-drafts:${user.uid}:${trip.id}:${date}`,
+          `journas-drafts:${user.uid}:${trip.id}:${date}`,
         );
         if (draft) {
           const pending = Object.values(JSON.parse(draft)) as Edit[];
@@ -546,7 +546,7 @@ export default function App() {
     if (!dirty.current || !tripRef.current) return;
     if (shareTrip) {
       localStorage.setItem(
-        `tevel-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
+        `journas-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
         JSON.stringify(layoutRef.current),
       );
       dirty.current = false;
@@ -563,7 +563,7 @@ export default function App() {
       });
       dirty.current = false;
       localStorage.removeItem(
-        `tevel-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,
+        `journas-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,
       );
       setStatus("All changes saved");
     } catch (e: any) {
@@ -576,7 +576,7 @@ export default function App() {
     await saveLayout();
     if (user && trip && !readonly) {
       const pending = localStorage.getItem(
-        `tevel-drafts:${user.uid}:${trip.id}:${date}`,
+        `journas-drafts:${user.uid}:${trip.id}:${date}`,
       );
       if (pending) {
         for (const draft of Object.values(JSON.parse(pending)) as Edit[])
@@ -606,12 +606,12 @@ export default function App() {
     setLayout((l) => ({ ...l, ...patch }));
     if (shareTrip && trip)
       localStorage.setItem(
-        `tevel-viewlayout:${user?.uid ?? "guest"}:${trip.id}:${date}`,
+        `journas-viewlayout:${user?.uid ?? "guest"}:${trip.id}:${date}`,
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
     else if (user && trip)
       localStorage.setItem(
-        `tevel-layout:${user.uid}:${trip.id}:${date}`,
+        `journas-layout:${user.uid}:${trip.id}:${date}`,
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
   }
@@ -711,7 +711,7 @@ export default function App() {
       return;
     }
     const draft: Edit = { kind: kind as Edit["kind"], item, base: original };
-    const draftKey = `tevel-drafts:${user?.uid}:${trip.id}:${date}`;
+    const draftKey = `journas-drafts:${user?.uid}:${trip.id}:${date}`;
     const drafts = JSON.parse(localStorage.getItem(draftKey) ?? "{}");
     localStorage.setItem(draftKey, JSON.stringify({ ...drafts, [id]: draft }));
     try {
@@ -847,7 +847,7 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="/">
           <Compass />
-          <strong>Tevel</strong>
+          <strong>Journas</strong>
           <span>TRIP PLANNER</span>
         </a>
         <div className="trip-selector">
@@ -1457,7 +1457,7 @@ export default function App() {
           {trip
             ? `${day.pins.length} places · ${day.blocks.length} moments · ${day.tasks.length} tasks`
             : "A world of possibilities"}{" "}
-          <span className="footer-version">Tevel v1.0.0</span>
+          <span className="footer-version">Journas v1.0.0</span>
         </span>
       </footer>
       {calendar && (
@@ -2359,7 +2359,7 @@ export default function App() {
             </button>
             <div className="settings-footer">
               <small>
-                Tevel · Version 1.0.0 · {trips.length}/100 saved trips
+                Journas · Version 1.0.0 · {trips.length}/100 saved trips
               </small>
               {user && (
                 <button
@@ -2448,7 +2448,7 @@ export default function App() {
             <button
               className="button"
               onClick={() => {
-                const draftKey = `tevel-drafts:${user?.uid}:${trip?.id}:${date}`;
+                const draftKey = `journas-drafts:${user?.uid}:${trip?.id}:${date}`;
                 const pending = JSON.parse(
                   localStorage.getItem(draftKey) ?? "{}",
                 );

@@ -40,11 +40,11 @@ Google login with the creator's real Google account, delivery of real verificati
 
 The actual production cleanup endpoint was invoked with its secret: an already-expired synthetic trip lost its owner's membership while the other participant retained access and original ownership metadata. After the last participant removed it, cleanup purged the trip. Unauthorized cleanup was rejected. The next automatic scheduled invocation has not been observed; a manual authenticated invocation does not prove scheduler delivery.
 
-## Tevel rename verification
+## Journas rename verification
 
-The active project is now in the Tevel directory, with the renamed public GitHub repository and production domain. The previous directory remains until the creator removes it after this task releases its processes, as requested by the creator. All 38,827 remaining source files were compared byte-for-byte after transfer. The Firebase display name changed to Tevel; its immutable project ID and stored accounts/trips are preserved.
+The active project is now in the Journas directory, with the renamed public GitHub repository and production domain. The Tevel source directory remains as a previous checkout; Journas is the active directory. The 92 project-owned files outside Git and dependency caches were compared byte-for-byte after transfer; the copied Git checkout builds and runs its tests. The Firebase display name changed to Journas; its immutable project ID and stored accounts/trips are preserved.
 
-After the rename, 36 tests passed: 13 emulator integration/rules/HTTP tests, 18 domain tests, 3 DST checks and 2 draft/layout migration checks. TypeScript/Vite build passed. The complete two-account production API verification passed at the new `/api/tevel` endpoint. Native email sign-in and the enlarged Tevel/Google-logo account screen were verified on the deployed site. Gallery captures were replaced with actual Tevel production images.
+After the Journas rename, 36 tests passed: 23 domain/time/storage tests and 13 emulator integration/rules/HTTP tests. TypeScript/Vite build passed. The complete two-account production API verification passed at the new `/api/journas` endpoint. Native email sign-in and the enlarged Journas/Google-logo account screen were verified on the deployed site. Gallery captures were replaced with actual Journas production images, including a 2,560 × 1,440 desktop capture for the README.
 
 ## Compact interface verification
 

@@ -23,27 +23,30 @@ describe("planner rename preserves recovery data", () => {
     const data = storage({
       "origin-drafts:user:trip:date": '{"note":"unsaved"}',
       "origin-layout:user:trip:date": '{"zoom":15}',
+      "tevel-viewlayout:user:trip:date": '{"todo":true}',
       unrelated: "keep",
     });
     migratePlannerStorage(data);
-    expect(data.getItem("tevel-drafts:user:trip:date")).toBe(
+    expect(data.getItem("journas-drafts:user:trip:date")).toBe(
       '{"note":"unsaved"}',
     );
-    expect(data.getItem("tevel-layout:user:trip:date")).toBe('{"zoom":15}');
+    expect(data.getItem("journas-layout:user:trip:date")).toBe('{"zoom":15}');
     expect(data.getItem("origin-drafts:user:trip:date")).toBeNull();
     expect(data.getItem("unrelated")).toBe("keep");
     migratePlannerStorage(data);
-    expect(data.length).toBe(3);
+    expect(data.getItem("journas-viewlayout:user:trip:date")).toBe('{"todo":true}');
+    expect(data.getItem("tevel-viewlayout:user:trip:date")).toBeNull();
+    expect(data.length).toBe(4);
   });
   it("preserves both differing drafts and keeps recovery data when storage is full", () => {
     const key = "origin-drafts:user:trip:date";
     const conflicting = storage({
       [key]: "older",
-      "tevel-drafts:user:trip:date": "newer",
+      "journas-drafts:user:trip:date": "newer",
     });
     migratePlannerStorage(conflicting);
     expect(conflicting.getItem(key)).toBe("older");
-    expect(conflicting.getItem("tevel-drafts:user:trip:date")).toBe("newer");
+    expect(conflicting.getItem("journas-drafts:user:trip:date")).toBe("newer");
     const full = storage({ [key]: "unsaved" }, true);
     migratePlannerStorage(full);
     expect(full.getItem(key)).toBe("unsaved");

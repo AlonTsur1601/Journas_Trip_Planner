@@ -12,7 +12,7 @@ async function collect(path) {
 for (const root of roots) await collect(root);
 for (const path of ['package.json', 'package-lock.json', 'index.html', 'tsconfig.json', 'vite.config.ts', 'vercel.json']) await collect(path);
 const config = JSON.parse(await readFile('vercel.json', 'utf8'));
-const body = { name: 'tevel-trip-planner', project: 'prj_gwUEDAaOWfIF8ihEGiskovutznbU', target: 'production', files, projectSettings: { framework: 'vite', buildCommand: config.buildCommand, outputDirectory: config.outputDirectory, installCommand: 'npm ci' } };
+const body = { name: 'journas-trip-planner', project: 'prj_gwUEDAaOWfIF8ihEGiskovutznbU', target: 'production', files, projectSettings: { framework: 'vite', buildCommand: config.buildCommand, outputDirectory: config.outputDirectory, installCommand: 'npm ci' } };
 const response = await fetch('https://api.vercel.com/v13/deployments', {method:'POST', headers:{Authorization:`Bearer ${auth.token}`, 'Content-Type':'application/json'}, body:JSON.stringify(body)});
 const result = await response.json();
 if (!response.ok) throw new Error(result.error?.message || `Deploy failed (${response.status})`);

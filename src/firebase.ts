@@ -5,10 +5,10 @@ const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
 const config = emulators
   ? {
-      apiKey: "demo-tevel-key",
-      authDomain: "demo-tevel.firebaseapp.com",
-      projectId: "demo-tevel",
-      appId: "demo-tevel-app",
+      apiKey: "demo-journas-key",
+      authDomain: "demo-journas.firebaseapp.com",
+      projectId: "demo-journas",
+      appId: "demo-journas-app",
     }
   : {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -31,7 +31,7 @@ export async function api<T = unknown>(
   data: Record<string, unknown> = {},
 ): Promise<T> {
   const token = await auth?.currentUser?.getIdToken();
-  const response = await fetch("/api/tevel", {
+  const response = await fetch("/api/journas", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

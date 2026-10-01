@@ -3,7 +3,7 @@ doc: scope
 status: approved
 ---
 
-# Tevel
+# Journas
 
 A shared travel planner that connects places, time, and tasks for each day of a trip.
 

@@ -1,5 +1,5 @@
 {
-  "name": "tevel-trip-planner",
+  "name": "journas-trip-planner",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,11 +9,11 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-tevel \"vitest run tests/rules.test.ts\"",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-journas \"vitest run tests/rules.test.ts\"",
     "api:dev": "tsx server/dev.ts",
     "dev:api": "tsx --env-file=.env.local server/dev.ts",
-    "dev:emulators": "firebase emulators:start --only auth,firestore --project demo-tevel",
-    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-tevel \"vitest run tests/backend.integration.test.ts tests/backend.http.test.ts tests/rules.test.ts\""
+    "dev:emulators": "firebase emulators:start --only auth,firestore --project demo-journas",
+    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-journas \"vitest run tests/backend.integration.test.ts tests/backend.http.test.ts tests/rules.test.ts\""
   },
   "dependencies": {
     "firebase": "^12.19.0",

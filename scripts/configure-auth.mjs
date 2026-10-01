@@ -8,7 +8,7 @@ const url = `https://identitytoolkit.googleapis.com/admin/v2/projects/${credenti
 const response = await fetch(url, { headers });
 if (!response.ok) throw new Error(`Cannot read Auth configuration: HTTP ${response.status}`);
 const config = await response.json();
-const domain = 'tevel-trip-planner.vercel.app';
+const domain = 'journas-trip-planner.vercel.app';
 if (!config.authorizedDomains.includes(domain)) {
   const updated = await fetch(url + '?updateMask=authorizedDomains', { method: 'PATCH', headers, body: JSON.stringify({ authorizedDomains: [...config.authorizedDomains, domain] }) });
   if (!updated.ok) throw new Error(`Cannot authorize production domain: HTTP ${updated.status}`);

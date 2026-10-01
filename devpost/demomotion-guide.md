@@ -4,12 +4,12 @@ The public HTML at [DemoMotion WebMCP](https://demomotion-ai-web-c73vaqorlq-an.a
 
 ## Paste into the first form
 
-**Product URL:** `https://tevel-trip-planner.vercel.app`. Sign in with your own test account before recording. A remotely hosted recorder cannot use localhost.
+**Product URL:** `https://journas-trip-planner.vercel.app`. Sign in with your own test account before recording. A remotely hosted recorder cannot use localhost.
 
 **Goal:**
 
 ```text
-Create an approximately 2 minute 30 second English narrated demo of Tevel, a collaborative trip planner. Use real recorded product interactions, with concise captions and a clean 16:9 screen recording. Show one coherent holiday-planning flow: open the daily workspace; create or select a trip; add two map pins with different colours, symbols, and notes; connect them with a gradient arrow; schedule a visit linked to a pin and show its inherited title, note, colour, and symbol; add and complete a task linked to that visit; resize the map/schedule split and move the floating checklist; switch dates and return to demonstrate saved planning and layout; open a join-enabled share link in a second signed-in account and show a live edit reaching the first account without a refresh. Finish with clock/theme settings and explain that automatic one-year removal is personal while an owner's manual delete affects everyone. Show only features that work in the actual session. If authenticated recording or two accounts cannot be captured, use supplied real browser recordings instead of inventing scenes. Keep the export below three minutes. Hide email addresses, credentials, private share tokens, and unrelated browser content. Use no copyrighted music or third-party branding beyond permitted product/map attribution.
+Create an approximately 2 minute 30 second English narrated demo of Journas, a collaborative trip planner. Use real recorded product interactions, with concise captions and a clean 16:9 screen recording. Show one coherent holiday-planning flow: open the daily workspace; create or select a trip; add two map pins with different colours, symbols, and notes; connect them with a gradient arrow; schedule a visit linked to a pin and show its inherited title, note, colour, and symbol; add and complete a task linked to that visit; resize the map/schedule split and move the floating checklist; switch dates and return to demonstrate saved planning and layout; open a join-enabled share link in a second signed-in account and show a live edit reaching the first account without a refresh. Finish with clock/theme settings and explain that automatic one-year removal is personal while an owner's manual delete affects everyone. Show only features that work in the actual session. If authenticated recording or two accounts cannot be captured, use supplied real browser recordings instead of inventing scenes. Keep the export below three minutes. Hide email addresses, credentials, private share tokens, and unrelated browser content. Use no copyrighted music or third-party branding beyond permitted product/map attribution.
 ```
 
 **Narration language:** `English` (`en-US`).
@@ -24,14 +24,14 @@ Use a prepared fictitious trip, such as “Lisbon weekend”, with no real trave
 
 | Time | Real action | Narration |
 |---|---|---|
-| 0:00–0:15 | Open Tevel's daily map/schedule workspace | “Tevel brings your places, time, and tasks together for every day of a trip.” |
+| 0:00–0:15 | Open Journas's daily map/schedule workspace | “Journas brings your places, time, and tasks together for every day of a trip.” |
 | 0:15–0:40 | Create/select trip and date; add two pins, colours/symbols/notes | “Choose a trip and a day. Add places to the map, give each one its own identity, and keep useful notes one click away.” |
 | 0:40–0:55 | Draw a gradient arrow between pins | “Connect your stops to make the day's plan easier to follow.” |
 | 0:55–1:15 | Schedule linked visit, add independent block, show inherited fields | “A scheduled visit starts with the place's name, notes, colour, and symbol. You can adjust any detail or add time blocks without a location.” |
 | 1:15–1:30 | Add linked task, check it, reveal strike-through | “Keep preparation beside the plan. Tasks can link to a place, a time block, both, or neither.” |
 | 1:30–1:50 | Resize split/move tasks; switch date and return | “Arrange the workspace for the way you plan. Each day remembers your layout, and your view stays personal.” |
 | 1:50–2:15 | Two actual accounts; read-only link, explicit join, live edit | “Sharing starts with a read-only view. Join-enabled links let travellers become editors. Changes appear in the shared trip without reloading.” |
-| 2:15–2:30 | Settings and final product view | “Choose your clock and theme. Old trips are automatically removed from your account after a year, without removing them for other travellers. Tevel keeps the whole day's journey in one place.” |
+| 2:15–2:30 | Settings and final product view | “Choose your clock and theme. Old trips are automatically removed from your account after a year, without removing them for other travellers. Journas keeps the whole day's journey in one place.” |
 
 If the real workflow needs more time, cut transitions rather than accelerating unreadable text. Include a final simple product title and verified URL. Preserve visible required map attribution.
 

@@ -3,7 +3,7 @@ doc: checklist
 status: approved
 ---
 
-# Tevel — Build Checklist
+# Journas — Build Checklist
 
 Build mode: fast. The creator explicitly approved the displayed complete plan and requested implementation. Checkboxes below represent demonstrated verification, not intended capabilities.
 
@@ -47,7 +47,7 @@ Build mode: fast. The creator explicitly approved the displayed complete plan an
   Build: Audit intended public files/history, finish setup documentation/assets, deploy and collect verification evidence.
   Verify (mechanical): Clean-install documented commands, final production auth/core flow, public repo/license, secret audit, no fabricated screenshots/links.
   Learner check: Open the deployed app and review screenshots/video; supply actual personal survey answers and eligible-user confirmation.
-  Commit: `Publish Tevel and document submission workflow`
+  Commit: `Publish Journas and document submission workflow`
 
 ## Hands-on Checkpoints
 

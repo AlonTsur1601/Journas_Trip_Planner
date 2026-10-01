@@ -947,10 +947,10 @@ textarea {
   width: 100%;
   margin: 0 auto;
   min-height: 100dvh;
-  background: var(--surface);
+  background: var(--auth-backdrop);
 }
 .auth-art {
-  background: var(--auth-backdrop);
+  background: transparent;
   position: relative;
   overflow: hidden;
   padding: 28px;
@@ -959,7 +959,8 @@ textarea {
 
   border-right: 1px solid var(--line);
 }
-.auth-art .brand {
+.auth-art .brand,
+.auth-form .mobile-brand {
   position: relative;
   z-index: 2;
   color: #7354d7;
@@ -1114,10 +1115,11 @@ textarea {
   --auth-backdrop: radial-gradient(ellipse at 85% 15%, #44305d 0%, transparent 60%), linear-gradient(145deg, #292035, #231d30);
 }
 [data-theme="dark"] .auth-art {
-  background: var(--auth-backdrop);
+  background: transparent;
   color: var(--ink);
 }
-[data-theme="dark"] .auth-art .brand {
+[data-theme="dark"] .auth-art .brand,
+[data-theme="dark"] .auth-form .mobile-brand {
   color: #b299ee;
 }
 [data-theme="dark"] [data-theme="dark"] .map-canvas {
@@ -1290,6 +1292,7 @@ textarea {
 }
 
 .modal .auth-page {
+  background: var(--surface);
   display: block;
   min-height: 0;
 }
@@ -1355,10 +1358,8 @@ textarea {
 [data-theme="dark"] .orbit { opacity: 0.4; }
 .auth-mobile-background { display: none; }
 @media (max-width: 900px) {
-  .auth-page { display: block; position: relative; isolation: isolate; background: var(--auth-backdrop); }
+  .auth-page { display: block; position: relative; isolation: isolate; }
   .auth-mobile-background { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
-  [data-theme="dark"] .auth-page { background: var(--auth-backdrop); }
-  .modal .auth-page { background: var(--surface); }
   .modal .auth-mobile-background { display: none; }
   .auth-art { display: none; }
   .auth-form { min-height: 100dvh; max-width: 450px; padding: 24px 20px; }

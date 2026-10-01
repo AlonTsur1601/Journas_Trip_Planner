@@ -105,7 +105,7 @@ textarea {
   align-items: center;
   background: var(--subtle);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   padding-left: 8px;
 }
 .trip-selector select {
@@ -122,7 +122,7 @@ textarea {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 0;
+  border-radius: 5px;
 }
 .icon:hover {
   background: var(--subtle);
@@ -164,7 +164,7 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 0;
+  border-radius: 5px;
   padding: 7px 10px;
   font-size: 13px;
   font-weight: 600;
@@ -186,7 +186,7 @@ textarea {
   font-size: 12px;
 }
 .avatar {
-  border-radius: 0;
+  border-radius: 50%;
   height: 34px;
   width: 34px;
   background: color-mix(in srgb, var(--accent) 13%, var(--surface));
@@ -226,10 +226,11 @@ textarea {
 .view-controls {
   display: flex;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   background: var(--surface);
   padding: 0;
   gap: 0;
+  overflow: hidden;
 }
 .view-controls button {
   display: flex;
@@ -296,7 +297,7 @@ textarea {
   background: var(--subtle);
   border: 1px solid var(--line);
   padding: 2px 6px;
-  border-radius: 0;
+  border-radius: 4px;
   color: var(--muted);
 }
 .map-wrapper {
@@ -316,7 +317,7 @@ textarea {
   background: var(--surface);
   box-shadow: none;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   padding: 5px 8px;
   white-space: nowrap;
   font-size: 11px;
@@ -326,9 +327,9 @@ textarea {
 .map-pin {
   width: 34px;
   height: 34px;
-  border-radius: 0;
+  border-radius: 50% 50% 50% 5px;
   border: 3px solid white;
-  box-shadow: none;
+  box-shadow: 0 2px 5px #26223235;
   color: white;
   font-size: 17px;
 }
@@ -354,7 +355,7 @@ textarea {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 4px;
   white-space: nowrap;
   padding: 5px 8px;
   font-size: 11px;
@@ -424,7 +425,7 @@ textarea {
   right: 0;
   text-align: left;
   padding: 5px 8px;
-  border-radius: 0;
+  border-radius: 6px;
   border-left: 3px solid var(--accent);
   overflow: hidden;
   display: flex;
@@ -457,7 +458,7 @@ textarea {
   position: absolute;
   left: -3px;
   top: -3px;
-  border-radius: 0;
+  border-radius: 50%;
   width: 8px;
   height: 8px;
   background: #e86673;
@@ -467,9 +468,11 @@ textarea {
   z-index: 5;
   display: flex;
   flex-direction: column;
-  box-shadow: none;
+  box-shadow: 0 3px 12px #24203a16;
 
   border: 1px solid var(--line);
+
+  border-radius: 6px;
 }
 .todo-drag {
   cursor: move;
@@ -599,7 +602,7 @@ textarea {
 .status-bar i {
   width: 5px;
   height: 5px;
-  border-radius: 0;
+  border-radius: 50%;
 }
 .saved {
   background: #70ad8d;
@@ -620,7 +623,7 @@ textarea {
   background: var(--surface);
   box-shadow: none;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 6px;
   text-align: center;
   max-width: 430px;
   width: 90%;
@@ -651,8 +654,8 @@ textarea {
 .modal {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #18102524;
   width: 460px;
   max-width: 100%;
   max-height: 90dvh;
@@ -696,7 +699,7 @@ textarea {
 .field textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   background: var(--subtle);
   padding: 7px 9px;
   outline: none;
@@ -780,7 +783,7 @@ textarea {
   min-width: 0;
   flex: 1;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   background: var(--subtle);
   padding: 8px;
   font-size: 11px;
@@ -827,7 +830,7 @@ textarea {
   color: var(--surface);
   font-size: 12px;
   line-height: 1.5;
-  border-radius: 0;
+  border-radius: 6px;
   padding: 12px 15px;
   z-index: 80;
   display: flex;
@@ -860,7 +863,7 @@ textarea {
   width: 320px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 0;
+  border-radius: 6px;
   padding: 10px;
   z-index: 20;
   box-shadow: none;
@@ -885,7 +888,7 @@ textarea {
 }
 .calendar-grid button {
   height: 37px;
-  border-radius: 0;
+  border-radius: 4px;
   font-size: 11px;
 }
 .calendar-grid button:hover {
@@ -1038,7 +1041,7 @@ textarea {
   height: 24px;
   padding: 2px;
   background: #fff;
-  border-radius: 0;
+  border-radius: 3px;
   object-fit: contain;
 }
 .divider {
@@ -1080,7 +1083,7 @@ textarea {
   padding: 20px;
   background: var(--subtle);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 6px;
   margin-top: 15px;
 }
 .setup-message h3 {
@@ -1301,7 +1304,7 @@ textarea {
 .maplibregl-ctrl-group,
 .maplibregl-ctrl-group button,
 .maplibregl-popup-content {
-  border-radius: 0;
+  border-radius: 4px;
   box-shadow: none;
 }
 

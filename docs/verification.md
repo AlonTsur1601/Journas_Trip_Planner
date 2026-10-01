@@ -48,4 +48,4 @@ After the rename, 36 tests passed: 13 emulator integration/rules/HTTP tests, 18 
 
 ## Compact interface verification
 
-The deployed interface uses square controls and panels, flat borders, and no ornamental orbit artwork or card shadows. The desktop top bar is 48px and panel headings are 38px; workspace margins are zero. Native map, schedule, checklist, calendar and settings interactions were checked. Mobile width is 390px with no horizontal overflow. Production gallery captures reflect this compact interface.
+The deployed interface keeps edge-to-edge workspace panels and compact spacing, with gently rounded controls, teardrop map pins and 6px schedule blocks. Floating dialogs and checklists have restrained shadows; ornamental orbit artwork remains removed. The desktop top bar is 48px and panel headings are 38px; workspace margins are zero. Native map, schedule, checklist, calendar and settings interactions were checked. Mobile width is 390px with no horizontal overflow. Production gallery captures reflect this compact interface.

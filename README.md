@@ -6,6 +6,10 @@ Built with React, TypeScript, Vite, Firebase Authentication, Firestore, MapLibre
 
 **Website:** [origin-trip-planner.vercel.app](https://origin-trip-planner.vercel.app). See [verification evidence](docs/verification.md) for the distinction between production checks, emulator checks, and remaining creator actions.
 
+![Origin's actual production daily planner with fictional trip data](devpost/assets/planner-desktop.jpg)
+
+The [submission guide](devpost/submission-guide.md) maps every returned Devpost field to prepared copy and the six checked images. The [DemoMotion guide](devpost/demomotion-guide.md) provides exact inputs and a 2:30 recording sequence. Personal reflections, survey answers, eligibility and the final public video remain creator actions.
+
 ## What you can plan
 
 - Trip dates up to one year ahead, with a monthly calendar of saved trips.
@@ -132,7 +136,8 @@ Emulator accounts/data are separate from production and can be discarded. Use em
 ```powershell
 npm test
 npm run build
-npm run test:rules -- --project demo-origin
+npm run test:rules
+npm run test:integration
 ```
 
 The rules suite requires Firestore Emulator/Java and denies foreign access independently of the UI. Domain tests exercise personal versus owner-global deletion, limits, membership, sparse persistence, and conflict handling. Browser acceptance must additionally cover real auth, date/layout restore, map/timeline/tasks, mobile, and two separate accounts. Record actual executed results in the checklist/verification report; do not mark unrun checks as passed. Emulator evidence and production evidence are distinct.

@@ -24,9 +24,11 @@ export default function MapPanel({
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
   const callbacks = useRef({ onView, onPin, onAdd, readonly });
+  const restoringView = useRef(false);
   callbacks.current = { onView, onPin, onAdd, readonly };
   useEffect(() => {
     if (!container.current) return;
+    restoringView.current = false;
     const m = new maplibregl.Map({
       container: container.current,
       style: "https://tiles.openfreemap.org/styles/liberty",
@@ -37,6 +39,7 @@ export default function MapPanel({
     map.current = m;
     m.addControl(new maplibregl.NavigationControl(), "bottom-left");
     m.on("moveend", () => {
+      if (restoringView.current) return;
       const c = m.getCenter();
       callbacks.current.onView([c.lng, c.lat], m.getZoom());
     });
@@ -47,10 +50,15 @@ export default function MapPanel({
       }
     });
     m.doubleClickZoom.disable();
-    const observer = new ResizeObserver(() => m.resize());
+    const observer = new ResizeObserver(() => {
+      restoringView.current = true;
+      m.resize();
+      restoringView.current = false;
+    });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
+      restoringView.current = true;
       m.remove();
       map.current = null;
     };
@@ -121,9 +129,21 @@ export default function MapPanel({
           el.className = "route-arrow";
           el.style.color = b.color;
           el.textContent = "➤";
-          el.style.transform = `rotate(${(Math.atan2(a.lat - b.lat, b.lng - a.lng) * 180) / Math.PI}deg)`;
+          const rotation =
+            (Math.atan2(
+              (a.lat - b.lat) / Math.cos((mid[1] * Math.PI) / 180),
+              b.lng - a.lng,
+            ) *
+              180) /
+            Math.PI;
           markers.current.push(
-            new maplibregl.Marker({ element: el }).setLngLat(mid).addTo(m),
+            new maplibregl.Marker({
+              element: el,
+              rotation,
+              rotationAlignment: "map",
+            })
+              .setLngLat(mid)
+              .addTo(m),
           );
         }
       });
@@ -149,8 +169,11 @@ export default function MapPanel({
       Math.abs(c.lng - layout.center[0]) > 0.00001 ||
       Math.abs(c.lat - layout.center[1]) > 0.00001 ||
       Math.abs(m.getZoom() - layout.zoom) > 0.00001
-    )
+    ) {
+      restoringView.current = true;
       m.jumpTo({ center: layout.center, zoom: layout.zoom });
+      restoringView.current = false;
+    }
   }, [layout.center[0], layout.center[1], layout.zoom]);
   return (
     <div className="map-wrapper">

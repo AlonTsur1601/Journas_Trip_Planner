@@ -4,7 +4,7 @@ The public HTML at [DemoMotion WebMCP](https://demomotion-ai-web-c73vaqorlq-an.a
 
 ## Paste into the first form
 
-**Product URL:** paste the real verified Origin production URL. Do not use `localhost` for a remotely hosted recorder. The expected Vercel project name is `origin-trip-planner`, but use the actual deployment result.
+**Product URL:** `https://origin-trip-planner.vercel.app`. Sign in with your own test account before recording. A remotely hosted recorder cannot use localhost.
 
 **Goal:**
 

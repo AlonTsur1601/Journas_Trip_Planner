@@ -18,22 +18,22 @@ Record observed evidence and date for each check rather than converting this tab
 
 | Scenario | Required observation | Evidence |
 |---|---|---|
-| Sparse dates | Opening an empty date creates no planning or layout record | Pending |
-| Personal workspace | Two users save different panel bounds; each restores their own | Pending |
-| Inheritance | Linked visit inherits place fields; a manual override stays independent | Pending |
-| Detachment | Removing a place/block preserves tasks and standalone visits | Pending |
-| Read-only link | Viewer sees content; direct write is rejected | Pending |
-| Live editing | Second account edit reaches first without refresh | Pending |
-| Same-field conflict | Stale revision gets an explicit conflict rather than silent overwrite | Pending |
-| Participant removal | Removing Bob's saved trip preserves Alice's shared content; Bob loses access | Pending |
-| Owner automatic removal | Owner loses personal saved trip; another member retains content/ownership unchanged | Pending |
-| Owner manual deletion | Everyone loses access; link is invalid and stale write cannot recreate data | Pending |
-| Last member cleanup | Remaining shared records and grants are purged | Pending |
-| Trip quota | Warning at 80; creation and joining rejected at 100; personal removal restores a slot | Pending |
-| Clock/DST | Active zone always visible; line only on its current date; ambiguous/nonexistent times handled | Pending |
-| Network loss | Failed write stays visibly pending; navigation/reload does not silently discard draft | Pending |
-| Production authentication | Actual Google and verified email login/reset work on authorised deployed domain | Pending |
-| Mobile/browser | Planner controls and floating task bounds remain reachable | Pending |
+| Sparse dates | Opening an empty date creates no planning or layout record | Domain test passed; production empty-day UI checked |
+| Personal workspace | Two users save different panel bounds; each restores their own | Independent layout test; production date/resize restoration checked |
+| Inheritance | Linked visit inherits place fields; a manual override stays independent | Domain tests passed; live place-note inheritance observed in production |
+| Detachment | Removing a place/block preserves tasks and standalone visits | Domain test passed |
+| Read-only link | Viewer sees content; direct write is rejected | Real share preview UI and emulator rules passed |
+| Live editing | Second account edit reaches first without refresh | Production browser owner + separate local frontend using production backend; observed shared note |
+| Same-field conflict | Stale revision gets an explicit conflict rather than silent overwrite | Production HTTP 409 and browser conflict-choice dialog observed |
+| Participant removal | Removing Bob's saved trip preserves Alice's shared content; Bob loses access | Production API passed; browser access revocation clears content |
+| Owner automatic removal | Owner loses personal saved trip; another member retains content/ownership unchanged | Production cleanup test passed |
+| Owner manual deletion | Everyone loses access; link is invalid and stale write cannot recreate data | Production API and emulator tests passed |
+| Last member cleanup | Remaining shared records and grants are purged | Production Firestore absence asserted after cleanup |
+| Trip quota | Warning at 80; creation and joining rejected at 100; personal removal restores a slot | Server boundary tests passed; warning/disable controls inspected in source |
+| Clock/DST | Active zone always visible; line only on its current date; ambiguous/nonexistent times handled | Destination-clock browser check and DST tests passed |
+| Network loss | Failed write stays visibly pending; navigation/reload does not silently discard draft | Recovered a failed-save draft in emulator browser and saved after reconnecting service |
+| Production authentication | Actual Google and verified email login/reset work on authorised deployed domain | Email/password form passed; real Google login and mailbox delivery await creator |
+| Mobile/browser | Planner controls and floating task bounds remain reachable | 390×844 browser check; desktop drag/resize and toolbar visibility checked |
 
 The final checklist should link actual test outputs/browser captures and distinguish emulator from production. No row is passed just because its intended behaviour is documented.
 

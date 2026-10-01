@@ -77,6 +77,7 @@ function Modal({ title, children, onClose }: any) {
       ?.querySelector<HTMLElement>("input,button,select,textarea")
       ?.focus();
     const handler = (event: KeyboardEvent) => {
+      if (!box.current?.contains(document.activeElement)) return;
       if (event.key === "Escape") {
         event.stopPropagation();
         onClose();
@@ -477,20 +478,48 @@ export default function App() {
         });
         if (!cancelled) setDay(next);
       },
-      (e) => setMessage(e.message),
+      (e) => {
+        if (e.code === "permission-denied") lostAccess();
+        else if (!cancelled)
+          setMessage(
+            "Live updates are temporarily unavailable. Please reconnect.",
+          );
+      },
     );
-    const stopTrip = onSnapshot(doc(db, "trips", trip.id), (snap) => {
-      if (!snap.exists() || snap.data()?.deleted) {
-        setTrip(null);
-        setDay(emptyDay());
-        refresh();
-        setMessage("This trip was deleted.");
-      } else if (!snap.data()?.memberIds?.includes(user.uid)) {
-        setTrip(null);
-        refresh();
-        setMessage("You no longer have access to this trip.");
-      }
-    });
+    const lostAccess = () => {
+      if (cancelled) return;
+      cancelled = true;
+      setTrip(null);
+      setDay(emptyDay());
+      setEdit(null);
+      setConflict(null);
+      setModal(null);
+      void refresh().catch(() => {});
+      setMessage("This trip was deleted or you no longer have access.");
+    };
+    const stopTrip = onSnapshot(
+      doc(db, "trips", trip.id),
+      (snap) => {
+        if (!snap.exists() || snap.data()?.deleted) {
+          lostAccess();
+        } else if (!snap.data()?.memberIds?.includes(user.uid)) {
+          lostAccess();
+        } else if (!cancelled) {
+          const updated = { ...snap.data(), id: snap.id } as Trip;
+          setTrip(updated);
+          setTrips((current) =>
+            current.map((value) => (value.id === updated.id ? updated : value)),
+          );
+        }
+      },
+      (error) => {
+        if (error.code === "permission-denied") lostAccess();
+        else if (!cancelled)
+          setMessage(
+            "Live updates are temporarily unavailable. Please reconnect.",
+          );
+      },
+    );
     return () => {
       cancelled = true;
       stop();
@@ -709,8 +738,16 @@ export default function App() {
         setMessage(
           "This hour occurs twice due to daylight saving. Choose the earlier or later occurrence, then save.",
         );
-      } else if (e.status === 409) setConflict({ draft, current: e.current });
-      else {
+      } else if (e.code === "CONFLICT")
+        setConflict({
+          draft,
+          current: e.current,
+          fields: e.details?.fields ?? [],
+        });
+      else if (e.status === 409) {
+        setMessage(e.message);
+        setStatus("Save pending — draft kept on this device");
+      } else {
         setMessage(e.message);
         setStatus("Save pending — draft kept on this device");
       }
@@ -903,7 +940,11 @@ export default function App() {
         </div>
         <div className="top-actions">
           {trip && (
-            <button className="button subtle" onClick={() => setModal("trip")}>
+            <button
+              className="button subtle"
+              aria-label="Trip details"
+              onClick={() => setModal("trip")}
+            >
               <Share2 size={16} />
               <span>Trip details</span>
             </button>
@@ -976,6 +1017,7 @@ export default function App() {
           ].map(([key, Icon, label]: any) => (
             <button
               key={key}
+              aria-label={label}
               className={layout[key as keyof Layout] ? "active" : ""}
               onClick={() => {
                 if (
@@ -1229,10 +1271,19 @@ export default function App() {
           <section
             className="todo-panel panel"
             style={{
-              left: Math.min(layout.todoX, Math.max(0, innerWidth - 56 - layout.todoWidth)),
-              top: Math.min(layout.todoY, Math.max(0, innerHeight - 225 - layout.todoHeight)),
+              left: Math.min(
+                layout.todoX,
+                Math.max(0, innerWidth - 56 - layout.todoWidth),
+              ),
+              top: Math.min(
+                layout.todoY,
+                Math.max(0, innerHeight - 225 - layout.todoHeight),
+              ),
               width: Math.min(layout.todoWidth, innerWidth - 56),
-              height: Math.min(layout.todoHeight, Math.max(220, innerHeight - 225)),
+              height: Math.min(
+                layout.todoHeight,
+                Math.max(220, innerHeight - 225),
+              ),
             }}
           >
             <div
@@ -1241,7 +1292,9 @@ export default function App() {
                 if ((e.target as HTMLElement).closest("button")) return;
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
-                const bounds = el.closest(".workspace")!.getBoundingClientRect();
+                const bounds = el
+                  .closest(".workspace")!
+                  .getBoundingClientRect();
                 const panelBounds = el.parentElement!.getBoundingClientRect();
                 const start = {
                   x: e.clientX,
@@ -1340,7 +1393,9 @@ export default function App() {
               onPointerDown={(e) => {
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
-                const bounds = el.closest(".workspace")!.getBoundingClientRect();
+                const bounds = el
+                  .closest(".workspace")!
+                  .getBoundingClientRect();
                 const panelBounds = el.parentElement!.getBoundingClientRect();
                 const start = {
                   x: e.clientX,
@@ -1350,8 +1405,22 @@ export default function App() {
                 };
                 const move = (ev: PointerEvent) =>
                   changeLayout({
-                    todoWidth: Math.max(260, Math.min(bounds.right - panelBounds.left, start.w + ev.clientX - start.x)),
-                    todoHeight: Math.max(220, Math.min(bounds.bottom - panelBounds.top, start.h + ev.clientY - start.y)),
+                    todoX: panelBounds.left - bounds.left,
+                    todoY: panelBounds.top - bounds.top,
+                    todoWidth: Math.max(
+                      260,
+                      Math.min(
+                        bounds.right - panelBounds.left,
+                        start.w + ev.clientX - start.x,
+                      ),
+                    ),
+                    todoHeight: Math.max(
+                      220,
+                      Math.min(
+                        bounds.bottom - panelBounds.top,
+                        start.h + ev.clientY - start.y,
+                      ),
+                    ),
                   });
                 el.addEventListener("pointermove", move);
                 el.addEventListener(
@@ -1646,7 +1715,10 @@ export default function App() {
                       required
                       value={edit.item.start}
                       onInput={(e: any) =>
-                        setEdit({ ...edit, item: { ...edit.item, start: e.currentTarget.value } })
+                        setEdit({
+                          ...edit,
+                          item: { ...edit.item, start: e.currentTarget.value },
+                        })
                       }
                       onChange={(e: any) =>
                         setEdit({
@@ -1662,7 +1734,10 @@ export default function App() {
                       required
                       value={edit.item.end}
                       onInput={(e: any) =>
-                        setEdit({ ...edit, item: { ...edit.item, end: e.currentTarget.value } })
+                        setEdit({
+                          ...edit,
+                          item: { ...edit.item, end: e.currentTarget.value },
+                        })
                       }
                       onChange={(e: any) =>
                         setEdit({
@@ -1768,8 +1843,23 @@ export default function App() {
                       type="color"
                       value={edit.item.color}
                       onInput={(e: any) =>
-                        setEdit({ ...edit, item: { ...edit.item, color: e.currentTarget.value,
-                          ...(edit.kind === "blocks" ? { overrides: [...new Set([...edit.item.overrides, "color"])] } : {}) } })
+                        setEdit({
+                          ...edit,
+                          item: {
+                            ...edit.item,
+                            color: e.currentTarget.value,
+                            ...(edit.kind === "blocks"
+                              ? {
+                                  overrides: [
+                                    ...new Set([
+                                      ...edit.item.overrides,
+                                      "color",
+                                    ]),
+                                  ],
+                                }
+                              : {}),
+                          },
+                        })
                       }
                       onChange={(e: any) =>
                         setEdit({
@@ -2200,7 +2290,9 @@ export default function App() {
                 label="Accent color"
                 type="color"
                 value={settings.accent}
-                onInput={(e: any) => setSettings({ ...settings, accent: e.currentTarget.value })}
+                onInput={(e: any) =>
+                  setSettings({ ...settings, accent: e.currentTarget.value })
+                }
                 onChange={(e: any) =>
                   setSettings({ ...settings, accent: e.target.value })
                 }
@@ -2297,11 +2389,71 @@ export default function App() {
             Your changes overlap with another traveler’s edit. Your draft is
             preserved.
           </p>
-          <pre>{JSON.stringify(conflict.current, null, 2)}</pre>
+          <table className="conflict-table">
+            <thead>
+              <tr>
+                <th>Detail</th>
+                <th>Your draft</th>
+                <th>Latest version</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conflict.fields.map((field: string) => {
+                const labels: Record<string, string> = {
+                  title: "Name",
+                  note: "Place note",
+                  detail: "Description",
+                  start: "Starts at",
+                  end: "Ends at",
+                  lng: "Longitude",
+                  lat: "Latitude",
+                  pinId: "Linked place",
+                  blockId: "Linked time",
+                  overrides: "Custom properties",
+                  timezone: "Time zone",
+                  disambiguation: "Repeated hour",
+                };
+                const display = (value: any) =>
+                  value === null || value === undefined
+                    ? "None"
+                    : field === "pinId"
+                      ? (day.pins.find((pin) => pin.id === value)?.title ??
+                        "Removed place")
+                      : field === "blockId"
+                        ? (day.blocks.find((block) => block.id === value)
+                            ?.title ?? "Removed time")
+                        : Array.isArray(value)
+                          ? value.join(", ")
+                          : typeof value === "boolean"
+                            ? value
+                              ? "Yes"
+                              : "No"
+                            : String(value);
+                return (
+                  <tr key={field}>
+                    <th>
+                      {labels[field] ??
+                        field.charAt(0).toUpperCase() + field.slice(1)}
+                    </th>
+                    <td>{display(conflict.draft.item[field])}</td>
+                    <td>{display(conflict.current[field])}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
           <div className="modal-actions">
             <button
               className="button"
               onClick={() => {
+                const draftKey = `origin-drafts:${user?.uid}:${trip?.id}:${date}`;
+                const pending = JSON.parse(
+                  localStorage.getItem(draftKey) ?? "{}",
+                );
+                delete pending[conflict.draft.item.id];
+                if (Object.keys(pending).length)
+                  localStorage.setItem(draftKey, JSON.stringify(pending));
+                else localStorage.removeItem(draftKey);
                 setEdit({
                   ...conflict.draft,
                   item: conflict.current,

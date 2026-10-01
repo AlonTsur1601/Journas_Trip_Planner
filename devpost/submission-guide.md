@@ -19,15 +19,15 @@ The eligibility checkbox confirms age of majority, all teammates' eligibility, a
 | Full project description (maximum 50,000 characters) | Review the English draft in [submission-copy.md](submission-copy.md); fill the personal learning paragraph yourself. Remove any unverified feature claim. |
 | Built with (maximum 25 tags) | `React`, `TypeScript`, `Vite`, `Firebase`, `Firestore`, `MapLibre`, `OpenFreeMap`, `Vercel`, `Codex` — verify these match the final repository. |
 | Source repository link | `https://github.com/AlonTsur1601/Origin_Trip_Planner` — verify unauthenticated access before submission. |
-| Website link | Use the actual verified production URL from the deployment result. `origin-trip-planner` is the requested project name, not evidence of an available URL. |
+| Website link | `https://origin-trip-planner.vercel.app` — public production site verified with authenticated planning and collaboration. |
 | Video URL | Paste the final public YouTube/Vimeo URL; no video has been uploaded by preparing this guide. |
-| Thumbnail | Use `devpost/assets/cover.png` once generated and visually checked. |
-| Image gallery | Use the real screenshots listed below once captured and checked. |
-| Testing instructions | See the block below; change the URL only after verified deployment. |
+| Thumbnail | Upload `devpost/assets/cover.jpg`. |
+| Image gallery | Upload the checked production screenshots listed below, in order. |
+| Testing instructions | See the block below. |
 
 ### Testing instructions (English copy)
 
-Open the deployed Origin website in a desktop browser. Create a free account using Google or email and password, and verify your email if prompted. Create a trip with a date within the next year. Add two map pins, assign a scheduled visit to one pin, and create a linked task. Switch dates and return to check that your planning and workspace are restored. For collaboration, create a join-enabled share link and open it in a second browser with a separate account. The second account initially views the trip read-only and can explicitly join to edit. An edit should appear in the first browser without reloading. This does not require payment. Use your own disposable test trip; the owner's manual delete removes it for all participants.
+Open https://origin-trip-planner.vercel.app in a desktop browser. Create a free account using Google or email and password, and verify your email if prompted. Create a trip with a date within the next year. Add two map pins, assign a scheduled visit to one pin, and create a linked task. Switch dates and return to check that your planning and workspace are restored. For collaboration, create a join-enabled share link and open it in a second browser with a separate account. The second account initially views the trip read-only and can explicitly join to edit. An edit should appear in the first browser without reloading. This does not require payment. Use your own disposable test trip; the owner's manual delete removes it for all participants.
 
 If the deployed app is restricted at submission time, do not invent access instructions or expose a real personal password: arrange a dedicated reviewer account through the submission's testing-instructions surface as required by the rules, or resolve access first. Public self-service registration should make that unnecessary.
 
@@ -54,16 +54,16 @@ Eligibility statement from the form:
 
 ## Images and exact placement
 
-The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. Existing filenames alone do not imply an image was produced.
+The current upload tools accept PNG/JPEG/GIF up to 5 MB per file and up to 15 gallery images, with captions up to 140 characters. No image dimensions or mandatory gallery count were returned, so the sizes below are production choices, not event requirements. The six supplied JPEG files are real production captures with fictional QA trip data; each is below 5 MB. The cover and collaboration image reuse the desktop capture, where the second account’s inherited edit is visible.
 
-| Planned file | Size | Placement | Caption |
+| File | Size | Placement | Caption |
 |---|---|---|---|
-| `assets/cover.png` | 1280 × 720 | Project thumbnail | Origin — places, time, and tasks in one shared daily workspace. |
-| `assets/planner-desktop.png` | Desktop screenshot | Gallery 1 | Plan a day with map pins, scheduled visits, and linked tasks. |
-| `assets/planner-mobile.png` | Mobile screenshot | Gallery 2 | A compact planner that keeps trip controls accessible on a small screen. |
-| `assets/calendar.png` | Desktop screenshot | Gallery 3 | Browse overlapping trips in a month-by-month calendar. |
-| `assets/settings.png` | Desktop screenshot | Gallery 4 | Personalise the clock, theme, profile, and automatic trip retention. |
-| `assets/live-collaboration.png` | Two-account real browser capture | Gallery 5 | Two travellers edit the same itinerary without refreshing. |
+| `assets/cover.jpg` | 1280 × 720 | Project thumbnail | Origin — places, time, and tasks in one shared daily workspace. |
+| `assets/planner-desktop.jpg` | Desktop screenshot | Gallery 1 | Plan a day with map pins, scheduled visits, and linked tasks. |
+| `assets/planner-mobile.jpg` | Mobile screenshot | Gallery 2 | A compact planner that keeps trip controls accessible on a small screen. |
+| `assets/calendar.jpg` | Desktop screenshot | Gallery 3 | Browse overlapping trips in a month-by-month calendar. |
+| `assets/settings.jpg` | Desktop screenshot | Gallery 4 | Personalise the clock, theme, profile, and automatic trip retention. |
+| `assets/live-collaboration.jpg` | Production owner view after a second-account edit | Gallery 5 | A traveller’s live place-note edit also updates the linked visit. |
 
 Record whether each image shows production, emulator, or labelled sample data. Do not present an emulator screenshot as proof that production Firebase is configured. Do not put email addresses, private share tokens, credentials, or unrelated windows in gallery images.
 

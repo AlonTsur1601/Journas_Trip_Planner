@@ -74,3 +74,16 @@ Activity mode: To be recorded when performed.
 ## Revisions
 
 - Automatic removal defaults to one year and affects only the current account; owner manual deletion alone is global — explicit user revision to the original retention plan.
+
+## Mechanical verification record — 1 October 2026
+
+These checks are separate from the creator's hands-on learning confirmations above.
+
+- [x] Five automated suites / 34 checks pass, including Auth/Firestore emulators, rules, conflicts, quotas, deletion boundaries, sparse days and DST.
+- [x] Two-account production API verification passes all personal/global removal and orphan-cleanup scenarios.
+- [x] Actual browser planning, linked inheritance, checked tasks, sharing/joining, live edit/revocation, conflict resolution, date/layout restoration and mobile checks recorded in `docs/verification.md`.
+- [x] Public MIT repository, production deployment, setup guides, six real product images and exact DemoMotion instructions prepared.
+- [ ] Creator's real Google sign-in and mailbox delivery confirmed.
+- [ ] Creator's learning activity, eligibility/survey responses, public final video and Devpost submission completed.
+
+Code routes are documented in `devpost/app-map.html` and `devpost/learning-record.md`. Their existence does not establish a learning checkpoint or creator sign-off.

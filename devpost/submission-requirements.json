@@ -1,0 +1,146 @@
+{
+  "hackathon": {
+    "id": 30447,
+    "slug": "learn-ai-basics",
+    "title": "Build With AI: Basics"
+  },
+  "data": {
+    "description_html": "<h4><strong>What to Submit</strong></h4>\n<ul>\n<li>Your project: a short demo video (1 to 3 minutes, a screen recording is fine) and a public GitHub, GitLab, or BitBucket repo URL. Reviewers won't clone or run code, so the video has to show it working.</li>\n<li>A short description: what it does, who it's for, what you learned.</li>\n</ul>",
+    "description_text": "What to Submit\n\nYour project: a short demo video (1 to 3 minutes, a screen recording is fine) and a public GitHub, GitLab, or BitBucket repo URL. Reviewers won't clone or run code, so the video has to show it working.\nA short description: what it does, who it's for, what you learned.",
+    "fields": [
+      {
+        "id": 28614,
+        "label": "Are you submitting as an individual, a team, or an organization?",
+        "type": "dropdown",
+        "type_raw": "SubmissionFieldAdvancedDropdown",
+        "required": true,
+        "description": "",
+        "position": 0,
+        "options": [
+          "Individual",
+          "Team"
+        ],
+        "multiple": false
+      },
+      {
+        "id": 28615,
+        "label": "Country of residence",
+        "type": "text",
+        "type_raw": "SubmissionFieldText",
+        "required": true,
+        "description": "",
+        "position": 1
+      },
+      {
+        "id": 28616,
+        "label": "Organization name (if applicable)",
+        "type": "text",
+        "type_raw": "SubmissionFieldText",
+        "required": false,
+        "description": "",
+        "position": 2
+      },
+      {
+        "id": 28617,
+        "label": "Eligibility-confirmation",
+        "type": "checkbox",
+        "type_raw": "SubmissionFieldCheckBox",
+        "required": true,
+        "description": "I confirm that I (and all teammates) meet the eligibility requirements in the Official Rules, including being the age of majority where we reside, and that this project was newly created during the Submission Period using the Devpost Learn Skill Pack.",
+        "position": 3
+      },
+      {
+        "id": 28618,
+        "label": "Which of these did you actually use? Check all that apply.",
+        "type": "dropdown",
+        "type_raw": "SubmissionFieldAdvancedDropdown",
+        "required": true,
+        "description": "",
+        "position": 4,
+        "options": [
+          "Intro video",
+          "Live build session",
+          "Cup of Joe office hours",
+          "Discord",
+          "None"
+        ],
+        "multiple": true
+      },
+      {
+        "id": 28619,
+        "label": "Did the cost of AI (subscription, tokens, credits) affect what you did?",
+        "type": "dropdown",
+        "type_raw": "SubmissionFieldAdvancedDropdown",
+        "required": true,
+        "description": "",
+        "position": 5,
+        "options": [
+          "No, I never thought about it",
+          "It made me cut scope or switch to a cheaper model",
+          "I hit a usage limit or paywall",
+          "It stopped me from doing something I wanted to do"
+        ],
+        "multiple": true
+      },
+      {
+        "id": 28620,
+        "label": "Now, how confident are you that you could plan and build a small, maintainable project with a coding agent?",
+        "type": "dropdown",
+        "type_raw": "SubmissionFieldAdvancedDropdown",
+        "required": true,
+        "description": "",
+        "position": 6,
+        "options": [
+          "1 (No idea where to start",
+          "2",
+          "3",
+          "4",
+          "5 (Easily)"
+        ],
+        "multiple": false
+      },
+      {
+        "id": 28621,
+        "label": "If we could fix one thing before the next person tries this, what should it be?",
+        "type": "text",
+        "type_raw": "SubmissionFieldText",
+        "required": false,
+        "description": "",
+        "position": 7
+      },
+      {
+        "id": 28624,
+        "label": "What kind of value did your project create for you? (select all that apply)",
+        "type": "dropdown",
+        "type_raw": "SubmissionFieldAdvancedDropdown",
+        "required": true,
+        "description": "",
+        "position": 9,
+        "options": [
+          "Saved me time",
+          "Made or saved me money",
+          "Created delight / was just fun",
+          "Let me do something I couldn't do before"
+        ],
+        "multiple": true
+      },
+      {
+        "id": 28625,
+        "label": "Tell us more about the value your project provides for you?",
+        "type": "text",
+        "type_raw": "SubmissionFieldText",
+        "required": false,
+        "description": "This is *super* helpful to us in learning how to improve the learning hackathons over time.",
+        "position": 9
+      }
+    ],
+    "deliverables": {
+      "submission_object": "submission",
+      "video_required": true,
+      "website_required": false,
+      "zip_file_required": false
+    }
+  },
+  "data_completeness": "complete",
+  "fetched_at": "2026-10-01T06:50:10Z"
+}

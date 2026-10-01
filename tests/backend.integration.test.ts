@@ -1,0 +1,57 @@
+import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { initializeTestEnvironment, assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+import { firestoreStore } from '../server/store.js';
+import { OriginService } from '../server/service.js';
+import type { Data, Trip } from '../server/types.js';
+const enabled = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
+describe.skipIf(!enabled)('Firestore Admin transactions + protected client Live', () => {
+    let service: OriginService, env: RulesTestEnvironment;
+    const day = '2026-10-01';
+    beforeAll(async () => { process.env.FIREBASE_PROJECT_ID = 'demo-origin'; env = await initializeTestEnvironment({ projectId: 'demo-origin', firestore: { rules: readFileSync('firestore.rules', 'utf8') } }); service = new OriginService(firestoreStore(), () => Date.parse(day + 'T12:00:00Z')); });
+    afterAll(async () => { await env?.cleanup(); });
+    it('commits real transactions, distributes Live changes, detects conflicts and revokes access', async () => {
+        const { trip } = await service.execute('integrationAlice', { action: 'trip.create', name: 'Live test', startDate: day, endDate: day });
+        const id = (trip as Trip).id;
+        const { token } = await service.execute('integrationAlice', { action: 'share.create', tripId: id, mode: 'editor' });
+        await service.execute('integrationBob', { action: 'share.join', token });
+        const db = env.authenticatedContext('integrationBob', { email_verified: true }).firestore();
+        const query = collection(db, `trips/${id}/days/${day}/items`);
+        const frames: Data[][] = [];
+        let stop = () => { };
+        const observed = new Promise<void>((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Live snapshot did not reflect shared edit')), 10000); stop = onSnapshot(query, snapshot => { const items = snapshot.docs.map(doc => doc.data()); frames.push(items); if (items.some(item => item.title === 'Second title')) {
+            clearTimeout(timer);
+            resolve();
+        } }, reject); });
+        const patch = { title: 'Museum', note: 'Shared', color: '#8b5cf6', symbol: '★', lng: 2.3, lat: 48.8 };
+        const result = await service.execute('integrationAlice', { action: 'item.patch', tripId: id, date: day, kind: 'pins', id: 'livepin', patch, baseVersions: {} });
+        await service.execute('integrationBob', { action: 'item.patch', tripId: id, date: day, kind: 'pins', id: 'livepin', patch: { title: 'Second title' }, baseVersions: (result.item as Data).versions });
+        await observed;
+        stop();
+        expect(frames.some(frame => frame.some(item => item.title === 'Second title'))).toBe(true);
+        await expect(service.execute('integrationAlice', { action: 'item.patch', tripId: id, date: day, kind: 'pins', id: 'livepin', patch: { title: 'Stale edit' }, baseVersions: (result.item as Data).versions })).rejects.toMatchObject({ code: 'CONFLICT' });
+        await service.execute('integrationBob', { action: 'trip.remove', tripId: id });
+        await assertFails(getDocs(query));
+        await assertSucceeds(getDocs(collection(env.authenticatedContext('integrationAlice', { email_verified: true }).firestore(), `trips/${id}/days/${day}/items`)));
+        await service.execute('integrationAlice', { action: 'trip.remove', tripId: id });
+        await expect(service.execute(null, { action: 'share.read', token, date: day })).rejects.toMatchObject({ code: 'INVALID_SHARE' });
+    }, 25000);
+    it('queries due memberships by index and removes an owner personally without affecting remaining member', async () => {
+        const { trip } = await service.execute('cleanupAlice', { action: 'trip.create', name: 'Retention', startDate: day, endDate: day });
+        const id = (trip as Trip).id;
+        const { token } = await service.execute('cleanupAlice', { action: 'share.create', tripId: id, mode: 'editor' });
+        await service.execute('cleanupBob', { action: 'share.join', token });
+        await service.execute('cleanupAlice', { action: 'settings.save', settings: { retentionDays: 30 } });
+        await service.execute('cleanupBob', { action: 'settings.save', settings: { autoDelete: false } });
+        const later = new OriginService(firestoreStore(), () => Date.parse('2026-11-03T00:00:00Z'));
+        const result = await later.cleanup();
+        expect(Number(result.removed)).toBeGreaterThanOrEqual(1);
+        const kept = (await later.execute('cleanupBob', { action: 'trip.get', tripId: id, date: day })).trip as Trip;
+        expect(kept.ownerId).toBe('cleanupAlice');
+        expect(kept.memberIds).toEqual(['cleanupBob']);
+        await expect(later.execute('cleanupAlice', { action: 'trip.get', tripId: id, date: day })).rejects.toMatchObject({ status: 403 });
+        await later.execute('cleanupBob', { action: 'trip.remove', tripId: id });
+        await later.cleanup();
+    }, 25000);
+});

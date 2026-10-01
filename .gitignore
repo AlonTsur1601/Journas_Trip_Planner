@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vercel/
+.env
+.env.*
+!.env.example
+*service-account*.json
+*.local
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+/devpost/learner-profile.md
+/test-results/
+/playwright-report/
+/.todo-mcp/

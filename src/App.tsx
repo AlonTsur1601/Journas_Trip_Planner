@@ -27,6 +27,7 @@ import {
   Compass,
   LogOut,
   Check,
+  Save,
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
@@ -308,7 +309,8 @@ export default function App() {
     [shareReady, setShareReady] = useState(false),
     [joinedToken, setJoinedToken] = useState<string | null>(null),
     [conflict, setConflict] = useState<any>(null),
-    [saving, setSaving] = useState(false);
+    [saving, setSaving] = useState(false),
+    [manualSaving, setManualSaving] = useState(false);
   const token = new URLSearchParams(location.search).get("share");
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -563,6 +565,7 @@ export default function App() {
     return () => clearInterval(id);
   }, [token, date, shareTrip, shareReady, joinedToken]);
   async function saveLayout() {
+    setTime(new Date());
     if (!dirty.current || !tripRef.current) return;
     if (shareTrip) {
       localStorage.setItem(
@@ -604,6 +607,18 @@ export default function App() {
       }
     }
   };
+  async function saveManually() {
+    if (manualSaving) return;
+    setManualSaving(true);
+    try {
+      await autosave.current();
+    } catch (error: any) {
+      setMessage(error.message);
+    } finally {
+      setTime(new Date());
+      setManualSaving(false);
+    }
+  }
   useEffect(() => {
     const run = () => void autosave.current();
     const id = setInterval(run, 300000);
@@ -754,6 +769,7 @@ export default function App() {
       else localStorage.removeItem(draftKey);
       setEdit(null);
       setConflict(null);
+      setTime(new Date());
       setStatus("All changes saved");
     } catch (e: any) {
       if (e.code === "AMBIGUOUS_TIME") {
@@ -959,6 +975,9 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
+          <button className="icon" aria-label="Save planning" title="Save planning" disabled={!user || manualSaving || saving} onClick={saveManually}>
+            <Save size={18} />
+          </button>
           <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           {trip && (
             <button

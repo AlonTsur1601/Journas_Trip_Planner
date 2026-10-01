@@ -74,6 +74,7 @@ textarea {
   width: 29px;
   height: 29px;
   stroke-width: 1.7;
+  flex-shrink: 0;
 }
 .brand strong {
   font-family: Manrope, sans-serif;
@@ -941,15 +942,14 @@ textarea {
 }
 .auth-page {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
-  width: min(100%, 960px);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 38%);
+  width: 100%;
   margin: 0 auto;
-  border-bottom: 1px solid var(--line);
   min-height: 100dvh;
   background: var(--surface);
 }
 .auth-art {
-  background: var(--surface);
+  background: #eeebf9;
   position: relative;
   overflow: hidden;
   padding: 28px;
@@ -1111,7 +1111,7 @@ textarea {
   color: var(--ink);
 }
 [data-theme="dark"] .auth-art {
-  background: var(--surface);
+  background: #292035;
   color: var(--ink);
 }
 [data-theme="dark"] .auth-art .brand {
@@ -1313,4 +1313,38 @@ textarea {
   .trip-selector { min-width: 0; }
   .trip-selector select { flex: 1; min-width: 0; width: 0; }
   .date-picker { justify-content: flex-end; }
+}
+
+.orbit {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid #cbbfea70;
+  border-radius: 50%;
+  width: 720px;
+  height: 720px;
+  right: -300px;
+  top: -170px;
+  transform: rotate(-25deg);
+}
+.orbit-two {
+  width: 900px;
+  height: 900px;
+  right: -330px;
+  top: -150px;
+  border-color: #ded5ee;
+}
+.orbit-one::after {
+  content: "✦";
+  font-size: 50px;
+  position: absolute;
+  bottom: 100px;
+  left: 120px;
+  color: #ae98e5;
+}
+[data-theme="dark"] .orbit { opacity: 0.25; }
+@media (max-width: 900px) {
+  .auth-page { display: block; }
+  .auth-art { display: none; }
+  .auth-form { min-height: 100dvh; max-width: 450px; padding: 24px 20px; }
+  .mobile-brand { display: flex; margin-bottom: 18px; }
 }

@@ -152,6 +152,8 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
           <Compass />
           <strong>Journas</strong>
         </div>
+        <div className="orbit orbit-one" aria-hidden="true" />
+        <div className="orbit orbit-two" aria-hidden="true" />
         <div className="art-copy">
           <span className="eyebrow">
             COLLABORATIVE TRIP PLANNER

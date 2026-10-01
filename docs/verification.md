@@ -48,4 +48,9 @@ After the Journas rename, 36 tests passed: 23 domain/time/storage tests and 13 e
 
 ## Compact interface verification
 
-The deployed interface keeps edge-to-edge workspace panels and compact spacing, with gently rounded controls, teardrop map pins and 6px schedule blocks. Floating dialogs and checklists have restrained shadows; ornamental orbit artwork remains removed. The desktop top bar is 48px and panel headings are 38px; workspace margins are zero. Native map, schedule, checklist, calendar and settings interactions were checked. Mobile width is 390px with no horizontal overflow. Production gallery captures reflect this compact interface.
+The deployed interface keeps edge-to-edge workspace panels and compact spacing, with gently rounded controls, teardrop map pins and 6px schedule blocks. Floating dialogs and checklists have restrained shadows; the sign-in screen restores its purple orbit background. The desktop top bar is 48px and panel headings are 38px; workspace margins are zero. Native map, schedule, checklist, calendar and settings interactions were checked. Mobile width is 390px with no horizontal overflow. Production gallery captures reflect this compact interface.
+
+
+## Full-window sign-in verification
+
+The sign-in page now spans the full viewport width and height, with no 960px cap. The form retains a readable width within its panel. Native browser checks at 320×740, 800×900 and 2560×1440 confirmed no horizontal overflow; the visible compass remains 48px wide with flex shrinking disabled. Mobile sign-in measures exactly 320×740 without a border-induced scrollbar. The changes were built and deployed to Journas.

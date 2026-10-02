@@ -980,10 +980,12 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
+          <div className="save-control">
+          <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           <button className="icon" aria-label="Save planning" title="Save planning" disabled={!user || manualSaving || saving} onClick={saveManually}>
             <Save size={18} />
           </button>
-          <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
+          </div>
           {trip && (
             <button
               className="button subtle"
@@ -1049,7 +1051,7 @@ export default function App() {
       )}
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">
-          <Map size={17} /><h1>Your places</h1><span className="count">{day.pins.length}</span>
+          <Map size={17} /><h1>Your places</h1><span className="count" title="Places pinned for this day" aria-label={`${day.pins.length} places pinned for this day`}>{day.pins.length}</span>
           {shareTrip && <span className="shared-label">View only</span>}
           {!readonly && <><button className="text-button" onClick={() => newItem("connections")} disabled={day.pins.length < 2}>Connect</button><button className="icon" aria-label="Add place" onClick={() => newItem("pins")}><Plus size={19} /></button></>}
         </div>
@@ -1079,6 +1081,7 @@ export default function App() {
           ))}
         </div>
       </div>
+      {!trip && <div className="planning-required" role="note">Select a trip above, or use + to create one, before adding places, schedule blocks or tasks.</div>}
       <div
         className="workspace"
         style={{
@@ -1167,7 +1170,7 @@ export default function App() {
               <div>
                 <Clock3 size={17} />
                 <h2>Day schedule</h2>
-                <span className="count">{day.blocks.length}</span>
+                <span className="count" title="Scheduled time blocks for this day" aria-label={`${day.blocks.length} scheduled time blocks for this day`}>{day.blocks.length}</span>
               </div>
               {!readonly && (
                 <button

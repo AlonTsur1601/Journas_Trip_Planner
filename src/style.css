@@ -1422,12 +1422,17 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
   button:not(:disabled):hover, summary.maplibregl-ctrl-attrib-button:hover {
     box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 22%, transparent);
   }
+  .button.primary:not(:disabled):hover {
+    box-shadow: inset 0 0 0 100vmax #ffffff30;
+    filter: none;
+  }
   .text-button:not(:disabled):hover { color: var(--ink); }
   select:not(:disabled):hover { border-color: var(--accent); background-color: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 }
 
 /* Press feedback applies to mouse, pen and touch, independently of hover support. */
 button:not(:disabled):active,
+.button.primary:not(:disabled):active,
 summary.maplibregl-ctrl-attrib-button:active,
 select:not(:disabled):active {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 24%, transparent);

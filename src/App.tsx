@@ -33,7 +33,7 @@ import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
-import { Dropdown, ColorPicker } from "./Controls";
+import { Dropdown, ColorPicker, Toast } from "./Controls";
 const MapPanel = lazy(() => import("./MapPanel"));
 import {
   defaultLayout,
@@ -888,14 +888,7 @@ export default function App() {
     return (
       <>
         <AuthScreen onError={setMessage} />
-        {message && (
-          <div className="toast" role="status">
-            {message}
-            <button onClick={() => setMessage("")} aria-label="Dismiss">
-              <X size={16} />
-            </button>
-          </div>
-        )}
+        <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
   return (
@@ -2507,14 +2500,7 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {message && (
-        <div className="toast" role="status">
-          {message}
-          <button onClick={() => setMessage("")} aria-label="Dismiss">
-            <X size={16} />
-          </button>
-        </div>
-      )}
+      <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
   );
 }

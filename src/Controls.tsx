@@ -1,5 +1,5 @@
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, X } from "lucide-react";
 
 export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", ...props }: any) {
   const [open, setOpen] = useState(false);
@@ -57,5 +57,20 @@ export function ColorPicker({ label, value, onChange, onInput, disabled }: any) 
     <div className="color-swatches">{colors.map((color) => <button type="button" disabled={disabled} key={color} aria-label={`${label}: ${color}`} aria-pressed={value.toLowerCase() === color} style={{ background: color }} onClick={() => update(color)}>{value.toLowerCase() === color && <Check size={12} />}</button>)}</div>
     <button className="text-button advanced-color" type="button" disabled={disabled} aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>Advanced color</button>
     {advanced && <div className="advanced-color-fields"><input type="color" aria-label={`${label} color picker`} disabled={disabled} value={value} onChange={(event) => update(event.target.value)} /><input aria-label={`${label} HEX`} disabled={disabled} value={hex} maxLength={7} onChange={(event) => { setHex(event.target.value); if (/^#[\da-f]{6}$/i.test(event.target.value)) update(event.target.value); }} onBlur={() => setHex(value)} /></div>}
+  </div>;
+}
+
+export function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const [displayed, setDisplayed] = useState(message);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (message) { setDisplayed(message); setLeaving(false); return; }
+    setLeaving(true);
+    const timer = setTimeout(() => setDisplayed(""), 180);
+    return () => clearTimeout(timer);
+  }, [message]);
+  if (!displayed) return null;
+  return <div className={`toast${leaving ? " leaving" : ""}`} role="status">
+    {displayed}<button onClick={onDismiss} aria-label="Dismiss"><X size={16} /></button>
   </div>;
 }

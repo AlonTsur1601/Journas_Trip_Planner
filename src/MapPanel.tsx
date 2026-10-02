@@ -43,7 +43,7 @@ export default function MapPanel({
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag right or up to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M16 5L20 16L16 14L12 16Z" fill="var(--accent)"/><path d="M16 27L12 16L16 18L20 16Z" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
+    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="23,9 12,12 20,20" fill="var(--accent)"/><polygon points="9,23 20,20 12,12" fill="currentColor"/></svg>';
     let constraining = false;
     const containWorld = () => {
       if (constraining) return;
@@ -74,7 +74,7 @@ export default function MapPanel({
       if (!rotation) return;
       const dx = event.clientX - rotation.x, dy = event.clientY - rotation.y;
       if (Math.hypot(dx, dy) > 3) dragged = true;
-      if (dragged) m.setBearing(rotation.bearing + (dx + dy) * 0.7);
+      if (dragged) m.setBearing(rotation.bearing - (dx + dy) * 0.7);
     });
     const endRotation = () => { rotation = null; };
     compass.addEventListener("pointerup", endRotation);

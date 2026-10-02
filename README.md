@@ -141,7 +141,7 @@ Emulator accounts/data are separate from production and can be discarded. Use em
 
 Run `npm run build` to check TypeScript and create the production bundle. Local automated test suites and creator-specific setup/submission guides are maintained privately and are not included in this public repository. The public [build checklist](devpost/checklist.md) records completed checks and remaining work. Verify authentication, saving, sharing, and deletion on the deployed website; a build alone does not verify these flows.
 
-Authentication lasts only while the page remains open. Leaving or refreshing the page requires signing in again.
+Authentication survives page refreshes in the same tab. Closing the tab or browser window ends the session; a new tab requires signing in again.
 
 ## Free-tier operation and privacy
 

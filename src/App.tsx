@@ -334,6 +334,11 @@ export default function App() {
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [calendar]);
   const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    if (!message) return;
+    const timeout = setTimeout(() => setMessage(""), 5000);
+    return () => clearTimeout(timeout);
+  }, [message]);
   function setEdit(value: Edit | null) {
     if (value && !value.base)
       value = {

@@ -1420,3 +1420,12 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
   .toast, .toast.leaving, .dropdown-menu, .calendar-popover, .modal { animation: none; }
   .toast.leaving { opacity: 0; }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover, summary.maplibregl-ctrl-attrib-button:hover {
+    background-image: linear-gradient(color-mix(in srgb, var(--accent) 16%, transparent), color-mix(in srgb, var(--accent) 16%, transparent));
+    filter: brightness(1.12);
+  }
+  .text-button:not(:disabled):hover { color: var(--ink); }
+  select:not(:disabled):hover { border-color: var(--accent); background-color: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+}

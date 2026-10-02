@@ -185,7 +185,6 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
           <Compass />
           <strong>Journas</strong>
         </div>
-        <span className="eyebrow">YOUR JOURNAS ACCOUNT</span>
         <h2>{register ? "Create an account" : "Sign in to Journas"}</h2>
         <p>
           Plan each day with a map, schedule, and task list. Sign in to save your

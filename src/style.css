@@ -1439,3 +1439,22 @@ select:not(:disabled):active {
   filter: brightness(0.9);
   transition-duration: 0ms;
 }
+
+:is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) {
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(input, textarea, select):not(:disabled):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):hover {
+    border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+    background-color: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  }
+}
+:is(input, textarea, select):not(:disabled):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):focus {
+  border-color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--accent);
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  input, textarea, select { transition: none; }
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 maplibregl.setWorkerUrl(workerURL);
+import { worldViewportLimits } from "./map-viewport";
 import type { Connection, Layout, Pin } from "./types";
 export default function MapPanel({
   pins,
@@ -34,12 +35,31 @@ export default function MapPanel({
       style: "https://tiles.openfreemap.org/styles/liberty",
       center: layout.center,
       zoom: layout.zoom,
-      attributionControl: {},
+      attributionControl: { compact: true },
     });
     map.current = m;
-    m.addControl(new maplibregl.NavigationControl(), "bottom-left");
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
+    m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "bottom-left");
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag right or up to rotate; click to reset north";
+    compass.parentElement!.classList.add("compass-control");
+    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M16 5L20 16L16 14L12 16Z" fill="var(--accent)"/><path d="M16 27L12 16L16 18L20 16Z" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
+    let constraining = false;
+    const containWorld = () => {
+      if (constraining) return;
+      constraining = true;
+      const { width, height } = m.getCanvas().getBoundingClientRect();
+      const center = m.getCenter();
+      const y = maplibregl.MercatorCoordinate.fromLngLat(center).y;
+      const limits = worldViewportLimits(width, height, m.getBearing(), m.getZoom(), y);
+      m.setMinZoom(limits.minZoom);
+      const bounded = limits.centerY;
+      if (Math.abs(y - bounded) > 0.0000001) m.setCenter([center.lng, new maplibregl.MercatorCoordinate(0, bounded).toLngLat().lat]);
+      constraining = false;
+    };
+    m.on("move", containWorld);
+    m.on("resize", containWorld);
+    containWorld();
     let rotation: { x: number; y: number; bearing: number } | null = null;
     let dragged = false;
     compass.addEventListener("pointerdown", (event) => {
@@ -62,9 +82,15 @@ export default function MapPanel({
     compass.addEventListener("click", (event) => {
       if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
     }, true);
+    let attributionInitialized = false;
     m.on("sourcedata", () => {
       const attribution = container.current?.querySelector(".maplibregl-ctrl-attrib-inner");
       if (!attribution) return;
+      if (!attributionInitialized && attribution.textContent) {
+        attributionInitialized = true;
+        attribution.parentElement?.removeAttribute("open");
+        attribution.parentElement?.classList.remove("maplibregl-compact-show");
+      }
       for (const node of attribution.childNodes) {
         if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes("Data from")) node.textContent = " ";
       }

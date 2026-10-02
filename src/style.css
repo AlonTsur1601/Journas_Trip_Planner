@@ -1384,3 +1384,24 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 .trip-selector .dropdown-trigger { border: 0; background: transparent; }
 .save-control { display: inline-flex; align-items: center; gap: 2px; }
 .planning-required { padding: 9px 12px; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-bottom: 1px solid var(--line); }
+
+.topbar .brand > span { font-size: 11px; border-left: 0; padding-left: 0; margin-left: 5px; border-right: 1px solid var(--line); padding-right: 16px; }
+.trip-selector { background: none; border: 0; padding: 0; gap: 8px; }
+.trip-selector .dropdown-trigger { background: var(--subtle); border: 1px solid var(--line); }
+.no-trips { font-size: 12px; color: var(--muted); padding: 0 6px; }
+.task-progress { border-radius: 10px; padding: 3px 9px; background: color-mix(in srgb, var(--accent) 20%, var(--surface)); color: var(--accent); font-weight: 750; }
+.compass-control { margin-left: 10px!important; margin-top: 12px!important; }
+.compass-control .maplibregl-ctrl-compass { width: 32px; height: 32px; transform-origin: left bottom; position: relative; z-index: 2; }
+.compass-control .maplibregl-ctrl-icon { background-image: none!important; display: grid; place-items: center; }
+.compass-control svg { width: 30px; height: 30px; }
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover { translate: 0 -1px; }
+  .map-pin:hover { scale: 1.08; }
+  .compass-control .maplibregl-ctrl-compass:hover, .compass-control .maplibregl-ctrl-compass:active { scale: 2; translate: 0 0; }
+}
+
+.map-canvas .maplibregl-ctrl-bottom-left { display: flex; flex-direction: column; align-items: flex-start; }
+.compass-control { margin: 0 0 12px 10px!important; }
+
+.compass-control .maplibregl-ctrl-compass { color: #292637; }
+@media (hover: hover) and (pointer: fine) { .maplibregl-ctrl-attrib-button:hover { translate: 0 -1px; } }

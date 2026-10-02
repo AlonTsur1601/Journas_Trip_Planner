@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
+import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
 import { Dropdown, ColorPicker } from "./Controls";
 const MapPanel = lazy(() => import("./MapPanel"));
@@ -358,8 +359,7 @@ export default function App() {
     });
   }, []);
   useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 30000);
-    return () => clearInterval(id);
+    return observeClock(() => setTime(new Date()));
   }, []);
   useEffect(() => {
     const dark =
@@ -673,6 +673,16 @@ export default function App() {
       if (dateRef.current === value) setLayout(initial);
     }
   }
+  const previousToday = useRef(today());
+  useEffect(() => {
+    const currentToday = today();
+    if (currentToday !== previousToday.current) {
+      const oldToday = previousToday.current;
+      previousToday.current = currentToday;
+      const nextDate = followCalendarDay(dateRef.current, oldToday, currentToday);
+      if (nextDate && !shareTrip) void switchDate(nextDate);
+    }
+  }, [time]);
   const readonly =
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -897,7 +907,7 @@ export default function App() {
           <span>TRIP PLANNER</span>
         </a>
         <div className="trip-selector">
-          <Dropdown
+          {trips.length || (shareTrip && trip) ? <Dropdown
             aria-label="Choose trip"
             placeholder="Choose a trip"
             value={trip?.id ?? ""}
@@ -926,7 +936,7 @@ export default function App() {
                 {t.name}
               </option>
             ))}
-          </Dropdown>
+          </Dropdown> : <span className="no-trips">No trips created yet</span>}
           <button
             className="icon"
             title="Create trip"
@@ -1051,7 +1061,7 @@ export default function App() {
       )}
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">
-          <Map size={17} /><h1>Your places</h1><span className="count" title="Places pinned for this day" aria-label={`${day.pins.length} places pinned for this day`}>{day.pins.length}</span>
+          <Map size={17} /><h1>Places & routes</h1>
           {shareTrip && <span className="shared-label">View only</span>}
           {!readonly && <><button className="text-button" onClick={() => newItem("connections")} disabled={day.pins.length < 2}>Connect</button><button className="icon" aria-label="Add place" onClick={() => newItem("pins")}><Plus size={19} /></button></>}
         </div>
@@ -1169,8 +1179,7 @@ export default function App() {
             <div className="panel-heading">
               <div>
                 <Clock3 size={17} />
-                <h2>Day schedule</h2>
-                <span className="count" title="Scheduled time blocks for this day" aria-label={`${day.blocks.length} scheduled time blocks for this day`}>{day.blocks.length}</span>
+                <h2>Daily itinerary</h2>
               </div>
               {!readonly && (
                 <button
@@ -1350,7 +1359,7 @@ export default function App() {
               <div>
                 <CheckSquare size={17} />
                 <h2>Travel checklist</h2>
-                <span className="count">
+                <span className="count task-progress" title="Completed tasks / total tasks">
                   {day.tasks.filter((t) => t.checked).length}/{day.tasks.length}
                 </span>
               </div>

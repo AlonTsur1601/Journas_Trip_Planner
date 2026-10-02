@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectAuthEmulator, initializeAuth, inMemoryPersistence, browserPopupRedirectResolver } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
@@ -20,7 +20,7 @@ export const configured = Boolean(
   config.apiKey && config.projectId && config.appId,
 );
 const app = configured ? initializeApp(config) : null;
-export const auth = app ? getAuth(app) : null;
+export const auth = app ? initializeAuth(app, { persistence: inMemoryPersistence, popupRedirectResolver: browserPopupRedirectResolver }) : null;
 export const db = app ? getFirestore(app) : null;
 if (emulators && auth && db) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });

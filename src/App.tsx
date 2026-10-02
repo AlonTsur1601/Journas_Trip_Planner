@@ -899,6 +899,7 @@ export default function App() {
         <div className="trip-selector">
           <Dropdown
             aria-label="Choose trip"
+            placeholder="Choose a trip"
             value={trip?.id ?? ""}
             onChange={async (e: any) => {
               await saveLayout();
@@ -917,7 +918,6 @@ export default function App() {
               if (!selected) setLayout(await startingLayout(settings));
             }}
           >
-            <option value="">Choose a trip</option>
             {shareTrip && trip && (
               <option value={trip.id}>{trip.name} · shared</option>
             )}
@@ -928,7 +928,7 @@ export default function App() {
             ))}
           </Dropdown>
           <button
-            className={`icon${!trip ? " create-trip-glow" : ""}`}
+            className="icon"
             title="Create trip"
             aria-label="Create trip"
             onClick={() => setModal("new-trip")}

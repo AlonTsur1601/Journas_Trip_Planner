@@ -17,4 +17,4 @@ Codex implemented and verified the product using skills `1-start` through `6-shi
 5. `server/store.ts` commits the buffered mutations. Authorised Firestore snapshots deliver them to participants' interfaces.
 6. `firestore.rules` restricts reads to verified retained members and rejects direct browser writes.
 
-See [the app map](app-map.html) and [verification report](../docs/verification.md). The creator's personal reflection, confidence rating, actual event participation and eligibility remain for the creator to supply.
+See [the app map](app-map.html) and [build checklist](checklist.md). The creator's personal reflection, confidence rating, actual event participation and eligibility remain for the creator to supply.

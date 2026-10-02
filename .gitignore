@@ -14,3 +14,11 @@ ui-debug.log
 /test-results/
 /playwright-report/
 /.todo-mcp/
+
+/docs/
+/tests/
+/scripts/
+/.agents/
+/devpost/*guide.md
+/devpost/submission-copy.md
+/devpost/submission-requirements.json

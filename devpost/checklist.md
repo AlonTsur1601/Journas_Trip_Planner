@@ -81,7 +81,7 @@ These checks are separate from the creator's hands-on learning confirmations abo
 
 - [x] Five automated suites / 34 checks pass, including Auth/Firestore emulators, rules, conflicts, quotas, deletion boundaries, sparse days and DST.
 - [x] Two-account production API verification passes all personal/global removal and orphan-cleanup scenarios.
-- [x] Actual browser planning, linked inheritance, checked tasks, sharing/joining, live edit/revocation, conflict resolution, date/layout restoration and mobile checks recorded in `docs/verification.md`.
+- [x] Actual browser planning, linked inheritance, checked tasks, sharing/joining, live edit/revocation, conflict resolution, date/layout restoration and mobile checks recorded in the locally maintained verification report (not published).
 - [x] Public MIT repository, production deployment, setup guides, six real product images and exact DemoMotion instructions prepared.
 - [ ] Creator's real Google sign-in and mailbox delivery confirmed.
 - [ ] Creator's learning activity, eligibility/survey responses, public final video and Devpost submission completed.

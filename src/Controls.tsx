@@ -1,7 +1,7 @@
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
-export function Dropdown({ children, value, onChange, disabled, ...props }: any) {
+export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", ...props }: any) {
   const [open, setOpen] = useState(false);
   const [above, setAbove] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -34,7 +34,7 @@ export function Dropdown({ children, value, onChange, disabled, ...props }: any)
     if (event.key === "Tab") setOpen(false);
   }}>
     <button type="button" role="combobox" aria-label={props["aria-label"]} aria-expanded={open} aria-controls={id} aria-haspopup="listbox" className="dropdown-trigger" disabled={disabled} onClick={toggle}>
-      <span>{options.find((option) => option.value === String(value))?.label ?? "Choose"}</span><ChevronDown size={15} />
+      <span>{options.find((option) => option.value === String(value))?.label ?? placeholder}</span><ChevronDown size={15} />
     </button>
     {open && <div id={id} role="listbox" aria-label={props["aria-label"]} className={`dropdown-menu${above ? " above" : ""}`}>
       {options.map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {

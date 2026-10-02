@@ -8,13 +8,12 @@ Google's sign-in logo comes from its [official branding assets](https://develope
 
 The production site connects to the Firebase project `journas-trip-planner`. Earlier projects are separate; their accounts and trips are not automatically transferred by changing the app configuration. Legacy local-storage prefixes are read only to migrate pending drafts and layouts safely. Existing share tokens are unchanged; links use the new site hostname.
 
-**Website:** [journas-trip-planner.vercel.app](https://journas-trip-planner.vercel.app). See [verification evidence](docs/verification.md) for the distinction between production checks, emulator checks, and remaining creator actions.
+**Website:** [journas-trip-planner.vercel.app](https://journas-trip-planner.vercel.app).
 
 ![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
 
 [Open the original 1,920 × 989 PNG captured directly in Chrome](devpost/assets/planner-desktop.png).
 
-The [submission guide](devpost/submission-guide.md) maps every returned Devpost field to prepared copy and the six checked images. The [DemoMotion guide](devpost/demomotion-guide.md) provides exact inputs and a 2:30 recording sequence. Personal reflections, survey answers, eligibility and the final public video remain creator actions.
 
 ## What you can plan
 
@@ -34,7 +33,6 @@ Automatic removal is **enabled by default**, **365 days after the trip ends**. S
 
 Each account can save **100 trips, including joined/shared trips**, with a warning at 80. Both creation and joining are blocked at 100 until that account removes an old trip. Shared planning is stored once, not duplicated per traveller. Opening an untouched day does not create a server record. Only changed day content/layout is stored. The active day receives live subscriptions; personal layout autosaves every five minutes and on navigation.
 
-A detailed Hebrew guide for a new Journas Firebase project is available in [firebase-setup-he.md](docs/firebase-setup-he.md).
 
 ## Prerequisites
 
@@ -139,16 +137,11 @@ Emulator accounts/data are separate from production and can be discarded. Use em
 5. Confirm the production homepage, Google sign-in, verified email account, trip write, reload, live two-account edit, and removal semantics on the actual URL. Check logs without printing secrets. A green deployment alone is not acceptance.
 6. Inspect **Project → Settings → Cron Jobs**. `vercel.json` schedules `/api/cleanup` daily at `0 2 * * *` (UTC). Vercel sends `Authorization: Bearer CRON_SECRET` when the environment secret is configured; unauthenticated calls must fail. Hobby timing can vary within the scheduled hour, so retention is daily, not an exact-minute promise. See [cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing).
 
-## Tests and verification
+## Verification
 
-```powershell
-npm test
-npm run build
-npm run test:rules
-npm run test:integration
-```
+Run `npm run build` to check TypeScript and create the production bundle. Local automated test suites and creator-specific setup/submission guides are maintained privately and are not included in this public repository. The public [build checklist](devpost/checklist.md) records completed checks and remaining work. Verify authentication, saving, sharing, and deletion on the deployed website; a build alone does not verify these flows.
 
-The rules suite requires Firestore Emulator/Java and denies foreign access independently of the UI. Domain tests exercise personal versus owner-global deletion, limits, membership, sparse persistence, and conflict handling. Browser acceptance must additionally cover real auth, date/layout restore, map/timeline/tasks, mobile, and two separate accounts. Record actual executed results in the checklist/verification report; do not mark unrun checks as passed. Emulator evidence and production evidence are distinct.
+Authentication lasts only while the page remains open. Leaving or refreshing the page requires signing in again.
 
 ## Free-tier operation and privacy
 
@@ -163,11 +156,8 @@ Trip content is shared only with retained participants and holders of a valid sc
 | `src/` | Planner interface, Firebase browser configuration, map, schedule, and preferences |
 | `server/` | Authenticated domain operations, persistence, validation, and cleanup |
 | `api/` | Vercel API handlers |
-| `tests/` | Behaviour and Firestore permissions tests |
 | `devpost/scope.md`, `prd.md`, `spec.md` | Approved planning documents required by the event |
 | `devpost/checklist.md` | Actual implementation/review progress |
-| `devpost/submission-guide.md` | Current exact Devpost fields, assets, links, and remaining personal answers |
-| `devpost/demomotion-guide.md` | Exact DemoMotion form inputs and 2:30 video storyboard |
 
 The personal `devpost/learner-profile.md`, `.env.local`, service-account JSON, and credentials are excluded from publication. An ignore rule does not remove a secret already committed: inspect staged changes and history before public pushes.
 

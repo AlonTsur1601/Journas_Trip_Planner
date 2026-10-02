@@ -625,14 +625,6 @@ textarea {
   margin-left: 14px;
   color: #aaa5b5;
 }
-button.create-trip-glow {
-  color: var(--accent);
-  background: var(--surface);
-  box-shadow: inset 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-button.create-trip-glow:not(:disabled):hover {
-  box-shadow: inset 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent);
-}
 .modal-shade {
   position: fixed;
   inset: 0;
@@ -1386,7 +1378,9 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
   .settings-modal .form-note { margin: 0; }
 }
 
-.map-canvas .maplibregl-ctrl-bottom-left { left: 24px; bottom: 24px; }
+.map-canvas .maplibregl-ctrl-bottom-left { left: 0; bottom: 0; }
+.maplibregl-ctrl-compass { touch-action: none; cursor: grab; }
+.maplibregl-ctrl-compass:active { cursor: grabbing; }
 .trip-selector .dropdown-trigger { border: 0; background: transparent; }
 .save-control { display: inline-flex; align-items: center; gap: 2px; }
 .planning-required { padding: 9px 12px; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-bottom: 1px solid var(--line); }

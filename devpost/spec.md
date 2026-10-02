@@ -45,9 +45,9 @@ Conceptual data: users/preferences; immutable trip owner plus dates/name/status;
 src/                 # React interface, authenticated client, planner and settings
 server/              # Authenticated operations, schema/limits, persistence, cleanup
 api/                 # Vercel request handlers
-tests/               # Behaviour, permissions, and integration verification
+tests/               # Local-only behaviour, permissions, and integration verification
 devpost/             # Scope, PRD, specification, checklist, submission materials
-docs/                # Setup and operational guidance
+docs/                # Local-only creator setup and operational guidance
 README.md            # Canonical run/configure/deploy instructions
 .env.example         # Placeholder configuration; never real credentials
 ```

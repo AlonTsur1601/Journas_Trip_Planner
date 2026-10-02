@@ -38,6 +38,40 @@ export default function MapPanel({
     });
     map.current = m;
     m.addControl(new maplibregl.NavigationControl(), "bottom-left");
+    const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
+    compass.title = "Drag right or up to rotate; click to reset north";
+    let rotation: { x: number; y: number; bearing: number } | null = null;
+    let dragged = false;
+    compass.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.stopImmediatePropagation();
+      rotation = { x: event.clientX, y: event.clientY, bearing: m.getBearing() };
+      dragged = false;
+      compass.setPointerCapture(event.pointerId);
+    }, true);
+    compass.addEventListener("mousedown", (event) => event.stopImmediatePropagation(), true);
+    compass.addEventListener("pointermove", (event) => {
+      if (!rotation) return;
+      const dx = event.clientX - rotation.x, dy = event.clientY - rotation.y;
+      if (Math.hypot(dx, dy) > 3) dragged = true;
+      if (dragged) m.setBearing(rotation.bearing + (dx + dy) * 0.7);
+    });
+    const endRotation = () => { rotation = null; };
+    compass.addEventListener("pointerup", endRotation);
+    compass.addEventListener("pointercancel", endRotation);
+    compass.addEventListener("click", (event) => {
+      if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
+    }, true);
+    m.on("sourcedata", () => {
+      const attribution = container.current?.querySelector(".maplibregl-ctrl-attrib-inner");
+      if (!attribution) return;
+      for (const node of attribution.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes("Data from")) node.textContent = " ";
+      }
+      for (const link of attribution.querySelectorAll("a")) {
+        if (link.textContent === "OpenStreetMap") link.textContent = "©OpenStreetMap";
+      }
+    });
     m.on("moveend", () => {
       if (restoringView.current) return;
       const c = m.getCenter();

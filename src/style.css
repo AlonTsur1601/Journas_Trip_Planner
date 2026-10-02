@@ -1339,7 +1339,6 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
   button:not(:disabled):hover {
     filter: brightness(0.94);
   }
-  .text-button:not(:disabled):hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 
@@ -1408,7 +1407,7 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 .toast { animation: toast-in 180ms ease-out; }
 .toast.leaving { animation: toast-out 180ms ease-in forwards; pointer-events: none; }
 .dropdown-menu, .calendar-popover, .modal { animation: panel-in 140ms ease-out; }
-button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 150ms ease, translate 150ms ease, scale 150ms ease; }
+button { transition: color 150ms ease, box-shadow 150ms ease, filter 150ms ease, background-color 150ms ease, translate 150ms ease, scale 150ms ease; }
 @keyframes toast-in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 @keyframes toast-out { from { opacity: 1; translate: 0 0; } to { opacity: 0; translate: 0 8px; } }
 @keyframes panel-in { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
@@ -1419,7 +1418,7 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 }
 
 @media (hover: hover) and (pointer: fine) {
-  button:not(:disabled):hover, summary.maplibregl-ctrl-attrib-button:hover {
+  button:not(:disabled):not(.text-button):hover, summary.maplibregl-ctrl-attrib-button:hover {
     box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 20%, transparent);
     filter: none;
   }
@@ -1427,12 +1426,12 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
     box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 82%, #000);
     filter: none;
   }
-  .text-button:not(:disabled):hover { color: var(--ink); }
+  .text-button:not(:disabled):hover { color: color-mix(in srgb, var(--accent) 70%, var(--ink)); }
   select:not(:disabled):hover { border-color: var(--accent); background-color: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 }
 
 /* Press feedback applies to mouse, pen and touch, independently of hover support. */
-button:not(:disabled):active,
+button:not(:disabled):not(.text-button):active,
 .button.primary:not(:disabled):active,
 summary.maplibregl-ctrl-attrib-button:active,
 select:not(:disabled):active {
@@ -1442,6 +1441,11 @@ select:not(:disabled):active {
 }
 .button.primary:not(:disabled):active {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 65%, #000);
+}
+.text-button { text-decoration: none; }
+.text-button:not(:disabled):active {
+  color: color-mix(in srgb, var(--accent) 45%, var(--ink));
+  transition-duration: 0ms;
 }
 
 :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) {

@@ -1065,6 +1065,7 @@ export default function App() {
         user.providerData.some((p) => p.providerId === "password") && (
           <div className="verification">
             Verify your email to start saving trips.{" "}
+            <span className="verification-actions">
             <button
               onClick={() =>
                 sendEmailVerification(user)
@@ -1084,6 +1085,7 @@ export default function App() {
             >
               I have verified
             </button>
+            </span>
           </div>
         )}
       {trips.length >= 80 && (

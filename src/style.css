@@ -1345,7 +1345,6 @@ button.create-trip-glow:not(:disabled):hover {
 button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 150ms ease; }
 @media (hover: hover) and (pointer: fine) {
   button:not(:disabled):hover {
-    
     filter: brightness(0.94);
   }
   .text-button:not(:disabled):hover { text-decoration: underline; text-underline-offset: 3px; }

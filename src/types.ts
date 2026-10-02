@@ -52,17 +52,18 @@ export type Trip = {
   endDate: string;
   ownerId: string;
   memberIds: string[];
+  lodging?: {name: string; lng: number; lat: number; timezone: string};
 };
 export type Settings = {
   theme: "light" | "dark" | "system";
   accent: string;
-  clock: "local" | "destination" | "utc";
+  clock: "local" | "destination" | "utc" | "lodging";
   timezone: string;
   autoDelete: boolean;
   retentionDays: number;
   displayName?: string;
   photoURL?: string;
-  mapStart: "current" | "custom" | "world";
+  mapStart: "current" | "custom" | "world" | "trip";
   mapCenter: [number, number];
   mapZoom: number;
 };

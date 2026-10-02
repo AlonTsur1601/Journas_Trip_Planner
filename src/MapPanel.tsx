@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { MapPinPlus, Route, X } from "lucide-react";
+import { symbolMarkup } from "./PlannerControls";
 import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 maplibregl.setWorkerUrl(workerURL);
@@ -12,6 +14,11 @@ export default function MapPanel({
   onPin,
   onAdd,
   readonly,
+  onConnect,
+  movingPinId,
+  onMovePin,
+  onCancelMove,
+  placementMode = false,
 }: {
   pins: Pin[];
   connections: Connection[];
@@ -20,13 +27,22 @@ export default function MapPanel({
   onPin: (pin: Pin) => void;
   onAdd: (lng: number, lat: number) => void;
   readonly: boolean;
+  onConnect?: (from: string, to: string, arrow: boolean) => void;
+  movingPinId?: string | null;
+  onMovePin?: (pin: Pin, lng: number, lat: number) => void;
+  onCancelMove?: () => void;
+  placementMode?: boolean;
 }) {
+  const [mode,setMode]=useState<'add'|'connect'|null>(null);
+  const [source,setSource]=useState<string|null>(null);
+  const [arrow,setArrow]=useState(true);
+  const action=useRef({mode,source,placementMode,arrow}); action.current={mode,source,placementMode,arrow};
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
-  const callbacks = useRef({ onView, onPin, onAdd, readonly });
+  const callbacks = useRef({ onView, onPin, onAdd, readonly, onConnect, onMovePin });
   const restoringView = useRef(false);
-  callbacks.current = { onView, onPin, onAdd, readonly };
+  callbacks.current = { onView, onPin, onAdd, readonly, onConnect, onMovePin };
   useEffect(() => {
     if (!container.current) return;
     restoringView.current = false;
@@ -36,14 +52,15 @@ export default function MapPanel({
       center: layout.center,
       zoom: layout.zoom,
       attributionControl: { compact: true },
+      canvasContextAttributes: {preserveDrawingBuffer:true},
     });
     map.current = m;
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
     m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "bottom-left");
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
-    compass.title = "Drag right or up to rotate; click to reset north";
+    compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="23,9 12,12 20,20" fill="var(--accent)"/><polygon points="9,23 20,20 12,12" fill="currentColor"/></svg>';
+    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="16,5 11,16 21,16" fill="var(--accent)"/><polygon points="16,27 21,16 11,16" fill="currentColor"/></svg>';
     let constraining = false;
     const containWorld = () => {
       if (constraining) return;
@@ -52,7 +69,7 @@ export default function MapPanel({
       const center = m.getCenter();
       const y = maplibregl.MercatorCoordinate.fromLngLat(center).y;
       const limits = worldViewportLimits(width, height, m.getBearing(), m.getZoom(), y);
-      m.setMinZoom(limits.minZoom);
+      if(Math.abs(m.getMinZoom()-limits.minZoom)>.001)m.setMinZoom(limits.minZoom);
       const bounded = limits.centerY;
       if (Math.abs(y - bounded) > 0.0000001) m.setCenter([center.lng, new maplibregl.MercatorCoordinate(0, bounded).toLngLat().lat]);
       constraining = false;
@@ -60,12 +77,14 @@ export default function MapPanel({
     m.on("move", containWorld);
     m.on("resize", containWorld);
     containWorld();
-    let rotation: { x: number; y: number; bearing: number } | null = null;
+    let rotation: { x: number; y: number; bearing: number; angle: number; cx: number; cy: number } | null = null;
     let dragged = false;
     compass.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       event.stopImmediatePropagation();
-      rotation = { x: event.clientX, y: event.clientY, bearing: m.getBearing() };
+      event.preventDefault();
+      const rect=compass.getBoundingClientRect(), cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+      rotation = { x: event.clientX, y: event.clientY, bearing: m.getBearing(), angle: Math.atan2(event.clientY-cy,event.clientX-cx), cx,cy };
       dragged = false;
       compass.setPointerCapture(event.pointerId);
     }, true);
@@ -74,11 +93,17 @@ export default function MapPanel({
       if (!rotation) return;
       const dx = event.clientX - rotation.x, dy = event.clientY - rotation.y;
       if (Math.hypot(dx, dy) > 3) dragged = true;
-      if (dragged) m.setBearing(rotation.bearing - (dx + dy) * 0.7);
+      if (dragged) {
+        const angle=Math.atan2(event.clientY-rotation.cy,event.clientX-rotation.cx);
+        let delta=(angle-rotation.angle)*180/Math.PI;
+        delta=((delta+540)%360)-180;
+        m.setBearing(rotation.bearing-delta);
+        rotation.bearing=m.getBearing(); rotation.angle=angle;
+      }
     });
-    const endRotation = () => { rotation = null; };
+    const endRotation = () => { if(rotation&&!dragged)m.resetNorth({duration:180}); rotation = null; };
     compass.addEventListener("pointerup", endRotation);
-    compass.addEventListener("pointercancel", endRotation);
+    compass.addEventListener("pointercancel", () => {rotation=null;});
     compass.addEventListener("click", (event) => {
       if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
     }, true);
@@ -98,26 +123,44 @@ export default function MapPanel({
         if (link.textContent === "OpenStreetMap") link.textContent = "©OpenStreetMap";
       }
     });
+    m.on('load',()=>{
+      for(const layer of m.getStyle().layers??[]) if(layer.type==='symbol'&&JSON.stringify(layer.layout?.['text-field']??'').includes('name'))
+        m.setLayoutProperty(layer.id,'text-field',['coalesce',['get','name:en'],['get','name_en'],'']);
+    });
     m.on("moveend", () => {
       if (restoringView.current) return;
       const c = m.getCenter();
       callbacks.current.onView([c.lng, c.lat], m.getZoom());
     });
-    m.on("dblclick", (e) => {
-      if (!callbacks.current.readonly) {
-        e.preventDefault();
-        callbacks.current.onAdd(e.lngLat.lng, e.lngLat.lat);
-      }
-    });
+    let gestureDragged=false;
+    m.on('mousedown',()=>{gestureDragged=false;});
+    m.on('touchstart',()=>{gestureDragged=false;});
+    m.on('dragstart',()=>{gestureDragged=true;container.current?.classList.add('map-dragging');});
+    m.on('dragend',()=>container.current?.classList.remove('map-dragging'));
+    m.on('click',e=>{if(!callbacks.current.readonly&&!gestureDragged&&(action.current.mode==='add'||action.current.placementMode)&&!(e.originalEvent.target as HTMLElement)?.closest('button')){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}});
     m.doubleClickZoom.disable();
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    let awaitingRender=false,hasFrame=false;
+    const cover=document.createElement('canvas');
+    cover.className='map-resize-cover'; cover.setAttribute('aria-hidden','true');
+    container.current.appendChild(cover);
+    const reveal=()=>{hasFrame=true;if(awaitingRender){cover.style.display='none';cover.width=cover.height=0;awaitingRender=false;}};
+    m.on('render',reveal);
     const observer = new ResizeObserver(() => {
-      restoringView.current = true;
-      m.resize();
-      restoringView.current = false;
+      clearTimeout(resizeTimer);
+      if(hasFrame && cover.style.display!=='block'){
+        const canvas=m.getCanvas();cover.width=canvas.width;cover.height=canvas.height;
+        cover.getContext('2d')?.drawImage(canvas,0,0);cover.style.display='block';
+      }
+      resizeTimer=setTimeout(()=>{
+        restoringView.current=true;awaitingRender=true;m.resize();m.triggerRepaint();restoringView.current=false;
+      },120);
     });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
+      clearTimeout(resizeTimer);
+      cover.remove();
       restoringView.current = true;
       m.remove();
       map.current = null;
@@ -131,13 +174,23 @@ export default function MapPanel({
       const el = document.createElement("button");
       el.className = "map-pin";
       el.style.background = pin.color;
-      el.textContent = pin.symbol;
+      const content=document.createElement('span');content.className='pin-symbol';const markup=symbolMarkup(pin.symbol);if(markup)content.innerHTML=markup;else content.textContent=pin.symbol;el.appendChild(content);
       el.title = pin.title;
       el.setAttribute("aria-label", `Place: ${pin.title}`);
-      el.onclick = () => callbacks.current.onPin(pin);
-      return new maplibregl.Marker({ element: el })
+      let ignoreClick=false;
+      el.onclick = (event) => {event.stopPropagation();if(ignoreClick){ignoreClick=false;return;}if(action.current.mode==='connect'){if(!action.current.source){setSource(pin.id);}else if(action.current.source!==pin.id){callbacks.current.onConnect?.(action.current.source,pin.id,action.current.arrow);setSource(null);setMode(null);}}else if(!movingPinId&&!placementMode)callbacks.current.onPin(pin);};
+      const marker=new maplibregl.Marker({ element: el, draggable: false })
         .setLngLat([pin.lng, pin.lat])
         .addTo(m);
+      if(movingPinId===pin.id || placementMode){
+        el.classList.add('drag-edit');
+        let drag: {x:number;y:number;pixel:maplibregl.PointLike;original:[number,number];moved:boolean}|null=null;
+        el.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();m.stop();const point=m.project(marker.getLngLat());const original=marker.getLngLat();drag={x:e.clientX,y:e.clientY,pixel:[point.x,point.y],original:[original.lng,original.lat],moved:false};el.setPointerCapture(e.pointerId);});
+        el.addEventListener('pointermove',e=>{if(!drag)return;e.stopPropagation();const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>3)drag.moved=true;if(drag.moved){const [x,y]=drag.pixel as [number,number];marker.setLngLat(m.unproject([x+dx,y+dy]));}});
+        el.addEventListener('pointerup',e=>{if(!drag)return;e.stopPropagation();const moved=drag.moved;drag=null;if(moved){ignoreClick=true;const p=marker.getLngLat();if(placementMode)callbacks.current.onAdd(p.lng,p.lat);else callbacks.current.onMovePin?.(pin,p.lng,p.lat);}});
+        el.addEventListener('pointercancel',()=>{if(drag)marker.setLngLat(drag.original);drag=null;});
+      }
+      return marker;
     });
     const arrowUpdates: (() => void)[] = [];
     const updateArrows = () => arrowUpdates.forEach((update) => update());
@@ -250,7 +303,7 @@ export default function MapPanel({
       m.off("load", draw);
       m.off("move", updateArrows);
     };
-  }, [pins, connections]);
+  }, [pins, connections, movingPinId, placementMode]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -266,9 +319,10 @@ export default function MapPanel({
     }
   }, [layout.center[0], layout.center[1], layout.zoom]);
   return (
-    <div className="map-wrapper">
+    <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
       <div ref={container} className="map-canvas" />
-
+      {!readonly&&!placementMode&&<div className="map-tools"><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></div>}
+      {(mode||movingPinId)&&<div className="map-mode-note">{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}<button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>
   );
 }

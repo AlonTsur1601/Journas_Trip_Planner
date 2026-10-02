@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store, type Transaction, type Trip } from './types.js';
 import { resolveWallTime } from './time.js';
+import tzlookup from 'tz-lookup';
 const kinds: Kind[] = ['pins', 'blocks', 'tasks', 'connections'];
 const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'title', 'detail', 'color', 'symbol', 'pinId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId'], connections: ['from', 'to', 'arrow'] };
 function fail(status: number, code: string, message: string, details?: unknown): never { throw new ApiError(status, code, message, details); }
@@ -23,6 +24,11 @@ const itemsPath = (id: string, day: string) => `trips/${id}/days/${day}/items`;
 const layoutPath = (uid: string, id: string, day: string) => `users/${uid}/layouts/${id}_${day}`;
 const isColor = (x: unknown) => typeof x === 'string' && /^#[a-fA-F0-9]{6}$/.test(x);
 const finite = (x: unknown, min: number, max: number) => typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max;
+function lodging(value: unknown) {
+    const place=object(value),name=place.name===undefined?'Lodging':text(place.name,200).trim();
+    if(!name||!finite(place.lng,-180,180)||!finite(place.lat,-85,85))fail(400,'INVALID_LODGING','Select a lodging location and enter its name.');
+    return {name,lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng))};
+}
 function validTimezone(value: unknown) {
     if (value === '')
         return true;
@@ -43,7 +49,7 @@ function validateSettings(value: Data) {
             fail(400, 'INVALID_SETTINGS', `Unknown setting ${key}`);
     if (value.theme !== undefined && !['light', 'dark', 'system'].includes(String(value.theme)))
         fail(400, 'INVALID_SETTINGS', 'Invalid theme');
-    if (value.mapStart !== undefined && !['current', 'custom', 'world'].includes(String(value.mapStart)))
+    if (value.mapStart !== undefined && !['current', 'custom', 'world', 'trip'].includes(String(value.mapStart)))
         fail(400, 'INVALID_SETTINGS', 'Invalid map start');
     if (value.mapCenter !== undefined && (!Array.isArray(value.mapCenter) || value.mapCenter.length !== 2 || !finite(value.mapCenter[0], -180, 180) || !finite(value.mapCenter[1], -85, 85)))
         fail(400, 'INVALID_SETTINGS', 'Invalid map center');
@@ -51,7 +57,7 @@ function validateSettings(value: Data) {
         fail(400, 'INVALID_SETTINGS', 'Invalid map zoom');
     if (value.accent !== undefined && !isColor(value.accent))
         fail(400, 'INVALID_SETTINGS', 'Invalid accent');
-    if (value.clock !== undefined && !['local', 'destination', 'utc'].includes(String(value.clock)))
+    if (value.clock !== undefined && !['local', 'destination', 'utc', 'lodging'].includes(String(value.clock)))
         fail(400, 'INVALID_SETTINGS', 'Invalid clock');
     if (value.autoDelete !== undefined && typeof value.autoDelete !== 'boolean')
         fail(400, 'INVALID_SETTINGS', 'Invalid automatic deletion preference');
@@ -212,7 +218,7 @@ export class JournasService {
                     fail(400, 'INVALID_TRIP', 'Trips must span at most one year and cannot be planned more than one year ahead');
                 const user = await this.checkQuota(tx, userId);
                 const id = randomUUID();
-                const trip: Trip = { id, name, startDate, endDate, ownerId: userId, memberIds: [userId], deleted: false, createdAt: this.now(), updatedAt: this.now(), shareVersion: 0 };
+                const trip: Trip = { id, name, startDate, endDate, lodging: lodging(input.lodging), ownerId: userId, memberIds: [userId], deleted: false, createdAt: this.now(), updatedAt: this.now(), shareVersion: 0 };
                 tx.set(tripPath(id), trip);
                 tx.set(membershipPath(userId, id), this.membership(userId, trip, user.settings));
                 tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
@@ -237,6 +243,17 @@ export class JournasService {
                 return { trip: updated };
             }
             const id = identifier(input.tripId);
+            if (action === 'trip.update') {
+                const trip=await this.member(tx,id,userId);
+                const name=text(input.name,120).trim(),startDate=date(input.startDate),endDate=date(input.endDate);
+                const latest=new Date(this.now());latest.setUTCFullYear(latest.getUTCFullYear()+1);
+                if(!name||startDate>endDate||endDate>latest.toISOString().slice(0,10)||(Date.parse(endDate)-Date.parse(startDate))/86400000>366)fail(400,'INVALID_TRIP','Choose a name and a date range within one year.');
+                const updated={...trip,name,startDate,endDate,lodging:lodging(input.lodging),updatedAt:this.now()};
+                const memberships=await Promise.all(trip.memberIds.map(async uid=>({uid,ref:await tx.get(membershipPath(uid,id)),user:await tx.get(userPath(uid))})));
+                tx.set(tripPath(id),updated);
+                for(const member of memberships) if(member.ref) tx.set(membershipPath(member.uid,id),{...member.ref,endDate,cleanupAt:this.cleanupAt(endDate,member.user?.settings as any)});
+                return {trip:updated};
+            }
             if (action === 'trip.remove') {
                 const trip = await this.member(tx, id, userId);
                 if (trip.ownerId === userId) {

@@ -19,7 +19,7 @@ export interface Item extends Data {
 export interface Settings extends Data {
     theme: 'light' | 'dark' | 'system';
     accent: string;
-    clock: 'local' | 'destination' | 'utc';
+    clock: 'local' | 'destination' | 'utc' | 'lodging';
     autoDelete: boolean;
     retentionDays: 30 | 90 | 365;
     timezone: string;

@@ -20,6 +20,7 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
   Share2,
   Trash2,
@@ -33,7 +34,9 @@ import tzlookup from "tz-lookup";
 import { api, auth, configured, db } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
+import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
+import { DateField, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const MapPanel = lazy(() => import("./MapPanel"));
 import {
   defaultLayout,
@@ -51,13 +54,15 @@ const maxDate = () => {
   d.setFullYear(d.getFullYear() + 1);
   return d.toLocaleDateString("en-CA");
 };
-const symbols = ["●", "✦", "☕", "♜", "✈", "★", "♥", "⚑", "⌂", "♫", "☀", "◆"];
+
 type Edit = {
   kind: "pins" | "blocks" | "tasks" | "connections";
   item: Record<string, any>;
   base?: Record<string, any>;
 };
 function Input({ label, ...props }: any) {
+  if (props.type === "date") return <DateField label={label} {...props} />;
+  if (props.type === "time") return <TimeField label={label} {...props} />;
   if (props.type === "color") return <ColorPicker label={label} {...props} />;
   return (
     <label className="field">
@@ -114,7 +119,7 @@ function Modal({ title, children, onClose }: any) {
     >
       <section
         ref={box}
-        className={`modal${title === "Your preferences" ? " settings-modal" : ""}`}
+        className={`modal${title === "Your preferences" ? " settings-modal" : /pin|place|time block/i.test(title) ? " item-modal" : /^(Create|Edit) trip$/.test(title) ? " trip-modal" : /task/i.test(title) ? " task-modal" : title === "Share trip" ? " share-modal" : title === "Confirm deletion" ? " confirm-modal" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -311,6 +316,18 @@ export default function App() {
     [conflict, setConflict] = useState<any>(null),
     [saving, setSaving] = useState(false),
     [manualSaving, setManualSaving] = useState(false);
+  const [movingPinId,setMovingPinId]=useState<string|null>(null);
+  const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
+  const [lodgingView,setLodgingView]=useState(defaultLayout());
+  const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
+  const [ambiguousTime,setAmbiguousTime]=useState(false);
+  const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
+  const [taskPage,setTaskPage]=useState(0),[memberPage,setMemberPage]=useState(0),[connectionPage,setConnectionPage]=useState(0);
+  const [hourHeight,setHourHeight]=useState(28);
+  const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
+  const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
+  const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
+
   const token = new URLSearchParams(location.search).get("share");
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -319,6 +336,7 @@ export default function App() {
   const dateRef = useRef(date);
   dateRef.current = date;
   const dirty = useRef(false);
+  const layoutLoading = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const calendarBox = useRef<HTMLDivElement>(null);
   const profilePhoto = useRef<HTMLInputElement>(null);
@@ -334,6 +352,11 @@ export default function App() {
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [calendar]);
   const [time, setTime] = useState(new Date());
+  useEffect(()=>{const element=scroller.current;if(!element)return;const observer=new ResizeObserver(()=>setHourHeight(element.clientHeight/24));observer.observe(element);return()=>observer.disconnect();},[layout.timeline,ready,user?.uid]);
+  useEffect(()=>{setMemberPage(0);},[trip?.id,modal]);
+  useEffect(()=>{setConnectionPage(0);},[edit?.item.id]);
+  useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
+
   useEffect(() => {
     if (!message) return;
     const timeout = setTimeout(() => setMessage(""), 5000);
@@ -437,7 +460,7 @@ export default function App() {
         const local = localStorage.getItem(
           `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
-        const nextLayout = local ? JSON.parse(local) : await startingLayout(settings);
+        const nextLayout = local ? JSON.parse(local) : await startingLayout(settings, tripRef.current?.lodging);
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
       })
@@ -462,6 +485,7 @@ export default function App() {
     )
       return;
     let cancelled = false;
+    layoutLoading.current=true;
     api<{ trip: Trip; day: Day; layout: Layout | null }>("trip.get", {
       tripId: trip.id,
       date,
@@ -473,10 +497,11 @@ export default function App() {
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
-        const nextLayout = restored ?? await startingLayout(settings);
+        const nextLayout = restored ?? await startingLayout(settings, tripRef.current?.lodging);
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
         dirty.current = Boolean(local);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!cancelled)layoutLoading.current=false;}));
         const draft = localStorage.getItem(
           `journas-drafts:${user.uid}:${trip.id}:${date}`,
         );
@@ -494,7 +519,7 @@ export default function App() {
             scroller.current.scrollTop = restored?.scroll ?? 400;
         }, 0);
       })
-      .catch((e) => setMessage(e.message));
+      .catch((e) => {layoutLoading.current=false;setMessage(e.message);});
     const stop = onSnapshot(
       collection(db, "trips", trip.id, "days", date, "items"),
       (snap) => {
@@ -663,12 +688,13 @@ export default function App() {
             ? trip.endDate
             : value;
     await saveLayout();
+    layoutLoading.current=true;
     setDate(value);
     setDay(emptyDay());
-    setLayout(defaultLayout());
+    setLayout(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout());
     setCalendar(false);
     if (!trip || value < trip.startDate || value > trip.endDate) {
-      const initial = await startingLayout(settings);
+      const initial = await startingLayout(settings, tripRef.current?.lodging);
       if (dateRef.current === value) setLayout(initial);
     }
   }
@@ -686,6 +712,7 @@ export default function App() {
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (settings.clock === "utc") timezone = "UTC";
+  if (settings.clock === "lodging" && trip?.lodging) timezone=trip.lodging.timezone;
   if (settings.clock === "destination") {
     timezone = settings.timezone || timezone;
     const first = [...day.blocks]
@@ -733,7 +760,7 @@ export default function App() {
     force = false,
     baseline?: Record<string, any>,
   ) {
-    if (!trip) return;
+    if (!trip) return false;
     setSaving(true);
     setStatus("Saving…");
     const { id, versions, ...fields } = item;
@@ -761,7 +788,7 @@ export default function App() {
     if (!Object.keys(patch).length) {
       setEdit(null);
       setSaving(false);
-      return;
+      return true;
     }
     const draft: Edit = { kind: kind as Edit["kind"], item, base: original };
     const draftKey = `journas-drafts:${user?.uid}:${trip.id}:${date}`;
@@ -785,8 +812,10 @@ export default function App() {
       setConflict(null);
       setTime(new Date());
       setStatus("All changes saved");
+      return true;
     } catch (e: any) {
       if (e.code === "AMBIGUOUS_TIME") {
+        setAmbiguousTime(true); setStatus("Choose the occurrence of the repeated hour");
         setEdit({
           ...draft,
           item: { ...item, timezone: item.timezone || timezone },
@@ -807,12 +836,13 @@ export default function App() {
         setMessage(e.message);
         setStatus("Save pending — draft kept on this device");
       }
+      return false;
     } finally {
       setSaving(false);
     }
   }
   async function remove(kind: string, item: any) {
-    if (!trip || !confirm("Delete this item? Linked items will be kept."))
+    if (!trip || !await confirmAction("Delete this item? Linked items will be kept."))
       return;
     try {
       await api("item.delete", {
@@ -827,7 +857,26 @@ export default function App() {
       setMessage(e.message);
     }
   }
+  async function toggleTask(task:Day['tasks'][number]) {
+    if(!trip||readonly||optimisticTasks[task.id]?.saving)return;
+    const tripId=trip.id,dayDate=date,checked=!task.checked;
+    setOptimisticTasks(previous=>({...previous,[task.id]:{checked,saving:true}}));
+    const draft={kind:'tasks',item:{...task,checked},base:task};
+    const key=`journas-drafts:${user?.uid}:${tripId}:${dayDate}`;
+    const drafts=JSON.parse(localStorage.getItem(key)??'{}');localStorage.setItem(key,JSON.stringify({...drafts,[task.id]:draft}));
+    try{
+      const result=await api<{item:Day['tasks'][number]}>('item.patch',{tripId,date:dayDate,kind:'tasks',id:task.id,patch:{checked},baseVersions:task.versions});
+      if(tripRef.current?.id===tripId&&dateRef.current===dayDate)setDay(previous=>({...previous,tasks:previous.tasks.map(t=>t.id===task.id?result.item:t)}));
+      const pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[task.id];if(Object.keys(pending).length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);
+      setTime(new Date());
+    }catch(e:any){
+      setMessage(e.message);setStatus('Save pending — draft kept on this device');
+      if(e.code==='CONFLICT')setConflict({draft,current:e.current,fields:e.details?.fields??[]});
+    }finally{setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
+  }
+  async function logout(){await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}
   function newItem(kind: Edit["kind"], extras: any = {}) {
+    setAmbiguousTime(false);
     if (readonly) {
       setMessage("Choose or create a trip to start planning.");
       return;
@@ -838,7 +887,7 @@ export default function App() {
             title: "",
             note: "",
             color: settings.accent,
-            symbol: "●",
+            symbol: "icon:stay",
             lng: layout.center[0],
             lat: layout.center[1],
           }
@@ -849,7 +898,7 @@ export default function App() {
               title: "",
               detail: "",
               color: settings.accent,
-              symbol: "●",
+              symbol: "icon:stay",
               pinId: null,
               overrides: [],
               timezone,
@@ -877,6 +926,14 @@ export default function App() {
       setMessage(e.message);
     }
   }
+  const taskIsCurrent=(task:Day['tasks'][number])=>{
+    if(optimisticTasks[task.id]?.checked??task.checked)return false;const block=day.blocks.find(b=>b.id===task.blockId);if(!block)return false;
+    if(block.startEpoch&&block.endEpoch)return block.startEpoch<=time.getTime()&&time.getTime()<block.endEpoch;
+    const minute=(value:string)=>{const [h,m]=value.split(':').map(Number);return h*60+m;};return date===displayedToday&&nowMinutes>=minute(block.start)&&nowMinutes<minute(block.end);
+  };
+  const taskPageSize=Math.max(1,Math.floor((layout.todoHeight-112)/52));
+  const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
+  const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
   if (!ready)
     return (
       <div className="loading">
@@ -896,7 +953,6 @@ export default function App() {
         <a className="brand" href="/">
           <Compass />
           <strong>Journas</strong>
-          <span>TRIP PLANNER</span>
         </a>
         <div className="trip-selector">
           {trips.length || (shareTrip && trip) ? <Dropdown
@@ -917,11 +973,11 @@ export default function App() {
                 setDate(selected.startDate);
               setDay(emptyDay());
               setLayout(defaultLayout());
-              if (!selected) setLayout(await startingLayout(settings));
+              if (!selected) setLayout(await startingLayout(settings, trip?.lodging));
             }}
           >
             {shareTrip && trip && (
-              <option value={trip.id}>{trip.name} · shared</option>
+              <option value={trip.id}>{trip.name}</option>
             )}
             {trips.map((t) => (
               <option key={t.id} value={t.id}>
@@ -933,7 +989,7 @@ export default function App() {
             className="icon"
             title="Create trip"
             aria-label="Create trip"
-            onClick={() => setModal("new-trip")}
+            onClick={() => {setLodgingDraft(undefined);setLodgingView({...layout});setModal("new-trip");}}
             disabled={!user || trips.length >= 100}
           >
             <Plus size={18} />
@@ -957,7 +1013,7 @@ export default function App() {
           </button>
           <button
             className="date-button"
-            onClick={() => setCalendar(!calendar)}
+            onClick={() => {setMonth(date.slice(0,7));setCalendar(!calendar);}}
           >
             <CalendarDays size={17} />
             <span>
@@ -991,31 +1047,17 @@ export default function App() {
           {trip && (
             <button
               className="button subtle"
-              aria-label="Trip details"
+              aria-label="Share trip"
               onClick={() => setModal("trip")}
             >
               <Share2 size={16} />
-              <span>Trip details</span>
+              <span>Share trip</span>
             </button>
           )}
-          <button
-            className="icon"
-            aria-label="Settings"
-            onClick={() => setModal("settings")}
-          >
-            <SettingsIcon size={19} />
-          </button>
-          <button
-            className="avatar"
-            title={user?.displayName ?? "Guest"}
-            onClick={() => setModal("settings")}
-          >
-            {settings.photoURL ? (
-              <img src={settings.photoURL} alt="Profile" />
-            ) : (
-              (settings.displayName ?? user?.displayName ?? "G").slice(0, 1)
-            )}
-          </button>
+          <div className="profile-control" ref={profileAnchor}>
+            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><span className="avatar">{settings.photoURL?<img src={settings.photoURL} alt=""/>:(settings.displayName??user?.displayName??'A').slice(0,1)}</span><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
+            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={100} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
+          </div>
         </div>
       </header>
       {user &&
@@ -1047,15 +1089,15 @@ export default function App() {
       {trips.length >= 80 && (
         <div className="verification">
           {trips.length >= 100
-            ? "Your 100-trip limit is reached. Remove an old trip before creating or joining another."
-            : `${trips.length}/100 saved trips. You are approaching your limit; remove old trips to make room.`}
+            ? "Your saved-trip limit is reached. Remove an old trip before creating or joining another."
+            : "You are approaching your saved-trip limit. Remove old trips to make room."}
         </div>
       )}
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">
           <Map size={17} /><h1>Places & routes</h1>
           {shareTrip && <span className="shared-label">View only</span>}
-          {!readonly && <><button className="text-button" onClick={() => newItem("connections")} disabled={day.pins.length < 2}>Connect</button><button className="icon" aria-label="Add place" onClick={() => newItem("pins")}><Plus size={19} /></button></>}
+
         </div>
         <div className="view-controls">
           {[
@@ -1103,29 +1145,15 @@ export default function App() {
                 connections={day.connections}
                 layout={layout}
                 readonly={readonly}
-                onView={(center, zoom) => changeLayout({ center, zoom })}
+                onConnect={async(from,to,arrow)=>{if(await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow}))setMessage("Connection created.");}}
+                movingPinId={movingPinId}
+                onCancelMove={()=>setMovingPinId(null)}
+                onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
+                onView={(center, zoom) => {if(!layoutLoading.current)changeLayout({ center, zoom });}}
                 onPin={(pin) => setEdit({ kind: "pins", item: pin })}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
             </Suspense>
-            <div className="places-strip">
-              {day.pins.length ? (
-                day.pins.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      changeLayout({ center: [p.lng, p.lat], zoom: 14 });
-                      setEdit({ kind: "pins", item: p });
-                    }}
-                  >
-                    <span style={{ color: p.color }}>{p.symbol}</span>
-                    {p.title}
-                  </button>
-                ))
-              ) : (
-                null
-              )}
-            </div>
           </section>
         )}
         {layout.map && layout.timeline && (
@@ -1159,7 +1187,7 @@ export default function App() {
                 });
               el.addEventListener("pointermove", move);
               el.addEventListener(
-                "pointerup",
+                "lostpointercapture",
                 () => el.removeEventListener("pointermove", move),
                 { once: true },
               );
@@ -1202,7 +1230,7 @@ export default function App() {
             >
               <div className="timeline-grid">
                 {Array.from({ length: 24 }, (_, i) => (
-                  <div className="hour" key={i} style={{ top: i * 64 }}>
+                  <div className="hour" key={i} style={{ top: i * hourHeight }}>
                     <span>{String(i).padStart(2, "0")}:00</span>
                     <i />
                   </div>
@@ -1233,19 +1261,20 @@ export default function App() {
                   return (
                     <button
                       className="time-block"
+                      aria-label={`${field("title")}, ${displayTime(b.startEpoch,b.start)} to ${displayTime(b.endEpoch,b.end)}`}
                       key={b.id}
                       style={{
                         left: `calc(64px + (100% - 64px) * ${lane / lanes})`,
                         right: `calc((100% - 64px) * ${1 - (lane + 1) / lanes})`,
                         top:
                           (minutes(displayTime(b.startEpoch, b.start)) / 60) *
-                          64,
+                          hourHeight,
                         height: Math.max(
-                          38,
+                          24,
                           ((minutes(displayTime(b.endEpoch, b.end)) -
                             minutes(displayTime(b.startEpoch, b.start)) || 60) /
                             60) *
-                            64,
+                            hourHeight,
                         ),
                         borderLeftColor: field("color"),
                         background: `color-mix(in srgb, ${field("color")} 13%, var(--surface))`,
@@ -1263,13 +1292,9 @@ export default function App() {
                         })
                       }
                     >
-                      <span className="block-time">
-                        {displayTime(b.startEpoch, b.start)} —{" "}
-                        {displayTime(b.endEpoch, b.end)}
-                      </span>
                       <strong>
                         <span style={{ color: field("color") }}>
-                          {field("symbol")}
+                          <SymbolIcon value={field("symbol")}/>
                         </span>{" "}
                         {field("title")}
                       </strong>
@@ -1281,7 +1306,7 @@ export default function App() {
                   <div
                     className="now-line"
                     aria-label="Current time"
-                    style={{ top: (nowMinutes / 60) * 64 }}
+                    style={{ top: (nowMinutes / 60) * hourHeight }}
                   />
                 )}
               </div>
@@ -1289,33 +1314,16 @@ export default function App() {
           </section>
         )}
         {layout.todo && (
-          <section
-            className="todo-panel panel"
-            style={{
-              left: Math.min(
-                layout.todoX,
-                Math.max(0, innerWidth - 56 - layout.todoWidth),
-              ),
-              top: Math.min(
-                layout.todoY,
-                Math.max(0, innerHeight - 225 - layout.todoHeight),
-              ),
-              width: Math.min(layout.todoWidth, innerWidth - 56),
-              height: Math.min(
-                layout.todoHeight,
-                Math.max(220, innerHeight - 225),
-              ),
-            }}
-          >
+          <FloatingChecklist layout={layout} onChange={changeLayout}>{({x,y,topbar}:any)=><>
             <div
               className="panel-heading todo-drag"
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest("button")) return;
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
-                const bounds = el
-                  .closest(".workspace")!
-                  .getBoundingClientRect();
+                e.preventDefault();
+                document.body.classList.add("dragging-ui");
+                const bounds = {left:0,top:topbar,right:innerWidth,bottom:innerHeight,width:innerWidth,height:innerHeight-topbar};
                 const panelBounds = el.parentElement!.getBoundingClientRect();
                 const start = {
                   x: e.clientX,
@@ -1342,8 +1350,8 @@ export default function App() {
                   });
                 el.addEventListener("pointermove", move);
                 el.addEventListener(
-                  "pointerup",
-                  () => el.removeEventListener("pointermove", move),
+                  "lostpointercapture",
+                  () => {el.removeEventListener("pointermove", move);document.body.classList.remove("dragging-ui");},
                   { once: true },
                 );
               }}
@@ -1352,7 +1360,7 @@ export default function App() {
                 <CheckSquare size={17} />
                 <h2>Travel checklist</h2>
                 <span className="count task-progress" title="Completed tasks / total tasks">
-                  {day.tasks.filter((t) => t.checked).length}/{day.tasks.length}
+                  {day.tasks.filter((t) => optimisticTasks[t.id]?.checked??t.checked).length}/{day.tasks.length}
                 </span>
               </div>
               <button
@@ -1369,21 +1377,20 @@ export default function App() {
               </button>
             </div>
             <div className="task-list">
-              {day.tasks.map((t) => (
-                <div className="task-row" key={t.id}>
+              {visibleTasks.map((t) => (
+                <div className={`task-row${taskIsCurrent(t)?" due-now":""}`} key={t.id}>
                   <input
                     type="checkbox"
                     aria-label={`Complete ${t.title}`}
-                    checked={t.checked}
-                    disabled={readonly}
-                    onChange={() =>
-                      mutate("tasks", { ...t, checked: !t.checked })
-                    }
+                    checked={optimisticTasks[t.id]?.checked??t.checked}
+                    disabled={readonly||optimisticTasks[t.id]?.saving}
+                    onChange={() => toggleTask(t)}
                   />
                   <button onClick={() => setEdit({ kind: "tasks", item: t })}>
-                    <span className={t.checked ? "completed" : ""}>
+                    <span className={(optimisticTasks[t.id]?.checked??t.checked) ? "completed" : ""}>
                       {t.title}
                     </span>
+                    {taskIsCurrent(t)&&<span className="task-now">Now</span>}
                     <small>
                       {[
                         day.pins.find((p) => p.id === t.pinId)?.title,
@@ -1398,11 +1405,11 @@ export default function App() {
               {!day.tasks.length && (
                 <div className="empty-tasks">
                   <CheckSquare size={28} />
-                  <strong>Little things, handled.</strong>
-                  <p>Keep tickets, packing, and plans in one place.</p>
+                  <strong>No tasks yet</strong>
                 </div>
               )}
             </div>
+            {taskPages>1&&<div className="picker-pages task-pages"><button className="icon" aria-label="Previous tasks page" disabled={!currentTaskPage} onClick={()=>setTaskPage(currentTaskPage-1)}><ChevronLeft size={16}/></button><span>{currentTaskPage+1} / {taskPages}</span><button className="icon" aria-label="Next tasks page" disabled={currentTaskPage===taskPages-1} onClick={()=>setTaskPage(currentTaskPage+1)}><ChevronRight size={16}/></button></div>}
             {!readonly && (
               <button className="todo-add" onClick={() => newItem("tasks")}>
                 <Plus size={17} /> Add a task
@@ -1414,9 +1421,9 @@ export default function App() {
               onPointerDown={(e) => {
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
-                const bounds = el
-                  .closest(".workspace")!
-                  .getBoundingClientRect();
+                e.preventDefault();
+                document.body.classList.add("dragging-ui");
+                const bounds = {left:0,top:topbar,right:innerWidth,bottom:innerHeight,width:innerWidth,height:innerHeight-topbar};
                 const panelBounds = el.parentElement!.getBoundingClientRect();
                 const start = {
                   x: e.clientX,
@@ -1426,8 +1433,8 @@ export default function App() {
                 };
                 const move = (ev: PointerEvent) =>
                   changeLayout({
-                    todoX: panelBounds.left - bounds.left,
-                    todoY: panelBounds.top - bounds.top,
+                    todoX: x,
+                    todoY: y-topbar,
                     todoWidth: Math.max(
                       260,
                       Math.min(
@@ -1445,13 +1452,13 @@ export default function App() {
                   });
                 el.addEventListener("pointermove", move);
                 el.addEventListener(
-                  "pointerup",
-                  () => el.removeEventListener("pointermove", move),
+                  "lostpointercapture",
+                  () => {el.removeEventListener("pointermove", move);document.body.classList.remove("dragging-ui");},
                   { once: true },
                 );
               }}
             />
-          </section>
+          </>}</FloatingChecklist>
         )}
 
       </div>
@@ -1467,7 +1474,7 @@ export default function App() {
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
-              <ChevronRight size={18} />
+              <ChevronLeft size={18} />
             </button>
             <strong>
               {new Date(`${month}-15`).toLocaleDateString("en-US", {
@@ -1484,7 +1491,7 @@ export default function App() {
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
-              <ChevronLeft size={18} />
+              <ChevronRight size={18} />
             </button>
           </header>
           <div className="calendar-grid">
@@ -1559,14 +1566,16 @@ export default function App() {
           </div>
         </div>
       )}
-      {modal === "new-trip" && (
-        <Modal title="A new adventure" onClose={() => setModal(null)}>
+      {(modal === "new-trip" || modal === "edit-trip") && (
+        <Modal title={modal === "edit-trip" ? "Edit trip" : "Create trip"} onClose={() => setModal(null)}>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
               try {
-                const r = await api<{ trip: Trip }>("trip.create", {
+                const r = await api<{ trip: Trip }>(modal === "edit-trip" ? "trip.update" : "trip.create", {
+                  tripId: modal === "edit-trip" ? trip?.id : undefined,
+                  lodging: lodgingDraft,
                   clientTimezone:
                     Intl.DateTimeFormat().resolvedOptions().timeZone,
                   name: f.get("name"),
@@ -1588,7 +1597,7 @@ export default function App() {
             <Input
               label="Trip name"
               name="name"
-              placeholder="A week in Rome"
+              defaultValue={modal === "edit-trip" ? trip?.name : ""}
               maxLength={120}
               required
             />
@@ -1597,8 +1606,8 @@ export default function App() {
                 label="First day"
                 name="start"
                 type="date"
-                defaultValue={date}
-                min={today()}
+                defaultValue={modal === "edit-trip" ? trip?.startDate : date}
+                min={modal === "edit-trip" ? undefined : today()}
                 max={maxDate()}
                 required
               />
@@ -1606,23 +1615,21 @@ export default function App() {
                 label="Last day"
                 name="end"
                 type="date"
-                defaultValue={date}
-                min={today()}
+                defaultValue={modal === "edit-trip" ? trip?.endDate : date}
+                min={modal === "edit-trip" ? undefined : today()}
                 max={maxDate()}
                 required
               />
             </div>
-            <p className="form-note">
-              {trips.length}/100 saved trips
-              {trips.length >= 80
-                ? " · You are approaching your trip limit."
-                : ""}
-            </p>
+            <span className="lodging-label">Lodging location</span>
+            <div className="lodging-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={lodgingDraft?.lng!==undefined?[{id:"lodging",title:"Lodging",note:"",color:settings.accent,symbol:"icon:stay",lng:lodgingDraft.lng,lat:lodgingDraft.lat,versions:{}}]:[]} connections={[]} readonly={false} placementMode layout={lodgingView} onView={(center,zoom)=>setLodgingView(previous=>({...previous,center,zoom}))} onPin={()=>{}} onAdd={(lng,lat)=>setLodgingDraft({name:'Lodging',lng,lat,timezone:tzlookup(lat,lng)})}/></Suspense></div>
+            {!lodgingDraft&&<small>Select your lodging on the map.</small>}
+            {modal==='new-trip'&&<small>{trips.length}/100 saved trips</small>}
             <button
               className="button primary full"
-              disabled={trips.length >= 100}
+              disabled={(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined}
             >
-              Create trip <ArrowUpRight size={17} />
+              {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </button>
           </form>
         </Modal>
@@ -1669,40 +1676,7 @@ export default function App() {
                   }
                 />
               )}
-              {edit.kind === "pins" && (
-                <div className="form-row">
-                  <Input
-                    label="Latitude"
-                    type="number"
-                    step="any"
-                    min={-85}
-                    max={85}
-                    required
-                    value={edit.item.lat}
-                    onChange={(e: any) =>
-                      setEdit({
-                        ...edit,
-                        item: { ...edit.item, lat: Number(e.target.value) },
-                      })
-                    }
-                  />
-                  <Input
-                    label="Longitude"
-                    type="number"
-                    step="any"
-                    min={-180}
-                    max={180}
-                    required
-                    value={edit.item.lng}
-                    onChange={(e: any) =>
-                      setEdit({
-                        ...edit,
-                        item: { ...edit.item, lng: Number(e.target.value) },
-                      })
-                    }
-                  />
-                </div>
-              )}
+              {edit.kind === "pins" && Object.keys(edit.item.versions??{}).length>0 && <button type="button" className="button" onClick={()=>{setMovingPinId(edit.item.id);changeLayout({map:true});setEdit(null);}}>Edit location on map</button>}
               {edit.kind === "blocks" && (
                 <>
                   <div className="form-row">
@@ -1714,13 +1688,13 @@ export default function App() {
                       onInput={(e: any) =>
                         setEdit({
                           ...edit,
-                          item: { ...edit.item, start: e.currentTarget.value },
+                          item: { ...edit.item, start: e.currentTarget.value, disambiguation:null },
                         })
                       }
                       onChange={(e: any) =>
                         setEdit({
                           ...edit,
-                          item: { ...edit.item, start: e.target.value },
+                          item: { ...edit.item, start: e.target.value, disambiguation:null },
                         })
                       }
                     />
@@ -1733,28 +1707,18 @@ export default function App() {
                       onInput={(e: any) =>
                         setEdit({
                           ...edit,
-                          item: { ...edit.item, end: e.currentTarget.value },
+                          item: { ...edit.item, end: e.currentTarget.value, disambiguation:null },
                         })
                       }
                       onChange={(e: any) =>
                         setEdit({
                           ...edit,
-                          item: { ...edit.item, end: e.target.value },
+                          item: { ...edit.item, end: e.target.value, disambiguation:null },
                         })
                       }
                     />
                   </div>
-                  <Input
-                    label="Time zone"
-                    value={edit.item.timezone ?? timezone}
-                    onChange={(e: any) =>
-                      setEdit({
-                        ...edit,
-                        item: { ...edit.item, timezone: e.target.value },
-                      })
-                    }
-                  />
-                  <Select
+                  {(ambiguousTime||edit.item.disambiguation)&&<Select
                     label="Repeated hour (daylight saving)"
                     value={edit.item.disambiguation ?? ""}
                     onChange={(e: any) =>
@@ -1767,10 +1731,10 @@ export default function App() {
                       })
                     }
                   >
-                    <option value="">Ask if the hour repeats</option>
+                    <option value="">Choose occurrence</option>
                     <option value="earlier">Earlier occurrence</option>
                     <option value="later">Later occurrence</option>
-                  </Select>
+                  </Select>}
                   <Select
                     label="Linked place"
                     value={edit.item.pinId ?? ""}
@@ -1789,7 +1753,7 @@ export default function App() {
                                 symbol: p.symbol,
                                 overrides: [],
                               }
-                            : {}),
+                            : {title:"",detail:"",color:settings.accent,symbol:"icon:stay",overrides:[]}),
                         },
                       });
                     }}
@@ -1878,8 +1842,7 @@ export default function App() {
                         })
                       }
                     />
-                    <Select
-                      label="Symbol"
+                    <SymbolPicker
                       value={edit.item.symbol}
                       onChange={(e: any) =>
                         setEdit({
@@ -1901,10 +1864,7 @@ export default function App() {
                         })
                       }
                     >
-                      {symbols.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </Select>
+                    </SymbolPicker>
                   </div>
                 </>
               )}
@@ -2008,7 +1968,7 @@ export default function App() {
                   </button>
                 )}
                 <button className="button primary" disabled={saving}>
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? "Saving…" : Object.keys(edit.item.versions??{}).length ? "Save changes" : edit.kind==="pins" ? "Create pin" : edit.kind==="blocks" ? "Create time block" : edit.kind==="tasks" ? "Create task" : "Create connection"}
                   <Check size={16} />
                 </button>
               </div>
@@ -2016,7 +1976,7 @@ export default function App() {
           </form>
           {edit.kind === "pins" &&
             day.connections
-              .filter((c) => c.from === edit.item.id || c.to === edit.item.id)
+              .filter((c) => c.from === edit.item.id || c.to === edit.item.id).slice(connectionPage*3,connectionPage*3+3)
               .map((c) => (
                 <div className="connection-row" key={c.id}>
                   {day.pins.find((p) => p.id === c.from)?.title}{" "}
@@ -2032,14 +1992,15 @@ export default function App() {
                   )}
                 </div>
               ))}
+          {edit.kind==='pins'&&day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length>3&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous connections page" disabled={!connectionPage} onClick={()=>setConnectionPage(connectionPage-1)}><ChevronLeft size={15}/></button><span>{connectionPage+1} / {Math.ceil(day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length/3)}</span><button type="button" className="icon" aria-label="Next connections page" disabled={(connectionPage+1)*3>=day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length} onClick={()=>setConnectionPage(connectionPage+1)}><ChevronRight size={15}/></button></div>}
         </Modal>
       )}
       {modal === "trip" && trip && (
-        <Modal title={trip.name} onClose={() => setModal(null)}>
-          <p className="form-note">
-            {trip.startDate} — {trip.endDate} · {trip.memberIds?.length ?? 0}{" "}
-            travelers
-          </p>
+        <Modal title="Share trip" onClose={() => setModal(null)}>
+          <h3>{trip.name}</h3>
+          <h3>Travelers</h3>
+          <div className="member-row"><span>{trip.ownerId===user?.uid?"Owner · You":"Trip owner"}</span></div>
+          {!shareTrip&&<button className="button" onClick={()=>{setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
           {shareTrip ? (
             <>
               <p>
@@ -2146,16 +2107,14 @@ export default function App() {
                   >
                     Revoke sharing links
                   </button>
-                  <h3>Travelers</h3>
-                  {trip.memberIds
-                    .filter((id) => id !== user.uid)
+                  {trip.memberIds.filter(id=>id!==trip.ownerId).slice(memberPage*4,memberPage*4+4)
                     .map((id) => (
                       <div className="member-row" key={id}>
-                        <span>Traveler · {id.slice(0, 8)}</span>
-                        <button
-                          className="text-button"
+                        <span>{id===trip.ownerId?"Owner":"Traveler"}{id===user.uid?" · You":` · ${id.slice(0,8)}`}</span>
+                        {id!==trip.ownerId&&<button
+                          className="text-button danger"
                           onClick={async () => {
-                            if (!confirm("Remove this traveler’s access?"))
+                            if (!await confirmAction("Remove this traveler’s access?"))
                               return;
                             try {
                               await api("member.remove", {
@@ -2174,27 +2133,18 @@ export default function App() {
                           }}
                         >
                           Remove
-                        </button>
+                        </button>}
                       </div>
                     ))}
+                  {trip.memberIds.length>5&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous travelers page" disabled={!memberPage} onClick={()=>setMemberPage(memberPage-1)}><ChevronLeft size={15}/></button><span>{memberPage+1} / {Math.ceil((trip.memberIds.length-1)/4)}</span><button type="button" className="icon" aria-label="Next travelers page" disabled={(memberPage+1)*4>=trip.memberIds.length-1} onClick={()=>setMemberPage(memberPage+1)}><ChevronRight size={15}/></button></div>}
                 </>
               )}
               <div className="delete-trip">
-                <h3>
-                  {trip.ownerId === user?.uid
-                    ? "Delete for everyone"
-                    : "Remove from my trips"}
-                </h3>
-                <p>
-                  {trip.ownerId === user?.uid
-                    ? "Manual deletion permanently deletes this trip for every traveler. Automatic cleanup only removes it from your own account."
-                    : "This removes your access. Other travelers keep the trip."}
-                </p>
                 <button
                   className="button danger"
                   onClick={async () => {
                     if (
-                      !confirm(
+                      !await confirmAction(
                         trip.ownerId === user?.uid
                           ? "Permanently delete this trip for EVERYONE? This cannot be undone."
                           : "Remove this trip from your account? Other travelers keep it.",
@@ -2305,23 +2255,12 @@ export default function App() {
               value={settings.mapStart}
               onChange={(e: any) => setSettings({ ...settings, mapStart: e.target.value })}
             >
+              <option value="trip">Trip lodging · world map without a trip</option>
               <option value="current">My current location</option>
               <option value="custom">A place I choose</option>
               <option value="world">World map</option>
             </Select>
-            {settings.mapStart === "custom" && (
-              <>
-                <button type="button" className="button" onClick={() => setSettings({ ...settings, mapCenter: [...layout.center], mapZoom: layout.zoom })}>
-                  Use current map view
-                </button>
-                <p className="form-note">Pan and zoom the map to your preferred place, then use its view here.</p>
-                <div className="form-row">
-                  <Input label="Latitude" type="number" min={-85} max={85} step="any" value={settings.mapCenter[1]} onChange={(e: any) => setSettings({ ...settings, mapCenter: [settings.mapCenter[0], Number(e.target.value)] })} />
-                  <Input label="Longitude" type="number" min={-180} max={180} step="any" value={settings.mapCenter[0]} onChange={(e: any) => setSettings({ ...settings, mapCenter: [Number(e.target.value), settings.mapCenter[1]] })} />
-                </div>
-              </>
-            )}
-            <p className="form-note">Used for days without a saved map view. If location access is unavailable, the world map opens instead.</p>
+            {settings.mapStart==='custom'&&<button type="button" className="button" onClick={()=>{setSettingsMapView({...layout,center:settings.mapCenter,zoom:settings.mapZoom});setModal('map-preference');}}>Choose starting location on map</button>}
             <Select
               label="Clock"
               value={settings.clock}
@@ -2331,22 +2270,11 @@ export default function App() {
             >
               <option value="local">My local time</option>
               <option value="destination">Destination time</option>
+              <option value="lodging">Lodging local time</option>
               <option value="utc">UTC</option>
             </Select>
-            {settings.clock === "destination" && (
-              <Input
-                label="Time zone override (optional)"
-                placeholder="Europe/Rome"
-                value={settings.timezone}
-                onChange={(e: any) =>
-                  setSettings({ ...settings, timezone: e.target.value })
-                }
-              />
-            )}
-            <p className="form-note">
-              Active clock: {timezone}. Destination time follows the first
-              scheduled place, then the first map pin.
-            </p>
+            {settings.clock==='destination'&&<TimezonePicker value={settings.timezone} onChange={(e:any)=>setSettings({...settings,timezone:e.target.value})}/>}
+            <small className="active-clock">Active clock: {timezone}</small>
             <label className="checkbox-field">
               <input
                 type="checkbox"
@@ -2358,7 +2286,7 @@ export default function App() {
               Automatically remove old trips from my account
             </label>
             <Select
-              label="Remove after the trip ends"
+              label="Remove from my account after the trip ends"
               value={settings.retentionDays}
               disabled={!settings.autoDelete}
               onChange={(e: any) =>
@@ -2381,25 +2309,8 @@ export default function App() {
             </button>
             <div className="settings-footer">
               <small>
-                Journas · Version 1.0.0 · {trips.length}/100 saved trips
+                Journas · Version 1.0.0
               </small>
-              {user && (
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={async () => {
-                    await saveLayout();
-                    await signOut(auth!);
-                    setTrip(null);
-                    setTrips([]);
-                    setSettings(defaultSettings);
-                    setShareLink("");
-                    setModal(null);
-                  }}
-                >
-                  <LogOut size={14} /> Sign out
-                </button>
-              )}
             </div>
           </form>
         </Modal>
@@ -2499,6 +2410,8 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
+      {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
   );

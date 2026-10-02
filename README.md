@@ -12,7 +12,6 @@ The production site connects to the Firebase project `journas-trip-planner`. Ear
 
 ![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
 
-[Open the original 1,920 × 989 PNG captured directly in Chrome](devpost/assets/planner-desktop.png).
 
 
 ## What you can plan

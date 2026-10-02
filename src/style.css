@@ -1395,7 +1395,6 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 .compass-control .maplibregl-ctrl-icon { background-image: none!important; display: grid; place-items: center; }
 .compass-control svg { width: 30px; height: 30px; }
 @media (hover: hover) and (pointer: fine) {
-  button:not(:disabled):hover { translate: 0 -1px; }
   .map-pin:hover { scale: 1.08; }
   .compass-control:hover, .compass-control:has(button:active) { scale: 2; }
 }
@@ -1404,10 +1403,8 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 .compass-control { margin: 0 0 12px 10px!important; }
 
 .compass-control .maplibregl-ctrl-compass { color: var(--ink); background: var(--surface); }
-@media (hover: hover) and (pointer: fine) { .maplibregl-ctrl-attrib-button:hover { translate: 0 -1px; } }
 
 .compass-control { transform-origin: left bottom; transition: scale 180ms ease; }
-.compass-control button:hover { translate: 0 0!important; }
 .toast { animation: toast-in 180ms ease-out; }
 .toast.leaving { animation: toast-out 180ms ease-in forwards; pointer-events: none; }
 .dropdown-menu, .calendar-popover, .modal { animation: panel-in 140ms ease-out; }

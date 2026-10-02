@@ -1420,10 +1420,11 @@ button { transition: box-shadow 150ms ease, filter 150ms ease, background-color 
 
 @media (hover: hover) and (pointer: fine) {
   button:not(:disabled):hover, summary.maplibregl-ctrl-attrib-button:hover {
-    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 20%, transparent);
+    filter: none;
   }
   .button.primary:not(:disabled):hover {
-    box-shadow: inset 0 0 0 100vmax #ffffff30;
+    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 82%, #000);
     filter: none;
   }
   .text-button:not(:disabled):hover { color: var(--ink); }
@@ -1435,9 +1436,12 @@ button:not(:disabled):active,
 .button.primary:not(:disabled):active,
 summary.maplibregl-ctrl-attrib-button:active,
 select:not(:disabled):active {
-  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 24%, transparent);
-  filter: brightness(0.9);
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 38%, transparent);
+  filter: none;
   transition-duration: 0ms;
+}
+.button.primary:not(:disabled):active {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 65%, #000);
 }
 
 :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) {
@@ -1445,8 +1449,8 @@ select:not(:disabled):active {
 }
 @media (hover: hover) and (pointer: fine) {
   :is(input, textarea, select):not(:disabled):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):hover {
-    border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
-    background-color: color-mix(in srgb, var(--accent) 7%, var(--surface));
+    border-color: var(--accent);
+    background-color: color-mix(in srgb, var(--accent) 14%, var(--surface));
   }
 }
 :is(input, textarea, select):not(:disabled):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):focus {

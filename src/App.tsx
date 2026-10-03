@@ -40,7 +40,10 @@ import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import { DateField, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
-const MapPanel = lazy(() => import("./MapPanel"));
+let mapPanelLoad:ReturnType<typeof importMapPanel>|undefined;
+const importMapPanel=()=>import("./MapPanel");
+const loadMapPanel=()=>mapPanelLoad??=importMapPanel();
+const MapPanel = lazy(loadMapPanel);
 import {
   defaultLayout,
   defaultSettings,
@@ -362,6 +365,7 @@ export default function App() {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline]);
   const calendarBox = useRef<HTMLDivElement>(null);
+  const initialTripRequest=useRef<{tripId:string;date:string;promise:Promise<{trip:Trip;day:Day;layout:Layout|null}|null>}|null>(null);
   const profilePhoto = useRef<HTMLInputElement>(null);
   const [photoCrop,setPhotoCrop]=useState<File|null>(null);
   useEffect(() => {
@@ -398,6 +402,8 @@ export default function App() {
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
+      screenReady.current=false;
+      if(u&&!token){try{const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${u.uid}`)??sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
       setUser(u);
       setReady(!u);
     });
@@ -436,12 +442,26 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     let cancelled=false;
-    Promise.all([refresh(), api<{ settings: Settings }>("settings.get"),user.getIdTokenResult()])
-      .then(async ([list, r, identity]) => {
+    let saved:any=null;
+    initialTripRequest.current=null;
+    try{saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");}catch{}
+    // Start the map download alongside the single authorized screen restore.
+    // Neither cached screen data nor preloading grants permission to a trip.
+    void loadMapPanel().catch(()=>{});
+    if(saved?.uid===user.uid&&saved.tripId&&!token)void import('./live-database').catch(()=>{});
+    const hasSaved=saved?.uid===user.uid&&!token;
+    const bootstrap=api<{trips:Trip[];settings:Settings;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
+      date:hasSaved?saved.date:today(),
+      ...(hasSaved?{tripId:saved.tripId??null}:token?{tripId:null}:{})
+    });
+    Promise.all([bootstrap,user.getIdTokenResult()])
+      .then(async ([result, identity]) => {
         if(cancelled)return;
+        const list=result.trips,r={settings:result.settings};
+        setTrips(list);
+        if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
-        const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");
         if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=saved.layout??await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
@@ -523,10 +543,10 @@ export default function App() {
       return;
     let cancelled = false;
     layoutLoading.current=true;
-    api<{ trip: Trip; day: Day; layout: Layout | null }>("trip.get", {
-      tripId: trip.id,
-      date,
-    })
+    const prepared=initialTripRequest.current;
+    initialTripRequest.current=null;
+    const readDay=()=>api<{trip:Trip;day:Day;layout:Layout|null}>("trip.get",{tripId:trip.id,date});
+    (prepared?.tripId===trip.id&&prepared.date===date ? prepared.promise.then(result=>result??readDay()) : readDay())
       .then(async (r) => {
         if (cancelled) return;
         setDay(r.day);
@@ -986,7 +1006,7 @@ export default function App() {
   const taskPageSize=Math.max(1,Math.floor(((innerWidth<=700?innerHeight-90:layout.todoHeight)-112)/52));
   const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
   const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
-  if (!ready)
+  if (!ready && !user)
     return (
       <div className="loading">
         <Compass /> Finding your next adventure…
@@ -1000,7 +1020,8 @@ export default function App() {
       </>
     );
   return (
-    <div className="app">
+    <>
+    <div className="app" inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
       <header className="topbar">
         <a className="brand" href="/">
           <Compass />
@@ -2409,5 +2430,7 @@ export default function App() {
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
+    {!ready&&<div className="restoring-screen" role="status"><Compass size={24}/> Restoring your last screen...</div>}
+    </>
   );
 }

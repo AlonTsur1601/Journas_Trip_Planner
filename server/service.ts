@@ -184,6 +184,20 @@ export class JournasService {
             fail(401, 'UNAUTHENTICATED', 'Sign in to continue');
         const userId = identifier(uid);
         return historyTransaction(this.store,userId,input,this.now(),async (tx) => {
+            if(action === 'planner.restore') {
+                const requestedDate=date(input.date);
+                const [user,refs]=await Promise.all([tx.get(userPath(userId)),tx.list(`users/${userId}/trips`)]);
+                const trips=(await Promise.all(refs.map(ref=>tx.get(tripPath(identifier(ref.id))))))
+                    .filter(trip=>trip&&!trip.deleted&&(trip.memberIds as string[]).includes(userId)) as Trip[];
+                const requestedId=input.tripId==null?null:identifier(input.tripId);
+                const selected='tripId' in input ? trips.find(trip=>trip.id===requestedId) : trips.find(trip=>trip.startDate<=requestedDate&&trip.endDate>=requestedDate);
+                let restore=null;
+                if(selected&&requestedDate>=selected.startDate&&requestedDate<=selected.endDate){
+                    const [day,view]=await Promise.all([this.day(tx,selected.id,requestedDate),tx.get(layoutPath(userId,selected.id,requestedDate))]);
+                    restore={trip:selected,day,layout:view?.layout??null};
+                }
+                return {trips,settings:{...defaultSettings,...object(user?.settings??{})},restore};
+            }
             if (action === 'settings.get') {
                 const user = await tx.get(userPath(userId));
                 return { settings: { ...defaultSettings, ...object(user?.settings ?? {}) } };

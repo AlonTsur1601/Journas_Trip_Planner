@@ -1898,3 +1898,6 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .pin-tooltip.maplibregl-popup-anchor-top .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--surface);}
 .pin-tooltip.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--surface);}
 .pin-tooltip.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--surface);}
+/* Profile photos and initial avatars share one stable circular footprint. */
+.avatar.profile-avatar,.profile-trigger .avatar.profile-avatar,.share-modal .avatar.profile-avatar{display:grid;place-items:center;width:28px;height:28px;min-width:28px;min-height:28px;flex:0 0 28px;aspect-ratio:1;border-radius:50%;margin:0;padding:0;font-size:13px;line-height:1;overflow:hidden;}
+.profile-avatar img{display:block;width:28px;height:28px;object-fit:cover;}

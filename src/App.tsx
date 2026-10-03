@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import {AccountCredentials} from "./AccountCredentials";
+import {accountPhoto} from "./account-profile";
 import { api, auth, configured, db } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
@@ -62,10 +63,11 @@ type Edit = {
   item: Record<string, any>;
   base?: Record<string, any>;
 };
-function ProfileAvatar({src, fallback, name}: {src?:string;fallback?:string;name:string}) {
+function ProfileAvatar({src, fallback, name, id}: {src?:string;fallback?:string;name:string;id:string}) {
   const [failed, setFailed] = useState<string[]>([]);
   const photo = [src, fallback].find(url => url && !failed.includes(url));
-  return <span className="avatar">{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : name.slice(0,1)}</span>;
+  const hue=Array.from(id).reduce((hash,char)=>(hash*31+char.codePointAt(0)!)>>>0,0)%360;
+  return <span className="avatar profile-avatar" style={photo?undefined:{background:`hsl(${hue} 62% 30%)`,color:'#fff'}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
 }
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;
@@ -323,6 +325,8 @@ export default function App() {
     [conflict, setConflict] = useState<any>(null),
     [saving, setSaving] = useState(false),
     [manualSaving, setManualSaving] = useState(false);
+  const [googleSession,setGoogleSession]=useState(false);
+  const activePhoto=accountPhoto(user,googleSession,settings.photoURL);
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
   const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
@@ -392,7 +396,7 @@ export default function App() {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setReady(true);
+      setReady(!u);
     });
   }, []);
   useEffect(() => {
@@ -428,9 +432,12 @@ export default function App() {
   }
   useEffect(() => {
     if (!user) return;
-    Promise.all([refresh(), api<{ settings: Settings }>("settings.get")])
-      .then(async ([list, r]) => {
-        const preferences = { ...defaultSettings, ...r.settings,photoURL:r.settings.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
+    let cancelled=false;
+    Promise.all([refresh(), api<{ settings: Settings }>("settings.get"),user.getIdTokenResult()])
+      .then(async ([list, r, identity]) => {
+        if(cancelled)return;
+        setGoogleSession(identity.signInProvider==='google.com');
+        const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");
         if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
@@ -443,7 +450,9 @@ export default function App() {
               null,
           );
       })
-      .catch((e) => setMessage(e.message));
+      .catch((e) => {if(!cancelled)setMessage(e.message);})
+      .finally(()=>{if(!cancelled)setReady(true);});
+    return ()=>{cancelled=true;};
   }, [user?.uid]);
   useEffect(() => {
     if (!token || joinedToken === token) return;
@@ -1099,7 +1108,7 @@ export default function App() {
             </button>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar src={settings.photoURL} fallback={user?.photoURL||user?.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined} name={settings.displayName||user?.displayName||'Account'}/><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
+            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} fallback={user?.photoURL||user?.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined} name={settings.displayName||user?.displayName||'Account'}/><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
             {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
           </div>
         </div>
@@ -2046,7 +2055,7 @@ export default function App() {
         <Modal title="Share trip" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list">{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar src={t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span><span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}</div>)}</div>
+          <div className="travelers-list">{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span><span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}</div>)}</div>
           {!shareTrip&&<button className="button" onClick={()=>{setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
           {shareTrip ? (
             <>
@@ -2222,7 +2231,7 @@ export default function App() {
                 }}
               />
               <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
-              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{user?.providerData.some(p=>p.providerId==="google.com")&&(!settings.photoURL||settings.photoURL===(user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL))&&<small>Using your Google profile photo</small>}
+              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&<small>Using your Google profile photo</small>}
             </div>
             <div className="form-row">
               <Select

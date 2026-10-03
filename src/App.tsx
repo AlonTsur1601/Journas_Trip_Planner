@@ -1,5 +1,5 @@
 import { Undo2, Redo2 } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -32,6 +32,7 @@ import {
   Save,
 } from "lucide-react";
 import tzlookup from "tz-lookup";
+import {AccountCredentials} from "./AccountCredentials";
 import { api, auth, configured, db } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
@@ -61,6 +62,11 @@ type Edit = {
   item: Record<string, any>;
   base?: Record<string, any>;
 };
+function ProfileAvatar({src, fallback, name}: {src?:string;fallback?:string;name:string}) {
+  const [failed, setFailed] = useState<string[]>([]);
+  const photo = [src, fallback].find(url => url && !failed.includes(url));
+  return <span className="avatar">{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : name.slice(0,1)}</span>;
+}
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;
   if (props.type === "time") return <TimeField label={label} {...props} />;
@@ -318,17 +324,21 @@ export default function App() {
     [saving, setSaving] = useState(false),
     [manualSaving, setManualSaving] = useState(false);
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
+  const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
   const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
   const [lodgingView,setLodgingView]=useState(defaultLayout());
   const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
   const [ambiguousTime,setAmbiguousTime]=useState(false);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
-  const [taskPage,setTaskPage]=useState(0),[memberPage,setMemberPage]=useState(0),[connectionPage,setConnectionPage]=useState(0);
-  const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:80);
+  const [taskPage,setTaskPage]=useState(0),[connectionPage,setConnectionPage]=useState(0);
+  const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:57);
   const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
   const [historyBusy,setHistoryBusy]=useState(false);
   const [travelers,setTravelers]=useState<any[]>([]);
+  const [shareLinks,setShareLinks]=useState<any[]>([]);
+  const [,refreshAccount]=useState(0);
   const screenReady=useRef(false);
+  const settingsRef=useRef(settings);settingsRef.current=settings;
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
@@ -343,6 +353,7 @@ export default function App() {
   const dirty = useRef(false);
   const layoutLoading = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline]);
   const calendarBox = useRef<HTMLDivElement>(null);
   const profilePhoto = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -357,8 +368,7 @@ export default function App() {
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [calendar]);
   const [time, setTime] = useState(new Date());
-  useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:80);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
-  useEffect(()=>{setMemberPage(0);},[trip?.id,modal]);
+  useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:57);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useEffect(()=>{setConnectionPage(0);},[edit?.item.id]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
 
@@ -403,13 +413,13 @@ export default function App() {
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, [settings.theme, settings.accent]);
-  useEffect(()=>{if(user&&screenReady.current)sessionStorage.setItem('journas-current-screen',JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout}));},[user?.uid,trip?.id,date,layout]);
-  useEffect(()=>{if(!user)return;const update=()=>api<{undo:string|null;redo:string|null}>('history.status').then(setHistoryState).catch(()=>{});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid]);
+  useEffect(()=>{if(user&&screenReady.current){const saved=JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout});sessionStorage.setItem('journas-current-screen',saved);localStorage.setItem(`journas-last-screen:${user.uid}`,saved);}},[user?.uid,trip?.id,date,layout]);
+  useEffect(()=>{setHistoryState({undo:null,redo:null});if(!user||!trip||shareTrip)return;let live=true;const update=()=>api<{undo:string|null;redo:string|null}>('history.status',{tripId:trip.id}).then(r=>{if(live)setHistoryState(r);}).catch(()=>{if(live)setHistoryState({undo:null,redo:null});});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{live=false;clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid,trip?.id,shareTrip]);
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid,historyBusy,saving]);
-  useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>setTravelers(r.members)).catch(e=>setMessage(e.message));},[modal,trip?.id,trip?.memberIds.join(',')]);
+  useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>{if(live)setTravelers([...new globalThis.Map<string,any>(r.members.map((member:any):[string,any]=>[member.id,member])).values()] as any[]);}).catch(e=>setMessage(e.message));if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>setMessage(e.message));return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
-   if(historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
-   try{const r=await api<{screen:any}>(`history.${direction}`);const [list,prefs]=await Promise.all([refresh(),api<{settings:Settings}>('settings.get')]);setSettings({...defaultSettings,...prefs.settings});const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status'));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+   if(!trip||shareTrip||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
+   try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
   async function refresh() {
     const result = await api<{ trips: Trip[] }>("trip.list");
@@ -420,9 +430,9 @@ export default function App() {
     if (!user) return;
     Promise.all([refresh(), api<{ settings: Settings }>("settings.get")])
       .then(async ([list, r]) => {
-        const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock };
-        const saved=JSON.parse(sessionStorage.getItem("journas-current-screen")??"null");
-        if(saved?.uid===user.uid&&!token){setDate(saved.date);setTrip(list.find(t=>t.id===saved.tripId)??null);setLayout(saved.layout??defaultLayout());screenReady.current=true;setSettings(preferences);return;}
+        const preferences = { ...defaultSettings, ...r.settings,photoURL:r.settings.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
+        const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");
+        if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
@@ -476,7 +486,7 @@ export default function App() {
         const local = localStorage.getItem(
           `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
-        const nextLayout = local ? JSON.parse(local) : await startingLayout(settings, tripRef.current?.lodging);
+        const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, tripRef.current?.lodging);
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
       })
@@ -513,7 +523,7 @@ export default function App() {
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
-        const nextLayout = restored ?? await startingLayout(settings, tripRef.current?.lodging);
+        const nextLayout = restored ?? await startingLayout(settingsRef.current, tripRef.current?.lodging);
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
         dirty.current = Boolean(local);
@@ -531,8 +541,8 @@ export default function App() {
           }
         }
         setTimeout(() => {
-          if (scroller.current)
-            scroller.current.scrollTop = restored?.scroll ?? 400;
+          if (!cancelled && scroller.current)
+            scroller.current.scrollTop = nextLayout.scroll ?? 400;
         }, 0);
       })
       .catch((e) => {layoutLoading.current=false;setMessage(e.message);});
@@ -630,8 +640,8 @@ export default function App() {
         layout: layoutRef.current,
       });
       dirty.current = false;
-      localStorage.removeItem(
-        `journas-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,
+      localStorage.setItem(
+        `journas-layout:${user.uid}:${tripRef.current.id}:${dateRef.current}`,JSON.stringify(layoutRef.current),
       );
       setStatus("All changes saved");
     } catch (e: any) {
@@ -674,7 +684,7 @@ export default function App() {
     };
   }, []);
   function changeLayout(patch: Partial<Layout>) {
-    if(user&&trip&&Object.keys(patch).some(k=>["map","timeline","todo"].includes(k)))void api("history.view",{screenAfter:{tripId:trip.id,date,layout:{...layoutRef.current,...patch}}}).catch(e=>setMessage(e.message));
+    if(!screenReady.current||layoutLoading.current)return;
     if (
       Object.entries(patch).every(
         ([key, value]) =>
@@ -684,7 +694,9 @@ export default function App() {
     )
       return;
     dirty.current = true;
-    setLayout((l) => ({ ...l, ...patch }));
+    const next={...layoutRef.current,...patch};
+    layoutRef.current=next;
+    setLayout(next);
     if (shareTrip && trip)
       localStorage.setItem(
         `journas-viewlayout:${user?.uid ?? "guest"}:${trip.id}:${date}`,
@@ -696,6 +708,9 @@ export default function App() {
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
   }
+  async function plannedInitialLayout(prefs:Settings,selected:Trip|null,nextDate:string){
+    if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,selected?.lodging);
+  }
   async function plannedLayout(selected:Trip|null,nextDate:string){
     if(selected&&user&&nextDate>=selected.startDate&&nextDate<=selected.endDate){
       const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);
@@ -703,7 +718,7 @@ export default function App() {
       const saved=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});
       if(saved.layout)return saved.layout;
     }
-    if(settings.mapStart==='current')return {...defaultLayout(),center:layoutRef.current.center,zoom:layoutRef.current.zoom};
+
     return startingLayout(settings,selected?.lodging);
   }
   async function switchDate(value: string) {
@@ -718,14 +733,14 @@ export default function App() {
             ? trip.endDate
             : value;
     await saveLayout();
-    let targetLayout:Layout|undefined; if(user&&value!==date&&!shareTrip){targetLayout=await plannedLayout(trip,value);await api("history.view",{screenAfter:{tripId:trip?.id??null,date:value,layout:targetLayout}}).catch(e=>setMessage(e.message));}
+    let targetLayout:Layout|undefined; if(user&&value!==date&&!shareTrip)targetLayout=await plannedLayout(trip,value);
     layoutLoading.current=true;
     setDate(value);
     setDay(emptyDay());
     setLayout(targetLayout??(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout()));
     setCalendar(false);
     if (!trip || value < trip.startDate || value > trip.endDate) {
-      const initial = await startingLayout(settings, tripRef.current?.lodging);
+      const initial = await startingLayout(settingsRef.current, tripRef.current?.lodging);
       if (dateRef.current === value) setLayout(initial);
     }
     }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
@@ -744,7 +759,7 @@ export default function App() {
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
-  else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){if(trip?.lodging)timezone=trip.lodging.timezone;}
+  else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){if(trip?.lodging)timezone=tzlookup(trip.lodging.lat,trip.lodging.lng);}
   try {
     new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
@@ -941,7 +956,8 @@ export default function App() {
     try {
       await api("settings.save", { settings: next });
       setSettings(next);
-      if (!trip) setLayout(await startingLayout(next));
+      const view=await startingLayout(next,trip?.lodging);
+      changeLayout({center:view.center,zoom:view.zoom});
       setMessage("Preferences saved.");
     } catch (e: any) {
       setMessage(e.message);
@@ -949,10 +965,10 @@ export default function App() {
   }
   const taskIsCurrent=(task:Day['tasks'][number])=>{
     if(optimisticTasks[task.id]?.checked??task.checked)return false;const block=day.blocks.find(b=>b.id===task.blockId);if(!block)return false;
-    if(block.startEpoch&&block.endEpoch)return block.startEpoch<=time.getTime()&&time.getTime()<block.endEpoch;
+
     const minute=(value:string)=>{const [h,m]=value.split(':').map(Number);return h*60+m;};return date===displayedToday&&nowMinutes>=minute(block.start)&&nowMinutes<minute(block.end);
   };
-  const taskPageSize=Math.max(1,Math.floor((layout.todoHeight-112)/52));
+  const taskPageSize=Math.max(1,Math.floor(((innerWidth<=700?innerHeight-90:layout.todoHeight)-112)/52));
   const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
   const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
   if (!ready)
@@ -986,7 +1002,7 @@ export default function App() {
               const chosenDate=chosen&&(date<chosen.startDate||date>chosen.endDate)?chosen.startDate:date;
               await saveLayout();
               const chosenLayout=await plannedLayout(chosen,chosenDate);
-              await api("history.view",{screenAfter:{tripId:chosen?.id??null,date:chosenDate,layout:chosenLayout}});
+              layoutLoading.current=true;
               setShareTrip(false);
               history.replaceState({}, "", location.pathname);
               const selected =
@@ -1064,8 +1080,8 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
-          <button className="icon" aria-label="Undo" title="Undo · Ctrl+Z · last 10 minutes" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
-          <button className="icon" aria-label="Redo" title="Redo · Ctrl+Shift+Z" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
+          <button className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
+          <button className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
           <div className="save-control">
           <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           <button className="icon" aria-label="Save planning" title="Save planning" disabled={!user || manualSaving || saving} onClick={saveManually}>
@@ -1083,8 +1099,8 @@ export default function App() {
             </button>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><span className="avatar">{settings.photoURL?<img src={settings.photoURL} alt=""/>:(settings.displayName??user?.displayName??'A').slice(0,1)}</span><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
-            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={100} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
+            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar src={settings.photoURL} fallback={user?.photoURL||user?.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined} name={settings.displayName||user?.displayName||'Account'}/><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
+            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
           </div>
         </div>
       </header>
@@ -1159,8 +1175,9 @@ export default function App() {
       <div
         className="workspace"
         style={{
+          gridTemplateRows: innerWidth<=700&&layout.map&&layout.timeline ? `${layout.split}% 12px minmax(0,1fr)` : undefined,
           gridTemplateColumns:
-            layout.map && layout.timeline
+            layout.map && layout.timeline && innerWidth>700
               ? `${layout.split}% 6px minmax(0,1fr)`
               : "1fr",
         }}
@@ -1171,7 +1188,7 @@ export default function App() {
               fallback={<div className="loading">Loading your map…</div>}
             >
               <MapPanel
-                pins={day.pins}
+                pins={mapPins}
                 connections={day.connections}
                 layout={layout}
                 readonly={readonly}
@@ -1180,7 +1197,7 @@ export default function App() {
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
                 onView={(center, zoom) => {if(!layoutLoading.current)changeLayout({ center, zoom });}}
-                onPin={(pin) => setEdit({ kind: "pins", item: pin })}
+                onPin={(pin) => {if(pin.id==="trip-lodging"){setLodgingDraft(trip!.lodging);setLodgingView({...layout,center:[pin.lng,pin.lat]});setModal("edit-trip");}else setEdit({kind:"pins",item:pin});}}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
             </Suspense>
@@ -1193,13 +1210,13 @@ export default function App() {
             aria-label="Resize map and schedule"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === "ArrowLeft" || e.key === "ArrowRight")
+              if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))
                 changeLayout({
                   split: Math.max(
                     25,
                     Math.min(
                       75,
-                      layout.split + (e.key === "ArrowLeft" ? -2 : 2),
+                      layout.split + (["ArrowLeft","ArrowUp"].includes(e.key) ? -2 : 2),
                     ),
                   ),
                 });
@@ -1212,7 +1229,7 @@ export default function App() {
                 changeLayout({
                   split: Math.max(
                     25,
-                    Math.min(75, ((ev.clientX - rect.left) / rect.width) * 100),
+                    Math.min(75, (innerWidth<=700?(ev.clientY-rect.top)/rect.height:(ev.clientX-rect.left)/rect.width) * 100),
                   ),
                 });
               el.addEventListener("pointermove", move);
@@ -1255,7 +1272,7 @@ export default function App() {
               className="timeline-scroll"
               ref={scroller}
               onScroll={(e) =>
-                changeLayout({ scroll: e.currentTarget.scrollTop })
+                !layoutLoading.current && changeLayout({ scroll: e.currentTarget.scrollTop })
               }
             >
               <div className="timeline-grid" style={{height:hourHeight*24}}>
@@ -1291,18 +1308,18 @@ export default function App() {
                   return (
                     <button
                       className="time-block"
-                      aria-label={`${field("title")}, ${displayTime(b.startEpoch,b.start)} to ${displayTime(b.endEpoch,b.end)}`}
+                      aria-label={`${field("title")}, ${b.start} to ${b.end}`}
                       key={b.id}
                       style={{
                         left: `calc(64px + (100% - 64px) * ${lane / lanes})`,
                         right: `calc((100% - 64px) * ${1 - (lane + 1) / lanes})`,
                         top:
-                          (minutes(displayTime(b.startEpoch, b.start)) / 60) *
+                          (minutes(b.start) / 60) *
                           hourHeight,
                         height: Math.max(
                           24,
-                          ((minutes(displayTime(b.endEpoch, b.end)) -
-                            minutes(displayTime(b.startEpoch, b.start)) || 60) /
+                          ((minutes(b.end) -
+                            minutes(b.start) || 60) /
                             60) *
                             hourHeight,
                         ),
@@ -1348,7 +1365,7 @@ export default function App() {
             <div
               className="panel-heading todo-drag"
               onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest("button")) return;
+                if (innerWidth<=700 || (e.target as HTMLElement).closest("button")) return;
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
                 e.preventDefault();
@@ -1497,10 +1514,10 @@ export default function App() {
           <header>
             <button
               className="icon"
-              aria-label="Previous month"
+              aria-label="Next month"
               onClick={() => {
                 const d = new Date(`${month}-15`);
-                d.setMonth(d.getMonth() - 1);
+                d.setMonth(d.getMonth() + 1);
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
@@ -1514,10 +1531,10 @@ export default function App() {
             </strong>
             <button
               className="icon"
-              aria-label="Next month"
+              aria-label="Previous month"
               onClick={() => {
                 const d = new Date(`${month}-15`);
-                d.setMonth(d.getMonth() + 1);
+                d.setMonth(d.getMonth() - 1);
                 setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
               }}
             >
@@ -1652,8 +1669,8 @@ export default function App() {
               />
             </div>
             <span className="lodging-label">Lodging location</span>
-            <div className="lodging-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={lodgingDraft?.lng!==undefined?[{id:"lodging",title:"Lodging",note:"",color:settings.accent,symbol:"icon:stay",lng:lodgingDraft.lng,lat:lodgingDraft.lat,versions:{}}]:[]} connections={[]} readonly={false} placementMode layout={lodgingView} onView={(center,zoom)=>setLodgingView(previous=>({...previous,center,zoom}))} onPin={()=>{}} onAdd={(lng,lat)=>setLodgingDraft({name:'Lodging',lng,lat,timezone:tzlookup(lat,lng)})}/></Suspense></div>
-            {!lodgingDraft&&<small>Select your lodging on the map.</small>}
+            <div className="lodging-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={lodgingDraft?.lng!==undefined?[{id:"lodging",title:lodgingDraft.name,note:lodgingDraft.note??"",color:lodgingDraft.color??settings.accent,symbol:lodgingDraft.symbol??"icon:stay",lng:lodgingDraft.lng,lat:lodgingDraft.lat,versions:{}}]:[]} connections={[]} readonly={false} placementMode layout={lodgingView} onView={(center,zoom)=>setLodgingView(previous=>({...previous,center,zoom}))} onPin={()=>{}} onAdd={(lng,lat)=>setLodgingDraft(previous=>({...previous,name:previous?.name??'Lodging',lng,lat,timezone:tzlookup(lat,lng)}))}/></Suspense></div>
+            {lodgingDraft?<div className="lodging-pin-fields"><Input label="Lodging pin name" value={lodgingDraft.name} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,name:e.target.value})}/><Input label="Color" type="color" value={lodgingDraft.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,color:e.target.value})}/><SymbolPicker value={lodgingDraft.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,symbol:e.target.value})}/></div>:<small>Select your lodging on the map.</small>}
             {modal==='new-trip'&&<small>{trips.length}/100 saved trips</small>}
             <button
               className="button primary full"
@@ -2029,8 +2046,7 @@ export default function App() {
         <Modal title="Share trip" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list">{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner).slice(memberPage*2,memberPage*2+2)].map(t=><div className="member-row" key={t.id}><span className="traveler-profile"><span className="avatar">{t.photoURL?<img src={t.photoURL} alt=""/>:t.displayName.slice(0,1)}</span><strong>{t.displayName}</strong></span>{t.owner?<span className="owner-badge">Owner</span>:trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}</div>)}</div>
-          {travelers.filter(t=>!t.owner).length>2&&<div className="picker-pages"><button className="icon" aria-label="Previous travelers page" disabled={!memberPage} onClick={()=>setMemberPage(memberPage-1)}><ChevronLeft size={15}/></button><span>{memberPage+1} / {Math.ceil(travelers.filter(t=>!t.owner).length/2)}</span><button className="icon" aria-label="Next travelers page" disabled={(memberPage+1)*2>=travelers.filter(t=>!t.owner).length} onClick={()=>setMemberPage(memberPage+1)}><ChevronRight size={15}/></button></div>}
+          <div className="travelers-list">{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar src={t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span><span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}</div>)}</div>
           {!shareTrip&&<button className="button" onClick={()=>{setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
           {shareTrip ? (
             <>
@@ -2092,9 +2108,7 @@ export default function App() {
                           tripId: trip.id,
                           mode: shareMode,
                         });
-                        setShareLink(
-                          `${location.origin}/?share=${encodeURIComponent(r.token)}`,
-                        );
+                        setShareLinks((previous)=>[...previous,{id:r.token,token:r.token,mode:shareMode}]);
                       } catch (e: any) {
                         setMessage(e.message);
                       }
@@ -2102,34 +2116,13 @@ export default function App() {
                   >
                     <Share2 size={16} /> Create share link
                   </button>
-                  {shareLink && (
-                    <div className="share-result">
-                      <input
-                        readOnly
-                        aria-label="Share link"
-                        value={shareLink}
-                      />
-                      <button
-                        className="button"
-                        onClick={() =>
-                          navigator.clipboard
-                            .writeText(shareLink)
-                            .then(() => setMessage("Link copied."))
-                            .catch(() =>
-                              setMessage("Select and copy the link manually."),
-                            )
-                        }
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  )}
+                  <div className="share-links" aria-label="Existing share links">{!shareLinks.length&&<small>No active sharing links</small>}{shareLinks.map(link=><div className="share-link-row" key={link.id}><span>{link.mode==='editor'?'View and join as an editor':'View only'}</span>{link.token?<div className="share-result"><input readOnly aria-label={`${link.mode==='editor'?'Editor':'Viewer'} share link`} value={`${location.origin}/?share=${encodeURIComponent(link.token)}`}/><button className="button" onClick={()=>navigator.clipboard.writeText(`${location.origin}/?share=${encodeURIComponent(link.token)}`).then(()=>setMessage('Link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}>Copy</button></div>:<small>Older link: URL unavailable. Revoke and create a new link to copy it.</small>}</div>)}</div>
                   <button
                     className="text-button"
                     onClick={async () => {
                       try {
                         await api("share.revoke", { tripId: trip.id });
-                        setShareLink("");
+                        setShareLink("");setShareLinks([]);
                         setMessage("All sharing links revoked.");
                       } catch (e: any) {
                         setMessage(e.message);
@@ -2148,13 +2141,14 @@ export default function App() {
                     if (
                       !await confirmAction(
                         trip.ownerId === user?.uid
-                          ? "Delete this trip for EVERYONE? Undo is available for 10 minutes."
-                          : "Remove this trip from your account? Other travelers keep it.",
+                          ? "Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible."
+                          : "Remove this trip from your account? Other travelers keep it. This action cannot be undone.",
                       )
                     )
                       return;
                     try {
                       await api("trip.remove", { tripId: trip.id });
+                      setHistoryState({undo:null,redo:null});
                       setTrip(null);
                       setDay(emptyDay());
                       refresh();
@@ -2179,6 +2173,7 @@ export default function App() {
           <AuthScreen onError={setMessage} />
         </Modal>
       )}
+      {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
       {modal === "settings" && (
         <Modal title="Your preferences" onClose={() => setModal(null)}>
           <form
@@ -2187,6 +2182,7 @@ export default function App() {
               saveSettings(settings);
             }}
           >
+            <button type="button" className="button" onClick={()=>setModal("account-settings")}>Manage sign-in methods, email and password</button>
             <Input
               label="Display name"
               value={settings.displayName ?? user?.displayName ?? ""}
@@ -2226,7 +2222,7 @@ export default function App() {
                 }}
               />
               <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
-              <span className="photo-file-note">JPG, PNG or WebP · up to 10 MB</span>
+              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{user?.providerData.some(p=>p.providerId==="google.com")&&(!settings.photoURL||settings.photoURL===(user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL))&&<small>Using your Google profile photo</small>}
             </div>
             <div className="form-row">
               <Select

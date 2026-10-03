@@ -140,28 +140,19 @@ export default function MapPanel({
     m.on('dragend',()=>container.current?.classList.remove('map-dragging'));
     m.on('click',e=>{if(!callbacks.current.readonly&&!gestureDragged&&(action.current.mode==='add'||action.current.placementMode)&&!(e.originalEvent.target as HTMLElement)?.closest('button')){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}});
     m.doubleClickZoom.disable();
-    let resizeTimer: ReturnType<typeof setTimeout>;
-    let awaitingRender=false,hasFrame=false;
-    const cover=document.createElement('canvas');
-    cover.className='map-resize-cover'; cover.setAttribute('aria-hidden','true');
-    container.current.appendChild(cover);
-    const reveal=()=>{hasFrame=true;if(awaitingRender){cover.style.display='none';cover.width=cover.height=0;awaitingRender=false;}};
-    m.on('render',reveal);
+    let resizeFrame=0;
     const observer = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      if(hasFrame && cover.style.display!=='block'){
-        const canvas=m.getCanvas();cover.width=canvas.width;cover.height=canvas.height;
-        cover.getContext('2d')?.drawImage(canvas,0,0);cover.style.display='block';
-      }
-      resizeTimer=setTimeout(()=>{
-        restoringView.current=true;awaitingRender=true;m.resize();m.triggerRepaint();restoringView.current=false;
-      },120);
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame=requestAnimationFrame(()=>{
+        restoringView.current=true;
+        m.resize();m.triggerRepaint();
+        restoringView.current=false;
+      });
     });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
-      clearTimeout(resizeTimer);
-      cover.remove();
+      cancelAnimationFrame(resizeFrame);
       restoringView.current = true;
       m.remove();
       map.current = null;
@@ -264,17 +255,19 @@ export default function MapPanel({
             const target = m.project([b.lng, b.lat]);
             const dx = target.x - source.x, dy = target.y - source.y;
             const distance = Math.hypot(dx, dy);
-            // Leave the arrow tip outside the destination pin's footprint.
+            // Trim the line and arrow to the same visible endpoint beside the pin.
             el.style.visibility = distance < 42 ? "hidden" : "visible";
             if (distance < 42) return;
             const ux = dx / distance, uy = dy / distance;
             const tipX = 40 - ux * 20, tipY = 40 - uy * 20;
-            const baseX = 40 - ux * 33, baseY = 40 - uy * 33;
+            const baseX = tipX - ux * 13, baseY = tipY - uy * 13;
+            const end=m.unproject([target.x-ux*20,target.y-uy*20]);
+            (m.getSource(id) as maplibregl.GeoJSONSource)?.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[a.lng,a.lat],[end.lng,end.lat]]}});
             head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
             gradient.setAttribute("x1", String(40 - dx));
             gradient.setAttribute("y1", String(40 - dy));
-            gradient.setAttribute("x2", "40");
-            gradient.setAttribute("y2", "40");
+            gradient.setAttribute("x2", String(tipX));
+            gradient.setAttribute("y2", String(tipY));
           };
           arrowUpdates.push(update);
           update();
@@ -297,11 +290,13 @@ export default function MapPanel({
         }
       }
     };
-    if (m.isStyleLoaded()) draw();
-    else m.once("load", draw);
+    // Tile loading can make isStyleLoaded false after the one-time load event.
+    // Route layers only need the parsed style, not every visible tile.
+    if (m.getStyle()?.layers?.length) draw();
+    else m.once("style.load", draw);
     m.on("move", updateArrows);
     return () => {
-      m.off("load", draw);
+      m.off("style.load", draw);
       m.off("move", updateArrows);
     };
   }, [pins, connections, movingPinId, placementMode]);

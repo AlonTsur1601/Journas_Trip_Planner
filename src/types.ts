@@ -52,7 +52,7 @@ export type Trip = {
   endDate: string;
   ownerId: string;
   memberIds: string[];
-  lodging?: {name: string; lng: number; lat: number; timezone: string};
+  lodging?: {name: string; lng: number; lat: number; timezone: string; color?:string; symbol?:string; note?:string};
 };
 export type Settings = {
   theme: "light" | "dark" | "system";

@@ -28,7 +28,9 @@ const finite = (x: unknown, min: number, max: number) => typeof x === 'number' &
 function lodging(value: unknown) {
     const place=object(value),name=place.name===undefined?'Lodging':text(place.name,200).trim();
     if(!name||!finite(place.lng,-180,180)||!finite(place.lat,-85,85))fail(400,'INVALID_LODGING','Select a lodging location and enter its name.');
-    return {name,lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng))};
+    const color=place.color??'#7c5ce7',symbol=place.symbol??'icon:stay',note=place.note??'';
+    if(!isColor(color))fail(400,'INVALID_COLOR','Choose a valid lodging pin color');
+    return {name,lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng)),color,symbol:text(symbol,40),note:text(note,4000)};
 }
 function validTimezone(value: unknown) {
     if (value === '')
@@ -276,8 +278,15 @@ export class JournasService {
                 const key = hash(token);
                 const share = { tripId: id, mode: input.mode, version: trip.shareVersion ?? 0, createdAt: this.now() };
                 tx.set(`shares/${key}`, share);
-                tx.set(`trips/${id}/shares/${key}`, { id: key });
+                // Owner-only server endpoint can retrieve links; public lookup remains hashed.
+                tx.set(`trips/${id}/shares/${key}`, { id: key, token, mode: input.mode, createdAt: this.now() });
                 return { token };
+            }
+            if (action === 'share.list') {
+                await this.owner(tx,id,userId);
+                const records=await tx.list(`trips/${id}/shares`);
+                const links=await Promise.all(records.map(async record=>{const publicRecord=await tx.get(`shares/${record.id}`);return {id:record.id,token:record.token??null,mode:publicRecord?.mode??record.mode,createdAt:publicRecord?.createdAt??record.createdAt};}));
+                return {links};
             }
             if (action === 'share.revoke') {
                 const trip = await this.owner(tx, id, userId);
@@ -301,7 +310,7 @@ export class JournasService {
             const trip = await this.member(tx, id, userId);
             const day = action === 'trip.members' ? trip.startDate : date(input.date);
             this.dayWithin(trip, day);
-            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,owner:uid===trip.ownerId};}));return {members};}
+            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,owner:uid===trip.ownerId,permission:uid===trip.ownerId?'Owner':trip.memberIds.includes(uid)?'Editor':'Owner (not participating)'};}));return {members};}
             if (action === 'trip.get')
                 return { trip, day: await this.day(tx, id, day), layout: (await tx.get(layoutPath(userId, id, day)))?.layout ?? null };
             if (action === 'layout.save') {
@@ -331,6 +340,7 @@ export class JournasService {
             if (conflicts.length)
                 fail(409, 'CONFLICT', 'This item changed while you were editing it', { item: current, fields: conflicts });
             const all = await tx.list(itemsPath(id, day)) as Item[];
+            if(trip.lodging){const place=trip.lodging as Data;all.push({id:'trip-lodging',kind:'pins',title:place.name,note:place.note??'',color:place.color??'#7c5ce7',symbol:place.symbol??'icon:stay',lng:place.lng,lat:place.lat,versions:{}});}
             if (action === 'item.delete') {
                 if (current)
                     await this.deleteItem(tx, id, day, current, all);
@@ -341,7 +351,7 @@ export class JournasService {
             let item = bump(current ?? { id: itemId, kind, versions: {} }, patch);
             if (kind === 'blocks') {
                 if (!('timezone' in item))
-                    item = bump(item, { timezone: input.clientTimezone ?? 'UTC' });
+                    item = bump(item, { timezone: (trip.lodging as Data|undefined)?.timezone ?? input.clientTimezone ?? 'UTC' });
                 if (!('disambiguation' in item))
                     item = bump(item, { disambiguation: null });
             }

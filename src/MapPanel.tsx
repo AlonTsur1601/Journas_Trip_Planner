@@ -162,13 +162,25 @@ export default function MapPanel({
     const m = map.current;
     if (!m) return;
     markers.current.forEach((x) => x.remove());
+    const tooltip = new maplibregl.Popup({closeButton:false,closeOnClick:false,offset:38,maxWidth:'260px',className:'pin-tooltip'});
     markers.current = pins.map((pin) => {
       const el = document.createElement("button");
       el.className = "map-pin";
       el.style.background = pin.color;
       const content=document.createElement('span');content.className='pin-symbol';const markup=symbolMarkup(pin.symbol);if(markup)content.innerHTML=markup;else content.textContent=pin.symbol;el.appendChild(content);
-      el.title = pin.title;
       el.setAttribute("aria-label", `Place: ${pin.title}`);
+      const showTooltip=()=>{
+        if(movingPinId||placementMode)return;
+        const bubble=document.createElement('div');
+        const title=document.createElement('strong');title.textContent=pin.title;bubble.appendChild(title);
+        if(pin.note){const note=document.createElement('p');note.textContent=pin.note;bubble.appendChild(note);}
+        tooltip.setLngLat([pin.lng,pin.lat]).setDOMContent(bubble).addTo(m);
+      };
+      el.addEventListener('mouseenter',showTooltip);
+      el.addEventListener('mouseleave',()=>tooltip.remove());
+      el.addEventListener('focus',showTooltip);
+      el.addEventListener('blur',()=>tooltip.remove());
+      el.addEventListener('pointerdown',()=>tooltip.remove());
       let ignoreClick=false;
       el.onclick = (event) => {event.stopPropagation();if(ignoreClick){ignoreClick=false;return;}if(action.current.mode==='connect'){if(!action.current.source){setSource(pin.id);}else if(action.current.source!==pin.id){callbacks.current.onConnect?.(action.current.source,pin.id,action.current.arrow);setSource(null);setMode(null);}}else if(!movingPinId&&!placementMode)callbacks.current.onPin(pin);};
       const marker=new maplibregl.Marker({ element: el, draggable: false })
@@ -296,6 +308,7 @@ export default function MapPanel({
     else m.once("style.load", draw);
     m.on("move", updateArrows);
     return () => {
+      tooltip.remove();
       m.off("style.load", draw);
       m.off("move", updateArrows);
     };

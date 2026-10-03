@@ -1762,7 +1762,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .share-modal .travelers-list,.share-modal .member-row{padding:9px;background:var(--subtle);border:1px solid var(--line);border-radius:5px;}
  .share-modal .travelers-list{display:flex;flex-direction:column;gap:7px;padding:0;border:0;background:transparent;min-height:40px;max-height:116px;overflow-y:auto;position:relative;}
  .share-modal .travelers-list>.member-row{flex-shrink:0;}
- .share-modal .travelers-list>.trip-owner-row{position:sticky;top:0;z-index:1;}
+ .share-modal .travelers-list>.trip-owner-row{position:static;}
 .share-modal>.field{margin:5px 0 0;}
 .share-modal>button:has(+button),.share-modal>button+button{margin:0;}
 .share-modal>button:has(+button){margin-bottom:-10px;}
@@ -1890,3 +1890,11 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .save-control>.save-indicator{width:5px;height:5px;flex-shrink:0;}
  .top-actions>.save-control>.icon{width:30px;min-width:30px;height:36px;padding:4px;border-radius:0 4px 4px 0;}
 }
+.pin-tooltip{pointer-events:none;z-index:5;}
+.pin-tooltip .maplibregl-popup-content{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px 12px;box-shadow:0 3px 12px #0002;font-family:inherit;}
+.pin-tooltip strong{display:block;font-size:13px;line-height:1.4;overflow-wrap:anywhere;}
+.pin-tooltip p{margin:4px 0 0;font-size:12px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;}
+.pin-tooltip.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--surface);}
+.pin-tooltip.maplibregl-popup-anchor-top .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,.pin-tooltip.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--surface);}
+.pin-tooltip.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--surface);}
+.pin-tooltip.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--surface);}

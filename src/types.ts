@@ -58,6 +58,7 @@ export type Settings = {
   theme: "light" | "dark" | "system";
   accent: string;
   clock: "local" | "destination" | "utc" | "lodging";
+  clockConfigured?: boolean;
   timezone: string;
   autoDelete: boolean;
   retentionDays: number;
@@ -102,7 +103,7 @@ export const defaultLayout = (): Layout => ({
 export const defaultSettings: Settings = {
   theme: "system",
   accent: "#7c5ce7",
-  clock: "local",
+  clock: "lodging",
   timezone: "",
   autoDelete: true,
   retentionDays: 365,

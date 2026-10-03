@@ -80,7 +80,12 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             tx.set(path, { minute, count, expiresAt: Date.now() + 86400000 });
             return null;
         });
-        send(res, 200, await new JournasService(firestoreStore()).execute(uid, input));
+        const result=await new JournasService(firestoreStore()).execute(uid,input);
+        if(input.action==='trip.members'){
+            const members=result.members as any[];const profiles=(await Promise.all(Array.from({length:Math.ceil(members.length/100)},(_,i)=>adminAuth().getUsers(members.slice(i*100,(i+1)*100).map(m=>({uid:m.id})))))).flatMap(r=>r.users);
+            result.members=members.map(m=>{const profile=profiles.find(p=>p.uid===m.id);return {...m,displayName:m.displayName==='Traveler'?(profile?.displayName??'Traveler'):m.displayName,photoURL:m.photoURL??profile?.photoURL??null};});
+        }
+        send(res,200,result);
     }
     catch (error) {
         errors(res, error);

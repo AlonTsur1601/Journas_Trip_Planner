@@ -1,3 +1,4 @@
+import { Undo2, Redo2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   onAuthStateChanged,
@@ -323,7 +324,11 @@ export default function App() {
   const [ambiguousTime,setAmbiguousTime]=useState(false);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
   const [taskPage,setTaskPage]=useState(0),[memberPage,setMemberPage]=useState(0),[connectionPage,setConnectionPage]=useState(0);
-  const [hourHeight,setHourHeight]=useState(28);
+  const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:80);
+  const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
+  const [historyBusy,setHistoryBusy]=useState(false);
+  const [travelers,setTravelers]=useState<any[]>([]);
+  const screenReady=useRef(false);
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
@@ -352,7 +357,7 @@ export default function App() {
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [calendar]);
   const [time, setTime] = useState(new Date());
-  useEffect(()=>{const element=scroller.current;if(!element)return;const observer=new ResizeObserver(()=>setHourHeight(element.clientHeight/24));observer.observe(element);return()=>observer.disconnect();},[layout.timeline,ready,user?.uid]);
+  useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:80);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useEffect(()=>{setMemberPage(0);},[trip?.id,modal]);
   useEffect(()=>{setConnectionPage(0);},[edit?.item.id]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
@@ -398,6 +403,14 @@ export default function App() {
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, [settings.theme, settings.accent]);
+  useEffect(()=>{if(user&&screenReady.current)sessionStorage.setItem('journas-current-screen',JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout}));},[user?.uid,trip?.id,date,layout]);
+  useEffect(()=>{if(!user)return;const update=()=>api<{undo:string|null;redo:string|null}>('history.status').then(setHistoryState).catch(()=>{});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid]);
+  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid]);
+  useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>setTravelers(r.members)).catch(e=>setMessage(e.message));},[modal,trip?.id,trip?.memberIds.join(',')]);
+  async function restoreHistory(direction:'undo'|'redo'){
+   if(historyBusy||!historyState[direction])return;setHistoryBusy(true);
+   try{const r=await api<{screen:any}>(`history.${direction}`);const [list,prefs]=await Promise.all([refresh(),api<{settings:Settings}>('settings.get')]);setSettings({...defaultSettings,...prefs.settings});const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status'));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+  }
   async function refresh() {
     const result = await api<{ trips: Trip[] }>("trip.list");
     setTrips(result.trips);
@@ -407,7 +420,10 @@ export default function App() {
     if (!user) return;
     Promise.all([refresh(), api<{ settings: Settings }>("settings.get")])
       .then(async ([list, r]) => {
-        const preferences = { ...defaultSettings, ...r.settings };
+        const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock };
+        const saved=JSON.parse(sessionStorage.getItem("journas-current-screen")??"null");
+        if(saved?.uid===user.uid&&!token){setDate(saved.date);setTrip(list.find(t=>t.id===saved.tripId)??null);setLayout(saved.layout??defaultLayout());screenReady.current=true;setSettings(preferences);return;}
+        screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
           setLayout(await startingLayout(preferences));
@@ -658,6 +674,7 @@ export default function App() {
     };
   }, []);
   function changeLayout(patch: Partial<Layout>) {
+    if(user&&trip&&Object.keys(patch).some(k=>["map","timeline","todo"].includes(k)))void api("history.view",{screenAfter:{tripId:trip.id,date,layout:{...layoutRef.current,...patch}}}).catch(e=>setMessage(e.message));
     if (
       Object.entries(patch).every(
         ([key, value]) =>
@@ -679,7 +696,20 @@ export default function App() {
         JSON.stringify({ ...layoutRef.current, ...patch }),
       );
   }
+  async function plannedLayout(selected:Trip|null,nextDate:string){
+    if(selected&&user&&nextDate>=selected.startDate&&nextDate<=selected.endDate){
+      const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);
+      if(local)return JSON.parse(local) as Layout;
+      const saved=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});
+      if(saved.layout)return saved.layout;
+    }
+    if(settings.mapStart==='current')return {...defaultLayout(),center:layoutRef.current.center,zoom:layoutRef.current.zoom};
+    return startingLayout(settings,selected?.lodging);
+  }
   async function switchDate(value: string) {
+    if(historyBusy)return;
+    setHistoryBusy(true);
+    try{
     if (shareTrip && trip)
       value =
         value < trip.startDate
@@ -688,15 +718,17 @@ export default function App() {
             ? trip.endDate
             : value;
     await saveLayout();
+    let targetLayout:Layout|undefined; if(user&&value!==date&&!shareTrip){targetLayout=await plannedLayout(trip,value);await api("history.view",{screenAfter:{tripId:trip?.id??null,date:value,layout:targetLayout}}).catch(e=>setMessage(e.message));}
     layoutLoading.current=true;
     setDate(value);
     setDay(emptyDay());
-    setLayout(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout());
+    setLayout(targetLayout??(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout()));
     setCalendar(false);
     if (!trip || value < trip.startDate || value > trip.endDate) {
       const initial = await startingLayout(settings, tripRef.current?.lodging);
       if (dateRef.current === value) setLayout(initial);
     }
+    }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
   const previousToday = useRef(today());
   useEffect(() => {
@@ -711,19 +743,8 @@ export default function App() {
   const readonly =
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (settings.clock === "utc") timezone = "UTC";
-  if (settings.clock === "lodging" && trip?.lodging) timezone=trip.lodging.timezone;
-  if (settings.clock === "destination") {
-    timezone = settings.timezone || timezone;
-    const first = [...day.blocks]
-      .sort((a, b) => a.start.localeCompare(b.start))
-      .find((b) => b.pinId);
-    const pin = day.pins.find((p) => p.id === first?.pinId) ?? day.pins[0];
-    if (!settings.timezone && pin)
-      try {
-        timezone = tzlookup(pin.lat, pin.lng);
-      } catch {}
-  }
+  if(settings.clock==='utc')timezone='UTC';
+  else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){if(trip?.lodging)timezone=trip.lodging.timezone;}
   try {
     new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
@@ -874,7 +895,7 @@ export default function App() {
       if(e.code==='CONFLICT')setConflict({draft,current:e.current,fields:e.details?.fields??[]});
     }finally{setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
   }
-  async function logout(){await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}
+  async function logout(){sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}
   function newItem(kind: Edit["kind"], extras: any = {}) {
     setAmbiguousTime(false);
     if (readonly) {
@@ -960,7 +981,12 @@ export default function App() {
             placeholder="Choose a trip"
             value={trip?.id ?? ""}
             onChange={async (e: any) => {
+              if(historyBusy)return;setHistoryBusy(true);try{
+              const chosen=trips.find(t=>t.id===e.target.value)??null;
+              const chosenDate=chosen&&(date<chosen.startDate||date>chosen.endDate)?chosen.startDate:date;
               await saveLayout();
+              const chosenLayout=await plannedLayout(chosen,chosenDate);
+              await api("history.view",{screenAfter:{tripId:chosen?.id??null,date:chosenDate,layout:chosenLayout}});
               setShareTrip(false);
               history.replaceState({}, "", location.pathname);
               const selected =
@@ -972,8 +998,8 @@ export default function App() {
               )
                 setDate(selected.startDate);
               setDay(emptyDay());
-              setLayout(defaultLayout());
-              if (!selected) setLayout(await startingLayout(settings, trip?.lodging));
+              setLayout(chosenLayout);
+              }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
             }}
           >
             {shareTrip && trip && (
@@ -1038,6 +1064,8 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
+          <button className="icon" aria-label="Undo" title="Undo · Ctrl+Z · last 10 minutes" disabled={!historyState.undo||historyBusy} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
+          <button className="icon" aria-label="Redo" title="Redo · Ctrl+Shift+Z" disabled={!historyState.redo||historyBusy} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
           <div className="save-control">
           <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           <button className="icon" aria-label="Save planning" title="Save planning" disabled={!user || manualSaving || saving} onClick={saveManually}>
@@ -1230,7 +1258,7 @@ export default function App() {
                 changeLayout({ scroll: e.currentTarget.scrollTop })
               }
             >
-              <div className="timeline-grid">
+              <div className="timeline-grid" style={{height:hourHeight*24}}>
                 {Array.from({ length: 24 }, (_, i) => (
                   <div className="hour" key={i} style={{ top: i * hourHeight }}>
                     <span>{String(i).padStart(2, "0")}:00</span>
@@ -2001,7 +2029,8 @@ export default function App() {
         <Modal title="Share trip" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="member-row"><span>{trip.ownerId===user?.uid?"Owner · You":"Trip owner"}</span></div>
+          <div className="travelers-list">{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner).slice(memberPage*2,memberPage*2+2)].map(t=><div className="member-row" key={t.id}><span className="traveler-profile"><span className="avatar">{t.photoURL?<img src={t.photoURL} alt=""/>:t.displayName.slice(0,1)}</span><strong>{t.displayName}</strong></span>{t.owner?<span className="owner-badge">Owner</span>:trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}</div>)}</div>
+          {travelers.filter(t=>!t.owner).length>2&&<div className="picker-pages"><button className="icon" aria-label="Previous travelers page" disabled={!memberPage} onClick={()=>setMemberPage(memberPage-1)}><ChevronLeft size={15}/></button><span>{memberPage+1} / {Math.ceil(travelers.filter(t=>!t.owner).length/2)}</span><button className="icon" aria-label="Next travelers page" disabled={(memberPage+1)*2>=travelers.filter(t=>!t.owner).length} onClick={()=>setMemberPage(memberPage+1)}><ChevronRight size={15}/></button></div>}
           {!shareTrip&&<button className="button" onClick={()=>{setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
           {shareTrip ? (
             <>
@@ -2109,36 +2138,7 @@ export default function App() {
                   >
                     Revoke sharing links
                   </button>
-                  {trip.memberIds.filter(id=>id!==trip.ownerId).slice(memberPage*4,memberPage*4+4)
-                    .map((id) => (
-                      <div className="member-row" key={id}>
-                        <span>{id===trip.ownerId?"Owner":"Traveler"}{id===user.uid?" · You":` · ${id.slice(0,8)}`}</span>
-                        {id!==trip.ownerId&&<button
-                          className="text-button danger"
-                          onClick={async () => {
-                            if (!await confirmAction("Remove this traveler’s access?"))
-                              return;
-                            try {
-                              await api("member.remove", {
-                                tripId: trip.id,
-                                userId: id,
-                              });
-                              setTrip({
-                                ...trip,
-                                memberIds: trip.memberIds.filter(
-                                  (x) => x !== id,
-                                ),
-                              });
-                            } catch (e: any) {
-                              setMessage(e.message);
-                            }
-                          }}
-                        >
-                          Remove
-                        </button>}
-                      </div>
-                    ))}
-                  {trip.memberIds.length>5&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous travelers page" disabled={!memberPage} onClick={()=>setMemberPage(memberPage-1)}><ChevronLeft size={15}/></button><span>{memberPage+1} / {Math.ceil((trip.memberIds.length-1)/4)}</span><button type="button" className="icon" aria-label="Next travelers page" disabled={(memberPage+1)*4>=trip.memberIds.length-1} onClick={()=>setMemberPage(memberPage+1)}><ChevronRight size={15}/></button></div>}
+
                 </>
               )}
               <div className="delete-trip">
@@ -2148,7 +2148,7 @@ export default function App() {
                     if (
                       !await confirmAction(
                         trip.ownerId === user?.uid
-                          ? "Permanently delete this trip for EVERYONE? This cannot be undone."
+                          ? "Delete this trip for EVERYONE? Undo is available for 10 minutes."
                           : "Remove this trip from your account? Other travelers keep it.",
                       )
                     )
@@ -2257,7 +2257,7 @@ export default function App() {
               value={settings.mapStart}
               onChange={(e: any) => setSettings({ ...settings, mapStart: e.target.value })}
             >
-              <option value="trip">Trip lodging · world map without a trip</option>
+              <option value="trip">Trip lodging</option>
               <option value="current">My current location</option>
               <option value="custom">A place I choose</option>
               <option value="world">World map</option>
@@ -2267,15 +2267,13 @@ export default function App() {
               label="Clock"
               value={settings.clock}
               onChange={(e: any) =>
-                setSettings({ ...settings, clock: e.target.value })
+                setSettings({ ...settings, clock: e.target.value,clockConfigured:true })
               }
             >
               <option value="local">My local time</option>
-              <option value="destination">Destination time</option>
               <option value="lodging">Lodging local time</option>
               <option value="utc">UTC</option>
             </Select>
-            {settings.clock==='destination'&&<TimezonePicker value={settings.timezone} onChange={(e:any)=>setSettings({...settings,timezone:e.target.value})}/>}
             <small className="active-clock">Active clock: {timezone}</small>
             <label className="checkbox-field">
               <input

@@ -37,7 +37,7 @@ export async function api<T = unknown>(
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ action, ...data }),
+    body: JSON.stringify({ action, screen:JSON.parse(sessionStorage.getItem('journas-current-screen')??'null'), ...data }),
   });
   const result = await response.json();
   if (!response.ok)
@@ -54,5 +54,6 @@ export async function api<T = unknown>(
         current: result.error?.details?.item ?? result.current,
       },
     );
+  if(result.historyId)window.dispatchEvent(new Event('journas-action-saved'));
   return result as T;
 }

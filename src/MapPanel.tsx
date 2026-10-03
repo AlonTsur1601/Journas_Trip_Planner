@@ -83,7 +83,8 @@ export default function MapPanel({
       if (event.button !== 0) return;
       event.stopImmediatePropagation();
       event.preventDefault();
-      const rect=compass.getBoundingClientRect(), cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+      compass.parentElement!.classList.add('compass-engaged');
+      const rect=compass.getBoundingClientRect(), cx=rect.left+compass.offsetWidth,cy=rect.bottom-compass.offsetHeight;
       rotation = { x: event.clientX, y: event.clientY, bearing: m.getBearing(), angle: Math.atan2(event.clientY-cy,event.clientX-cx), cx,cy };
       dragged = false;
       compass.setPointerCapture(event.pointerId);
@@ -101,9 +102,9 @@ export default function MapPanel({
         rotation.bearing=m.getBearing(); rotation.angle=angle;
       }
     });
-    const endRotation = () => { if(rotation&&!dragged)m.resetNorth({duration:180}); rotation = null; };
+    const endRotation = () => { if(rotation&&!dragged)m.resetNorth({duration:180}); rotation = null; setTimeout(()=>compass.parentElement?.classList.remove('compass-engaged'),300); };
     compass.addEventListener("pointerup", endRotation);
-    compass.addEventListener("pointercancel", () => {rotation=null;});
+    compass.addEventListener("pointercancel", () => {rotation=null;compass.parentElement?.classList.remove('compass-engaged');});
     compass.addEventListener("click", (event) => {
       if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
     }, true);

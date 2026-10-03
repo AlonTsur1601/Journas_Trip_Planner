@@ -1,3 +1,4 @@
+import {historyTransaction} from './history.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store, type Transaction, type Trip } from './types.js';
 import { resolveWallTime } from './time.js';
@@ -43,10 +44,11 @@ function validTimezone(value: unknown) {
     }
 }
 function validateSettings(value: Data) {
-    const allowed = ['theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL', 'mapStart', 'mapCenter', 'mapZoom'];
+    const allowed = ['clockConfigured', 'theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL', 'mapStart', 'mapCenter', 'mapZoom'];
     for (const key of Object.keys(value))
         if (!allowed.includes(key))
             fail(400, 'INVALID_SETTINGS', `Unknown setting ${key}`);
+    if(value.clockConfigured!==undefined&&typeof value.clockConfigured!=='boolean')fail(400,'INVALID_SETTINGS','Invalid clock preference');
     if (value.theme !== undefined && !['light', 'dark', 'system'].includes(String(value.theme)))
         fail(400, 'INVALID_SETTINGS', 'Invalid theme');
     if (value.mapStart !== undefined && !['current', 'custom', 'world', 'trip'].includes(String(value.mapStart)))
@@ -179,7 +181,7 @@ export class JournasService {
         if (!uid)
             fail(401, 'UNAUTHENTICATED', 'Sign in to continue');
         const userId = identifier(uid);
-        return this.store.transaction(async (tx) => {
+        return historyTransaction(this.store,userId,input,this.now(),async (tx) => {
             if (action === 'settings.get') {
                 const user = await tx.get(userPath(userId));
                 return { settings: { ...defaultSettings, ...object(user?.settings ?? {}) } };
@@ -297,8 +299,9 @@ export class JournasService {
                 return { ok: true };
             }
             const trip = await this.member(tx, id, userId);
-            const day = date(input.date);
+            const day = action === 'trip.members' ? trip.startDate : date(input.date);
             this.dayWithin(trip, day);
+            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,owner:uid===trip.ownerId};}));return {members};}
             if (action === 'trip.get')
                 return { trip, day: await this.day(tx, id, day), layout: (await tx.get(layoutPath(userId, id, day)))?.layout ?? null };
             if (action === 'layout.save') {
@@ -480,6 +483,7 @@ export class JournasService {
                 removed++;
         }
         for (const job of await this.store.list('cleanupJobs', 100)) {
+            if(Number(job.undoUntil??0)>this.now())continue;
             const uid = identifier(job.uid), tripId = identifier(job.tripId);
             await this.store.purgeLayouts(uid, tripId, Number(job.removedAt));
             const trip = await this.store.transaction(tx => tx.get(tripPath(tripId)));

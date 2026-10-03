@@ -10,6 +10,8 @@ The production site connects to the Firebase project `journas-trip-planner`. Ear
 
 **Website:** [journas-trip-planner.vercel.app](https://journas-trip-planner.vercel.app).
 
+**Planning documents:** All planning files are in [`devpost/`](devpost/): [scope.md](devpost/scope.md), [prd.md](devpost/prd.md), [spec.md](devpost/spec.md), and [checklist.md](devpost/checklist.md).
+
 ![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
 
 
@@ -155,8 +157,8 @@ Trip content is shared only with retained participants and holders of a valid sc
 | `src/` | Planner interface, Firebase browser configuration, map, schedule, and preferences |
 | `server/` | Authenticated domain operations, persistence, validation, and cleanup |
 | `api/` | Vercel API handlers |
-| [scope.md](scope.md), [prd.md](prd.md), [spec.md](spec.md) | Approved planning documents required by the event |
-| [checklist.md](checklist.md) | Actual implementation/review progress |
+| [scope.md](devpost/scope.md), [prd.md](devpost/prd.md), [spec.md](devpost/spec.md) | Approved planning documents required by the event |
+| [checklist.md](devpost/checklist.md) | Actual implementation/review progress |
 
 The personal `devpost/learner-profile.md`, `.env.local`, service-account JSON, and credentials are excluded from publication. An ignore rule does not remove a secret already committed: inspect staged changes and history before public pushes.
 

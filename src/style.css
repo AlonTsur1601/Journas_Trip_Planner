@@ -1759,6 +1759,13 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .share-modal>button:has(+button),.share-modal>button+button{margin:0;}
 .share-modal>button:has(+button){margin-bottom:-10px;}
 .share-modal>.danger,.share-modal>button.danger{margin-top:auto;}
+@media(min-width:701px) and (max-width:900px){
+ .topbar{height:auto;min-height:84px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;padding:6px 10px;}
+ .topbar>.brand{grid-column:1;grid-row:1;justify-self:start;}
+ .top-actions{grid-column:2;grid-row:1;min-width:0;width:max-content;max-width:100%;margin-left:0;justify-self:end;}
+ .trip-selector{grid-column:1;grid-row:2;min-width:0;}
+ .date-picker{grid-column:2;grid-row:2;min-width:0;margin-left:0;justify-self:end;}
+}
 @media(max-width:700px){
  .date-picker>.icon{width:28px!important;min-width:28px;flex:0 0 28px;padding:0;}
  .date-picker>.date-button{min-width:0;padding:5px;gap:4px;font-size:11px;}

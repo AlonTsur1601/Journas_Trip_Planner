@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, initializeAuth, browserSessionPersistence, browserPopupRedirectResolver } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
 const config = emulators
@@ -21,10 +20,9 @@ export const configured = Boolean(
 );
 const app = configured ? initializeApp(config) : null;
 export const auth = app ? initializeAuth(app, { persistence: browserSessionPersistence, popupRedirectResolver: browserPopupRedirectResolver }) : null;
-export const db = app ? getFirestore(app) : null;
-if (emulators && auth && db) {
+
+if (emulators && auth) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
 }
 export async function api<T = unknown>(
   action: string,

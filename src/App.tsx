@@ -11,7 +11,6 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { collection, doc, onSnapshot } from "firebase/firestore";
 import {
   CalendarDays,
   Map,
@@ -34,12 +33,13 @@ import {
 import tzlookup from "tz-lookup";
 import {AccountCredentials} from "./AccountCredentials";
 import {accountPhoto} from "./account-profile";
-import { api, auth, configured, db } from "./firebase";
+import { api, auth, configured } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import { DateField, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
+const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
 const MapPanel = lazy(() => import("./MapPanel"));
 import {
   defaultLayout,
@@ -363,6 +363,7 @@ export default function App() {
   useEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline]);
   const calendarBox = useRef<HTMLDivElement>(null);
   const profilePhoto = useRef<HTMLInputElement>(null);
+  const [photoCrop,setPhotoCrop]=useState<File|null>(null);
   useEffect(() => {
     if (!calendar) return;
     const outside = (event: PointerEvent) => {
@@ -441,11 +442,11 @@ export default function App() {
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");
-        if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
+        if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=saved.layout??await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
-          setLayout(await startingLayout(preferences));
+          void startingLayout(preferences).then(initial=>{if(!cancelled&&!tripRef.current&&layoutRef.current.center[0]===0&&layoutRef.current.center[1]===0)setLayout(initial);});
         if (!token)
           setTrip(
             list.find((t) => t.startDate <= today() && t.endDate >= today()) ??
@@ -516,7 +517,6 @@ export default function App() {
       !trip ||
       !user ||
       shareTrip ||
-      !db ||
       date < trip.startDate ||
       date > trip.endDate
     )
@@ -557,7 +557,10 @@ export default function App() {
         }, 0);
       })
       .catch((e) => {layoutLoading.current=false;setMessage(e.message);});
-    const stop = onSnapshot(
+    let stop=()=>{},stopTrip=()=>{};
+    void import('./live-database').then(({db,collection,doc,onSnapshot})=>{
+      if(cancelled)return;
+    stop = onSnapshot(
       collection(db, "trips", trip.id, "days", date, "items"),
       (snap) => {
         const next = emptyDay();
@@ -587,7 +590,7 @@ export default function App() {
       void refresh().catch(() => {});
       setMessage("This trip was deleted or you no longer have access.");
     };
-    const stopTrip = onSnapshot(
+    stopTrip = onSnapshot(
       doc(db, "trips", trip.id),
       (snap) => {
         if (!snap.exists() || snap.data()?.deleted) {
@@ -610,6 +613,7 @@ export default function App() {
           );
       },
     );
+    }).catch(()=>{if(!cancelled)setMessage('Live updates could not load. Please reconnect.');});
     return () => {
       cancelled = true;
       stop();
@@ -1205,7 +1209,7 @@ export default function App() {
                 readonly={readonly}
                 onConnect={async(from,to,arrow)=>{if(await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow}))setMessage("Connection created.");}}
                 movingPinId={movingPinId}
-                onConnections={()=>setModal("connections")}
+                onConnections={trip?()=>setModal("connections"):undefined}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
                 onView={(center, zoom) => {if(!layoutLoading.current)changeLayout({ center, zoom });}}
@@ -2174,7 +2178,7 @@ export default function App() {
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings"} onClose={() => setModal(null)}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => setModal(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -2209,19 +2213,8 @@ export default function App() {
                     setMessage("Choose an image smaller than 10 MB.");
                     return;
                   }
-                  try {
-                    const bitmap = await createImageBitmap(file);
-                    const canvas = document.createElement("canvas");
-                    canvas.width = canvas.height = 128;
-                    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, 128, 128);
-                    bitmap.close();
-                    setSettings({
-                      ...settings,
-                      photoURL: canvas.toDataURL("image/jpeg", 0.75),
-                    });
-                  } catch {
-                    setMessage("This image could not be read.");
-                  }
+                  setPhotoCrop(file);
+                  e.target.value="";
                 }}
               />
               <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
@@ -2410,6 +2403,7 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {photoCrop&&<Modal title="Crop profile photo" onClose={()=>setPhotoCrop(null)}><Suspense fallback={<div>Loading photo editor...</div>}><ProfilePhotoCropper file={photoCrop} onCancel={()=>setPhotoCrop(null)} onError={setMessage} onApply={photo=>{setSettings(previous=>({...previous,photoURL:photo}));setPhotoCrop(null);}}/></Suspense></Modal>}
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}

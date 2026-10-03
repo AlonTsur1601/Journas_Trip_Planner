@@ -83,9 +83,10 @@ function Input({ label, ...props }: any) {
 function Select({ label, children, ...props }: any) {
   return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
 }
-function Modal({ title, children, onClose }: any) {
+function Modal({ title, children, onClose, inactive=false }: any) {
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
+    if(inactive)return;
     const previous = document.activeElement as HTMLElement;
     box.current
       ?.querySelector<HTMLElement>("input,button,select,textarea")
@@ -118,10 +119,12 @@ function Modal({ title, children, onClose }: any) {
       document.removeEventListener("keydown", handler);
       previous?.focus();
     };
-  }, []);
+  }, [inactive]);
   return (
     <div
-      className="modal-shade"
+      inert={inactive}
+      aria-hidden={inactive||undefined}
+      className={`modal-shade${inactive?" inactive-modal":""}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -2170,16 +2173,16 @@ export default function App() {
           <AuthScreen onError={setMessage} />
         </Modal>
       )}
-      {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
-      {modal === "settings" && (
-        <Modal title="Your preferences" onClose={() => setModal(null)}>
+      {(modal === "settings" || modal === "account-settings") && (
+        <Modal title="Your preferences" inactive={modal === "account-settings"} onClose={() => setModal(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               saveSettings(settings);
             }}
           >
-            <button type="button" className="button" onClick={()=>setModal("account-settings")}>Manage sign-in methods, email and password</button>
+            <div className="settings-account">
+            <div className="settings-identity">
             <Input
               label="Display name"
               value={settings.displayName ?? user?.displayName ?? ""}
@@ -2188,7 +2191,10 @@ export default function App() {
                 setSettings({ ...settings, displayName: e.target.value })
               }
             />
+            <button type="button" className="button account-methods-button" onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
+            </div>
             <div className="field photo-field">
+              <div className="settings-photo-preview"><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={settings.displayName||user?.displayName||"Account"}/></div>
               <span>Profile photo</span>
               <input
                 aria-label="Choose profile photo"
@@ -2220,6 +2226,7 @@ export default function App() {
               />
               <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
               <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&<small>Using your Google profile photo</small>}
+            </div>
             </div>
             <div className="form-row">
               <Select
@@ -2403,6 +2410,7 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />

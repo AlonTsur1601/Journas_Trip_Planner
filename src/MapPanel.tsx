@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPinPlus, Route, List, X } from "lucide-react";
+import { MapPinPlus, Route, Waypoints, X } from "lucide-react";
 import { symbolMarkup } from "./PlannerControls";
 import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
@@ -62,7 +62,8 @@ export default function MapPanel({
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="16,5 11,16 21,16" fill="var(--accent)"/><polygon points="16,27 21,16 11,16" fill="currentColor"/></svg>';
+    compass.insertAdjacentHTML('beforeend','<svg class="compass-ring" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>');
+    compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,5 11,16 21,16" fill="var(--accent)"/><polygon points="16,27 21,16 11,16" fill="currentColor"/></svg>';
     let constraining = false;
     const containWorld = () => {
       if (constraining) return;
@@ -86,7 +87,7 @@ export default function MapPanel({
       event.stopImmediatePropagation();
       event.preventDefault();
       compass.parentElement!.classList.add('compass-engaged');
-      const rect=compass.getBoundingClientRect(), cx=rect.left+compass.offsetWidth,cy=rect.bottom-compass.offsetHeight;
+      const rect=compass.getBoundingClientRect(), cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
       rotation = { x: event.clientX, y: event.clientY, bearing: m.getBearing(), angle: Math.atan2(event.clientY-cy,event.clientX-cx), cx,cy };
       dragged = false;
       compass.setPointerCapture(event.pointerId);
@@ -97,7 +98,8 @@ export default function MapPanel({
       const dx = event.clientX - rotation.x, dy = event.clientY - rotation.y;
       if (Math.hypot(dx, dy) > 3) dragged = true;
       if (dragged) {
-        const angle=Math.atan2(event.clientY-rotation.cy,event.clientX-rotation.cx);
+        const rect=compass.getBoundingClientRect();
+        const angle=Math.atan2(event.clientY-(rect.top+rect.height/2),event.clientX-(rect.left+rect.width/2));
         let delta=(angle-rotation.angle)*180/Math.PI;
         delta=((delta+540)%360)-180;
         m.setBearing(rotation.bearing-delta);
@@ -143,17 +145,44 @@ export default function MapPanel({
     m.on('click',e=>{if(!callbacks.current.readonly&&!gestureDragged&&(action.current.mode==='add'||action.current.placementMode)&&!(e.originalEvent.target as HTMLElement)?.closest('button')){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}});
     m.doubleClickZoom.disable();
     let resizeFrame=0;
+    const retainedFrame=document.createElement('canvas');
+    retainedFrame.className='map-retained-frame';
+    retainedFrame.setAttribute('aria-hidden','true');
+    let retaining=false, awaitingResize=false, renderedFrame=false;
+    const revealRenderedMap=()=>{
+      if(!retaining)renderedFrame=true;
+      if(retaining && !awaitingResize && m.areTilesLoaded()){
+        retainedFrame.remove();
+        retaining=false;
+      }
+    };
+    m.on('render',revealRenderedMap);
     const observer = new ResizeObserver(() => {
+      awaitingResize=true;
+      // Resizing a WebGL drawing buffer clears it. Keep its last complete image
+      // stretched over the new dimensions until the replacement render is ready.
+      if(!retaining && renderedFrame){
+        const canvas=m.getCanvas();
+        retainedFrame.width=canvas.width;
+        retainedFrame.height=canvas.height;
+        retainedFrame.getContext('2d')!.drawImage(canvas,0,0);
+        canvas.parentElement!.append(retainedFrame);
+        retaining=true;
+      }
       cancelAnimationFrame(resizeFrame);
       resizeFrame=requestAnimationFrame(()=>{
         restoringView.current=true;
-        m.resize();m.triggerRepaint();
+        m.resize();
+        awaitingResize=false;
+        m.triggerRepaint();
         restoringView.current=false;
       });
     });
     observer.observe(container.current);
     return () => {
       observer.disconnect();
+      retainedFrame.remove();
+      m.off('render',revealRenderedMap);
       cancelAnimationFrame(resizeFrame);
       restoringView.current = true;
       m.remove();
@@ -275,7 +304,8 @@ export default function MapPanel({
             const ux = dx / distance, uy = dy / distance;
             const tipX = 40 - ux * 20, tipY = 40 - uy * 20;
             const baseX = tipX - ux * 13, baseY = tipY - uy * 13;
-            const end=m.unproject([target.x-ux*20,target.y-uy*20]);
+            // End inside the arrowhead, so the round line cap cannot protrude past its tip.
+            const end=m.unproject([target.x-ux*29,target.y-uy*29]);
             (m.getSource(id) as maplibregl.GeoJSONSource)?.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[a.lng,a.lat],[end.lng,end.lat]]}});
             head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
             gradient.setAttribute("x1", String(40 - dx));
@@ -332,7 +362,7 @@ export default function MapPanel({
   return (
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
       <div ref={container} className="map-canvas" />
-      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><List size={19}/></button>}</div>}
+      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
       {(mode||movingPinId)&&<div className="map-mode-note">{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}<button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>
   );

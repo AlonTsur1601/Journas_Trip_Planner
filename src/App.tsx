@@ -405,10 +405,10 @@ export default function App() {
   }, [settings.theme, settings.accent]);
   useEffect(()=>{if(user&&screenReady.current)sessionStorage.setItem('journas-current-screen',JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout}));},[user?.uid,trip?.id,date,layout]);
   useEffect(()=>{if(!user)return;const update=()=>api<{undo:string|null;redo:string|null}>('history.status').then(setHistoryState).catch(()=>{});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid]);
-  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid]);
+  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid,historyBusy,saving]);
   useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>setTravelers(r.members)).catch(e=>setMessage(e.message));},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
-   if(historyBusy||!historyState[direction])return;setHistoryBusy(true);
+   if(historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
    try{const r=await api<{screen:any}>(`history.${direction}`);const [list,prefs]=await Promise.all([refresh(),api<{settings:Settings}>('settings.get')]);setSettings({...defaultSettings,...prefs.settings});const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status'));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
   async function refresh() {
@@ -1064,8 +1064,8 @@ export default function App() {
           </button>
         </div>
         <div className="top-actions">
-          <button className="icon" aria-label="Undo" title="Undo · Ctrl+Z · last 10 minutes" disabled={!historyState.undo||historyBusy} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
-          <button className="icon" aria-label="Redo" title="Redo · Ctrl+Shift+Z" disabled={!historyState.redo||historyBusy} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
+          <button className="icon" aria-label="Undo" title="Undo · Ctrl+Z · last 10 minutes" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
+          <button className="icon" aria-label="Redo" title="Redo · Ctrl+Shift+Z" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
           <div className="save-control">
           <span className={`save-indicator${status.startsWith("All") ? " saved" : " pending"}`} role="status" title={status} aria-label={status} />
           <button className="icon" aria-label="Save planning" title="Save planning" disabled={!user || manualSaving || saving} onClick={saveManually}>

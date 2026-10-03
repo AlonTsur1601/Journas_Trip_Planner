@@ -1908,3 +1908,16 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .map-tools:has(.connections-button)>.map-arrow-choice{border-radius:0;}
 .map-tools>.connections-button{border-left:1px solid var(--line);border-radius:0 5px 5px 0;}
 .map-tools>.connections-button:only-child{border-left:0;border-radius:5px;}
+/* Dialogs and menus occupy only the height their current content needs. */
+.modal,.item-modal,.trip-modal,.task-modal,.confirm-modal,.settings-modal,.share-modal{height:auto;min-height:0;max-height:calc(100dvh - 24px);overflow-y:auto;}
+.modal>form{flex:none;}
+.modal>form>.modal-actions,.confirm-modal .modal-actions{margin-top:12px;}
+.trip-modal .lodging-map{flex:none;height:180px;min-height:150px;}
+.settings-location-map{flex:none;height:250px;min-height:150px;}
+.settings-modal form{padding-bottom:0;}
+.settings-modal .settings-footer{position:static;grid-column:1/-1;margin:8px -20px -20px;padding:12px 20px;}
+.profile-menu,.share-modal .travelers-list,.share-links{min-height:0;}
+.share-links:empty,.symbol-category:empty{display:none;}
+.symbol-menu{height:auto;min-height:0;overflow-y:auto;}
+.symbol-menu .symbol-grid{flex:none;grid-template-rows:none;grid-auto-rows:34px;}
+@media(max-width:700px){.modal,.settings-modal,.share-modal{height:auto;max-height:calc(100dvh - 16px);}.settings-modal .settings-footer{margin:8px -16px -16px;padding:12px 16px;}}

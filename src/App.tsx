@@ -1662,7 +1662,7 @@ export default function App() {
                 label="First day"
                 name="start"
                 type="date"
-                defaultValue={modal === "edit-trip" ? trip?.startDate : date}
+                defaultValue={modal === "edit-trip" ? trip?.startDate : today()}
                 min={modal === "edit-trip" ? undefined : today()}
                 max={maxDate()}
                 required
@@ -1671,7 +1671,7 @@ export default function App() {
                 label="Last day"
                 name="end"
                 type="date"
-                defaultValue={modal === "edit-trip" ? trip?.endDate : date}
+                defaultValue={modal === "edit-trip" ? trip?.endDate : today()}
                 min={modal === "edit-trip" ? undefined : today()}
                 max={maxDate()}
                 required

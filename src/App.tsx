@@ -334,7 +334,7 @@ export default function App() {
   const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
   const [ambiguousTime,setAmbiguousTime]=useState(false);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
-  const [taskPage,setTaskPage]=useState(0),[connectionPage,setConnectionPage]=useState(0);
+  const [taskPage,setTaskPage]=useState(0);
   const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:57);
   const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
   const [historyBusy,setHistoryBusy]=useState(false);
@@ -373,7 +373,6 @@ export default function App() {
   }, [calendar]);
   const [time, setTime] = useState(new Date());
   useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:57);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
-  useEffect(()=>{setConnectionPage(0);},[edit?.item.id]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
 
   useEffect(() => {
@@ -1203,6 +1202,7 @@ export default function App() {
                 readonly={readonly}
                 onConnect={async(from,to,arrow)=>{if(await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow}))setMessage("Connection created.");}}
                 movingPinId={movingPinId}
+                onConnections={()=>setModal("connections")}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
                 onView={(center, zoom) => {if(!layoutLoading.current)changeLayout({ center, zoom });}}
@@ -2030,27 +2030,15 @@ export default function App() {
               </div>
             )}
           </form>
-          {edit.kind === "pins" &&
-            day.connections
-              .filter((c) => c.from === edit.item.id || c.to === edit.item.id).slice(connectionPage*3,connectionPage*3+3)
-              .map((c) => (
-                <div className="connection-row" key={c.id}>
-                  {day.pins.find((p) => p.id === c.from)?.title}{" "}
-                  {c.arrow ? "→" : "—"}{" "}
-                  {day.pins.find((p) => p.id === c.to)?.title}
-                  {!readonly && (
-                    <button
-                      className="icon"
-                      onClick={() => setEdit({ kind: "connections", item: c })}
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-              ))}
-          {edit.kind==='pins'&&day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length>3&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous connections page" disabled={!connectionPage} onClick={()=>setConnectionPage(connectionPage-1)}><ChevronLeft size={15}/></button><span>{connectionPage+1} / {Math.ceil(day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length/3)}</span><button type="button" className="icon" aria-label="Next connections page" disabled={(connectionPage+1)*3>=day.connections.filter(c=>c.from===edit.item.id||c.to===edit.item.id).length} onClick={()=>setConnectionPage(connectionPage+1)}><ChevronRight size={15}/></button></div>}
+
         </Modal>
       )}
+      {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
+        <div className="connections-list">{day.connections.length?day.connections.map(connection=><div className="connection-row" key={connection.id}>
+          <span>{mapPins.find(pin=>pin.id===connection.from)?.title??"Place"} {connection.arrow?"→":"—"} {mapPins.find(pin=>pin.id===connection.to)?.title??"Place"}</span>
+          {!readonly&&<button className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</button>}
+        </div>):<p>No connections for this day.</p>}</div>
+      </Modal>}
       {modal === "trip" && trip && (
         <Modal title="Share trip" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>

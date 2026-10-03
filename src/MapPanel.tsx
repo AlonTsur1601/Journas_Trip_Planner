@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPinPlus, Route, X } from "lucide-react";
+import { MapPinPlus, Route, List, X } from "lucide-react";
 import { symbolMarkup } from "./PlannerControls";
 import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
@@ -18,6 +18,7 @@ export default function MapPanel({
   movingPinId,
   onMovePin,
   onCancelMove,
+  onConnections,
   placementMode = false,
 }: {
   pins: Pin[];
@@ -31,6 +32,7 @@ export default function MapPanel({
   movingPinId?: string | null;
   onMovePin?: (pin: Pin, lng: number, lat: number) => void;
   onCancelMove?: () => void;
+  onConnections?: () => void;
   placementMode?: boolean;
 }) {
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
@@ -330,7 +332,7 @@ export default function MapPanel({
   return (
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
       <div ref={container} className="map-canvas" />
-      {!readonly&&!placementMode&&<div className="map-tools"><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></div>}
+      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><List size={19}/></button>}</div>}
       {(mode||movingPinId)&&<div className="map-mode-note">{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}<button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>
   );

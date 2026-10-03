@@ -1901,3 +1901,10 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 /* Profile photos and initial avatars share one stable circular footprint. */
 .avatar.profile-avatar,.profile-trigger .avatar.profile-avatar,.share-modal .avatar.profile-avatar{display:grid;place-items:center;width:28px;height:28px;min-width:28px;min-height:28px;flex:0 0 28px;aspect-ratio:1;border-radius:50%;margin:0;padding:0;font-size:13px;line-height:1;overflow:hidden;}
 .profile-avatar img{display:block;width:28px;height:28px;object-fit:cover;}
+.connections-list{max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+.connections-list .connection-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px;background:var(--subtle);border:1px solid var(--line);border-radius:5px;}
+.connections-list .connection-row>span{min-width:0;overflow-wrap:anywhere;}
+.connections-list .connection-row>button{flex-shrink:0;}
+.map-tools:has(.connections-button)>.map-arrow-choice{border-radius:0;}
+.map-tools>.connections-button{border-left:1px solid var(--line);border-radius:0 5px 5px 0;}
+.map-tools>.connections-button:only-child{border-left:0;border-radius:5px;}

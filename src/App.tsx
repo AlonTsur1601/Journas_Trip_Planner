@@ -1057,7 +1057,7 @@ export default function App() {
   if (!ready && !user)
     return (
       <div className="loading">
-        <Compass aria-label="Loading" />
+        <Compass aria-label="Loading" /> Finding your next adventure…
       </div>
     );
   if (!user && !token)
@@ -2467,7 +2467,7 @@ export default function App() {
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
-    {!ready&&<div className="restoring-screen" role="status"><Compass size={24} aria-label="Loading"/></div>}
+    {!ready&&<div className="restoring-screen" role="status"><Compass size={28} aria-label="Loading"/><span>Finding your next adventure…</span></div>}
     </>
   );
 }

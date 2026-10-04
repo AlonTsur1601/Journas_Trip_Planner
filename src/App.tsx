@@ -31,6 +31,9 @@ import {
   Save,
 } from "lucide-react";
 import tzlookup from "tz-lookup";
+import HomePage, {TripBadge} from "./HomePage";
+import {emptyHome,availableHome,recordVisit,randomTripAppearance,tripAppearance} from "./home-state";
+import type {HomeState,HomeTarget,TripAppearance} from "./types";
 import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {accountPhoto} from "./account-profile";
@@ -334,6 +337,15 @@ export default function App() {
     [conflict, setConflict] = useState<any>(null),
     [saving, setSaving] = useState(false),
     [manualSaving, setManualSaving] = useState(false);
+  const [home,setHome]=useState(!new URLSearchParams(location.search).has('share'));
+  const [homeState,setHomeState]=useState<HomeState>(emptyHome);
+  const homeRef=useRef(homeState);homeRef.current=homeState;
+  const homeWrites=useRef<Promise<unknown>>(Promise.resolve());
+  const [homeBusy,setHomeBusy]=useState(false);
+  const [lastTarget,setLastTarget]=useState<HomeTarget|null>(null);
+  const [tripLook,setTripLook]=useState<TripAppearance>(randomTripAppearance);
+  const [tripCrop,setTripCrop]=useState<File|null>(null);
+  const tripPhoto=useRef<HTMLInputElement>(null);
   const [googleSession,setGoogleSession]=useState(false);
   const activePhoto=accountPhoto(user,googleSession,settings.photoURL);
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
@@ -382,6 +394,7 @@ export default function App() {
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [calendar]);
+  useEffect(()=>{if(modal==='new-trip')setTripLook(randomTripAppearance());else if(modal==='edit-trip'&&trip)setTripLook(tripAppearance(trip));},[modal]);
   const [time, setTime] = useState(new Date());
   useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:57);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
@@ -429,13 +442,38 @@ export default function App() {
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, [settings.theme, settings.accent]);
-  useEffect(()=>{if(user&&screenReady.current){const saved=JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout});sessionStorage.setItem('journas-current-screen',saved);localStorage.setItem(`journas-last-screen:${user.uid}`,saved);}},[user?.uid,trip?.id,date,layout]);
+  useEffect(()=>{if(user&&screenReady.current&&!home){const saved=JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout});sessionStorage.setItem('journas-current-screen',saved);localStorage.setItem(`journas-last-screen:${user.uid}`,saved);}},[user?.uid,trip?.id,date,layout,home]);
   useEffect(()=>{setHistoryState({undo:null,redo:null});if(!user||!trip||shareTrip)return;let live=true;const update=()=>api<{undo:string|null;redo:string|null}>('history.status',{tripId:trip.id}).then(r=>{if(live)setHistoryState(r);}).catch(()=>{if(live)setHistoryState({undo:null,redo:null});});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{live=false;clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid,trip?.id,shareTrip]);
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid,historyBusy,saving]);
   useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>{if(live)setTravelers([...new globalThis.Map<string,any>(r.members.map((member:any):[string,any]=>[member.id,member])).values()] as any[]);}).catch(e=>setMessage(e.message));if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>setMessage(e.message));return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
    if(!trip||shareTrip||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
    try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+  }
+  function persistHome(next:HomeState,availableTrips=trips){
+    const clean=availableHome(next,availableTrips);setHomeState(clean);homeRef.current=clean;
+    if(!user)return;const uid=user.uid;
+    homeWrites.current=homeWrites.current.catch(()=>{}).then(async()=>{if(auth?.currentUser?.uid===uid)await api('home.save',{home:clean});}).catch((e:any)=>setMessage(e.message));
+  }
+  useEffect(()=>{if(!ready||home||!user||shareTrip||!trip||date<trip.startDate||date>trip.endDate)return;const target={tripId:trip.id,date};setLastTarget(target);persistHome(recordVisit(homeRef.current,target));},[home,ready,user?.uid,trip?.id,date,trips.map(t=>t.id).join(',')]);
+  async function openPlanner(target:HomeTarget){
+    if(homeBusy)return;setHomeBusy(true);
+    try{
+      await saveLayout();
+      const selected=target.tripId?trips.find(t=>t.id===target.tripId)??null:target.date?null:trips.find(t=>t.id===lastTarget?.tripId)??trips[0]??null;
+      const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
+      if(!selected&&!trips.length){setTrip(null);setDate(nextDate);setDay(emptyDay());setHome(false);setCalendar(false);layoutLoading.current=false;return;}
+      let view:Layout,loaded:{trip:Trip;day:Day;layout:Layout|null}|null=null;
+      if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate){loaded=await api('trip.get',{tripId:selected.id,date:nextDate});const local=localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`);view=local?JSON.parse(local):loaded!.layout??(selected.id===tripRef.current?.id&&nextDate===dateRef.current?layoutRef.current:await startingLayout(settings,selected.lodging));initialTripRequest.current={tripId:selected.id,date:nextDate,promise:Promise.resolve(loaded)};}else view=await startingLayout(settings,selected?.lodging);
+      await loadMapPanel();if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate)persistHome(recordVisit(homeRef.current,{tripId:selected.id,date:nextDate}));layoutLoading.current=true;setTrip(loaded?.trip??selected);setDate(nextDate);setLayout({...defaultLayout(),...view});setDay(loaded?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
+      if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});
+    }catch(e:any){setMessage(e.message);}finally{setHomeBusy(false);}
+  }
+  function createTrip(){setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
+  function editTrip(selected:Trip){setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
+  async function removeTrip(selected:Trip){
+    if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
+    try{await api('trip.remove',{tripId:selected.id});const remaining=await refresh();const next=availableHome(homeRef.current,remaining);setHomeState(next);homeRef.current=next;await api('home.save',{home:next});setHistoryState({undo:null,redo:null});if(trip?.id===selected.id){setTrip(remaining[0]??null);setDate(remaining[0]?.startDate??today());setDay(emptyDay());}if(lastTarget?.tripId===selected.id)setLastTarget(remaining[0]?{tripId:remaining[0].id,date:remaining[0].startDate}:null);setModal(null);}catch(e:any){setMessage(e.message);}
   }
   async function refresh() {
     const result = await api<{ trips: Trip[] }>("trip.list");
@@ -453,19 +491,25 @@ export default function App() {
     void loadMapPanel().catch(()=>{});
     if(saved?.uid===user.uid&&saved.tripId&&!token)void import('./live-database').catch(()=>{});
     const hasSaved=saved?.uid===user.uid&&!token;
-    const bootstrap=api<{trips:Trip[];settings:Settings;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
+    const bootstrap=api<{trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
       date:hasSaved?saved.date:today(),
-      ...(hasSaved?{tripId:saved.tripId??null}:token?{tripId:null}:{})
+      ...(hasSaved&&saved.tripId?{tripId:saved.tripId}:token?{tripId:null}:{})
     });
     Promise.all([bootstrap,user.getIdTokenResult()])
       .then(async ([result, identity]) => {
         if(cancelled)return;
         const list=result.trips,r={settings:result.settings};
         setTrips(list);
+        const restoredHome=availableHome(result.home??emptyHome(),list);
+        const fallback=list.find(t=>t.id===(restoredHome.recentDays[0]?.tripId??restoredHome.recentTrips[0]))??list.find(t=>t.startDate<=today()&&t.endDate>=today())??list[0]??null;
+        const selected=list.find(t=>t.id===saved?.tripId)??fallback;
+        const selectedDate=selected&&saved?.uid===user.uid&&saved?.tripId===selected.id&&saved.date>=selected.startDate&&saved.date<=selected.endDate?saved.date:selected&&restoredHome.recentDays[0]?.tripId===selected.id?restoredHome.recentDays[0].date!:selected?(today()>=selected.startDate&&today()<=selected.endDate?today():selected.startDate):today();
+        setHomeState(restoredHome);
+        setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
         if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
-        if(saved?.uid===user.uid&&!token){const selected=list.find(t=>t.id===saved.tripId)??null;const initial=saved.layout??await plannedInitialLayout(preferences,selected,saved.date);settingsRef.current=preferences;layoutLoading.current=true;setDate(saved.date);setSettings(preferences);setLayout(initial);setTrip(selected);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
+        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore?.trip.id===selected?.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
@@ -537,6 +581,7 @@ export default function App() {
   }, [token, date, shareTrip, shareReady, joinedToken, user?.uid]);
   useEffect(() => {
     if (
+      home ||
       !trip ||
       !user ||
       shareTrip ||
@@ -642,7 +687,7 @@ export default function App() {
       stop();
       stopTrip();
     };
-  }, [trip?.id, date, user?.uid, shareTrip]);
+  }, [trip?.id, date, user?.uid, shareTrip,home]);
   useEffect(() => {
     if (!token || !shareTrip || !shareReady || joinedToken === token) return;
     const id = setInterval(
@@ -948,7 +993,7 @@ export default function App() {
       if(e.code==='CONFLICT')setConflict({draft,current:e.current,fields:e.details?.fields??[]});
     }finally{setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
   }
-  async function logout(){sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}
+  async function logout(){sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setHome(true);setHomeState(emptyHome());setLastTarget(null);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}
   function newItem(kind: Edit["kind"], extras: any = {}) {
     setAmbiguousTime(false);
     if (readonly) {
@@ -1012,7 +1057,7 @@ export default function App() {
   if (!ready && !user)
     return (
       <div className="loading">
-        <Compass /> Finding your next adventure…
+        <Compass aria-label="Loading" />
       </div>
     );
   if (!user && !token)
@@ -1024,9 +1069,11 @@ export default function App() {
     );
   return (
     <>
-    <div className="app" inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
+    <div className={`app${home&&!shareTrip?" home-app":""}${!trip&&!trips.length?" empty-planner":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
+      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={settings.displayName||user.displayName||'Account'} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={settings.displayName||user.displayName||'Account'}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {!home||shareTrip?<>
       <header className="topbar">
-        <a className="brand" href="/">
+        <a className="brand" href="/" onClick={async e=>{if(user&&!shareTrip){e.preventDefault();await saveLayout();setHome(true);setCalendar(false);}}}>
           <Compass />
           <strong>Journas</strong>
         </a>
@@ -1070,7 +1117,7 @@ export default function App() {
             className="icon"
             title="Create trip"
             aria-label="Create trip"
-            onClick={() => {setLodgingDraft(undefined);setLodgingView({...layout});setModal("new-trip");}}
+            onClick={createTrip}
             disabled={!user || trips.length >= 100}
           >
             <Plus size={18} />
@@ -1178,6 +1225,8 @@ export default function App() {
             : "You are approaching your saved-trip limit. Remove old trips to make room."}
         </div>
       )}
+      {!trip&&!shareTrip&&!trips.length&&<div className="empty-trip-screen"><Compass size={44}/><h1>Start with a trip.</h1><p><button className="text-button" onClick={createTrip}>Create your first trip</button> to bring your places, schedule and tasks together.</p></div>}
+      {(trip||shareTrip||trips.length>0)&&<>
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">
           <Map size={17} /><h1>Places & routes</h1>
@@ -1210,7 +1259,6 @@ export default function App() {
           ))}
         </div>
       </div>
-      {!trip && <div className="planning-required" role="note">Select a trip above, or use + to create one, before adding places, schedule blocks or tasks.</div>}
       <div
         className="workspace"
         style={{
@@ -1653,8 +1701,9 @@ export default function App() {
           </div>
         </div>
       )}
+      </>} </>:null}
       {(modal === "new-trip" || modal === "edit-trip") && (
-        <Modal title={modal === "edit-trip" ? "Edit trip" : "Create trip"} onClose={() => setModal(null)}>
+        <Modal title={modal === "edit-trip" ? "Edit trip" : "Create trip"} inactive={Boolean(tripCrop)} onClose={() => setModal(null)}>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -1662,6 +1711,7 @@ export default function App() {
               try {
                 const r = await api<{ trip: Trip }>(modal === "edit-trip" ? "trip.update" : "trip.create", {
                   tripId: modal === "edit-trip" ? trip?.id : undefined,
+                  appearance:tripLook,
                   lodging: lodgingDraft,
                   clientTimezone:
                     Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -1674,7 +1724,8 @@ export default function App() {
                 setDate(r.trip.startDate);
                 setShareTrip(false);
                 history.replaceState({}, "", location.pathname);
-                refresh();
+                const availableTrips=await refresh();
+                if(modal==='new-trip'){persistHome(recordVisit(homeRef.current,{tripId:r.trip.id,date:r.trip.startDate}),availableTrips);setHome(false);}
                 setModal(null);
               } catch (e: any) {
                 setMessage(e.message);
@@ -1708,13 +1759,14 @@ export default function App() {
                 required
               />
             </div>
+            <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><button type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</button><button type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</button></div><div className="trip-logo-fields"><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/>{tripLook.mode==='symbol'?<SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><button type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</button></div>}</div></div></div>
             <span className="lodging-label">Lodging location</span>
             <div className="lodging-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={lodgingDraft?.lng!==undefined?[{id:"lodging",title:lodgingDraft.name,note:lodgingDraft.note??"",color:lodgingDraft.color??settings.accent,symbol:lodgingDraft.symbol??"icon:stay",lng:lodgingDraft.lng,lat:lodgingDraft.lat,versions:{}}]:[]} connections={[]} readonly={false} placementMode layout={lodgingView} onView={(center,zoom)=>setLodgingView(previous=>({...previous,center,zoom}))} onPin={()=>{}} onAdd={(lng,lat)=>setLodgingDraft(previous=>({...previous,name:previous?.name??'Lodging',lng,lat,timezone:tzlookup(lat,lng)}))}/></Suspense></div>
             {lodgingDraft?<div className="lodging-pin-fields"><Input label="Lodging pin name" value={lodgingDraft.name} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,name:e.target.value})}/><Input label="Color" type="color" value={lodgingDraft.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,color:e.target.value})}/><SymbolPicker value={lodgingDraft.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,symbol:e.target.value})}/></div>:<small>Select your lodging on the map.</small>}
             {modal==='new-trip'&&<small>{trips.length}/100 saved trips</small>}
             <button
               className="button primary full"
-              disabled={(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined}
+              disabled={(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </button>
@@ -2165,26 +2217,7 @@ export default function App() {
               <div className="delete-trip">
                 <button
                   className="button danger"
-                  onClick={async () => {
-                    if (
-                      !await confirmAction(
-                        trip.ownerId === user?.uid
-                          ? "Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible."
-                          : "Remove this trip from your account? Other travelers keep it. This action cannot be undone.",
-                      )
-                    )
-                      return;
-                    try {
-                      await api("trip.remove", { tripId: trip.id });
-                      setHistoryState({undo:null,redo:null});
-                      setTrip(null);
-                      setDay(emptyDay());
-                      refresh();
-                      setModal(null);
-                    } catch (e: any) {
-                      setMessage(e.message);
-                    }
-                  }}
+                  onClick={() => removeTrip(trip)}
                 >
                   <Trash2 size={15} />
                   {trip.ownerId === user?.uid
@@ -2427,13 +2460,14 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {tripCrop&&<Modal title="Crop trip image" onClose={()=>setTripCrop(null)}><Suspense fallback={<Compass/>}><ProfilePhotoCropper file={tripCrop} onCancel={()=>setTripCrop(null)} onError={setMessage} onApply={image=>{setTripLook(previous=>({...previous,image,mode:'image'}));setTripCrop(null);}}/></Suspense></Modal>}
       {photoCrop&&<Modal title="Crop profile photo" onClose={()=>setPhotoCrop(null)}><Suspense fallback={<div>Loading photo editor...</div>}><ProfilePhotoCropper file={photoCrop} onCancel={()=>setPhotoCrop(null)} onError={setMessage} onApply={photo=>{setSettings(previous=>({...previous,photoURL:photo}));setPhotoCrop(null);}}/></Suspense></Modal>}
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
     </div>
-    {!ready&&<div className="restoring-screen" role="status"><Compass size={24}/> Restoring your last screen...</div>}
+    {!ready&&<div className="restoring-screen" role="status"><Compass size={24} aria-label="Loading"/></div>}
     </>
   );
 }

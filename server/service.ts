@@ -32,6 +32,25 @@ function lodging(value: unknown) {
     if(!isColor(color))fail(400,'INVALID_COLOR','Choose a valid lodging pin color');
     return {name,lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng)),color,symbol:text(symbol,40),note:text(note,4000)};
 }
+function appearance(value:unknown) {
+ const data=object(value),color=data.color,symbol=text(data.symbol,40),mode=data.mode,image=text(data.image??'',70000);
+ if(!isColor(color)||!symbol||!['symbol','image'].includes(String(mode))||image&&!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image)||mode==='image'&&!image)fail(400,'INVALID_APPEARANCE','Choose a valid trip logo and color.');
+ return {color,symbol,mode,image:mode==='image'?image:''};
+}
+async function homeState(tx:Transaction,uid:string,value:unknown) {
+ const state=object(value);
+ if(Object.keys(state).some(key=>!['recentTrips','recentDays','pins'].includes(key))||!Array.isArray(state.recentTrips)||state.recentTrips.length>100||!Array.isArray(state.recentDays)||state.recentDays.length>100||!Array.isArray(state.pins)||state.pins.length>9)fail(400,'INVALID_HOME','You can pin up to nine items.');
+ const ids=new Set<string>();const trips=state.recentTrips.map(id=>{const valid=identifier(id);ids.add(valid);return valid;});
+ const targets=(list:unknown[])=>list.map(value=>{const item=object(value);if(Object.keys(item).some(key=>!['tripId','date'].includes(key)))fail(400,'INVALID_HOME','Invalid pinned item');const tripId=item.tripId===null?null:identifier(item.tripId),day=item.date===null?null:date(item.date);if(!tripId&&!day)fail(400,'INVALID_HOME','Choose a trip or date');if(tripId)ids.add(tripId);return {tripId,date:day};});
+ const recentDays=targets(state.recentDays),pins=targets(state.pins);
+ if(recentDays.some(target=>!target.tripId||!target.date))fail(400,'INVALID_HOME','Recent dates belong to a trip');
+ const allowed=await Promise.all([...ids].map(async id=>{const trip=await tx.get(tripPath(id)) as Trip|undefined;return trip&&!trip.deleted&&trip.memberIds.includes(uid)?trip:null;}));
+ if(allowed.some(trip=>!trip))fail(403,'FORBIDDEN','A trip is no longer available.');
+ if([...recentDays,...pins].some(target=>target.tripId&&target.date&&!allowed.some(trip=>trip!.id===target.tripId&&target.date!>=trip!.startDate&&target.date!<=trip!.endDate)))fail(400,'DATE_OUTSIDE_TRIP','Choose a date within this trip');
+ const key=(target:{tripId:string|null;date:string|null})=>`${target.tripId??''}:${target.date??''}`;
+ if(new Set(trips).size!==trips.length||new Set(recentDays.map(key)).size!==recentDays.length||new Set(pins.map(key)).size!==pins.length)fail(400,'INVALID_HOME','Items must be unique');
+ return {recentTrips:trips,recentDays,pins};
+}
 function validTimezone(value: unknown) {
     if (value === '')
         return true;
@@ -196,8 +215,9 @@ export class JournasService {
                     const [day,view]=await Promise.all([this.day(tx,selected.id,requestedDate),tx.get(layoutPath(userId,selected.id,requestedDate))]);
                     restore={trip:selected,day,layout:view?.layout??null};
                 }
-                return {trips,settings:{...defaultSettings,...object(user?.settings??{})},restore};
+                return {trips,settings:{...defaultSettings,...object(user?.settings??{})},home:user?.home??{recentTrips:[],recentDays:[],pins:[]},restore};
             }
+            if(action==='home.save'){const home=await homeState(tx,userId,input.home);const user=await tx.get(userPath(userId))??{id:userId,tripCount:0};tx.set(userPath(userId),{...user,home});return {home};}
             if (action === 'settings.get') {
                 const user = await tx.get(userPath(userId));
                 return { settings: { ...defaultSettings, ...object(user?.settings ?? {}) } };
@@ -236,7 +256,7 @@ export class JournasService {
                     fail(400, 'INVALID_TRIP', 'Trips must span at most one year and cannot be planned more than one year ahead');
                 const user = await this.checkQuota(tx, userId);
                 const id = randomUUID();
-                const trip: Trip = { id, name, startDate, endDate, lodging: lodging(input.lodging), ownerId: userId, memberIds: [userId], deleted: false, createdAt: this.now(), updatedAt: this.now(), shareVersion: 0 };
+                const trip: Trip = { id, name, startDate, endDate, appearance: input.appearance===undefined?{color:['#7c5ce7','#2563eb','#059669','#ea580c'][randomBytes(1)[0]%4],symbol:['icon:flight','icon:peak','icon:coast','icon:museum'][randomBytes(1)[0]%4],mode:'symbol',image:''}:appearance(input.appearance), lodging: lodging(input.lodging), ownerId: userId, memberIds: [userId], deleted: false, createdAt: this.now(), updatedAt: this.now(), shareVersion: 0 };
                 tx.set(tripPath(id), trip);
                 tx.set(membershipPath(userId, id), this.membership(userId, trip, user.settings));
                 tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
@@ -266,7 +286,7 @@ export class JournasService {
                 const name=text(input.name,120).trim(),startDate=date(input.startDate),endDate=date(input.endDate);
                 const latest=new Date(this.now());latest.setUTCFullYear(latest.getUTCFullYear()+1);
                 if(!name||startDate>endDate||endDate>latest.toISOString().slice(0,10)||(Date.parse(endDate)-Date.parse(startDate))/86400000>366)fail(400,'INVALID_TRIP','Choose a name and a date range within one year.');
-                const updated={...trip,name,startDate,endDate,lodging:lodging(input.lodging),updatedAt:this.now()};
+                const updated={...trip,name,startDate,endDate,...(input.appearance===undefined?{}:{appearance:appearance(input.appearance)}),lodging:lodging(input.lodging),updatedAt:this.now()};
                 const memberships=await Promise.all(trip.memberIds.map(async uid=>({uid,ref:await tx.get(membershipPath(uid,id)),user:await tx.get(userPath(uid))})));
                 tx.set(tripPath(id),updated);
                 for(const member of memberships) if(member.ref) tx.set(membershipPath(member.uid,id),{...member.ref,endDate,cleanupAt:this.cleanupAt(endDate,member.user?.settings as any)});

@@ -1975,3 +1975,113 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 
 
 .password-input{position:relative;display:flex;align-items:center;min-width:0;}.password-input input{width:100%;padding-right:44px;}.password-input .password-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:5px;}.password-input .password-eye:hover{transform:translateY(-50%);background:color-mix(in srgb,var(--accent) 18%,var(--surface));color:var(--accent);}
+
+/* Attached field actions keep feedback within each half of the control. */
+.password-input{display:flex;align-items:stretch;gap:0;}
+.password-input input{flex:1;min-width:0;width:0;padding-right:12px;border-radius:5px 0 0 5px;}
+.password-input .password-eye{position:static;transform:none;flex:0 0 42px;width:42px;height:auto;min-height:40px;border:1px solid var(--line);border-left:0;border-radius:0 5px 5px 0;background:var(--subtle);}
+.password-input .password-eye:hover,.password-input .password-eye:active{transform:none;}
+.field>label{font-size:12px;font-weight:600;}
+.date-field-row{gap:0;align-items:stretch;}
+.date-field-row .segmented-date{border-radius:5px 0 0 5px;}
+.date-field-row>.icon{flex:0 0 40px;width:40px;min-width:40px;border:1px solid var(--line);border-left:0;border-radius:0 5px 5px 0;height:36px;}
+.empty-trip-screen{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:30px;text-align:center;gap:12px;}
+.empty-trip-screen>svg{color:var(--accent);}
+.empty-trip-screen h1{font:700 30px Manrope,sans-serif;margin:0;}
+.empty-trip-screen p{color:var(--muted);max-width:420px;font-size:16px;line-height:1.8;margin:0;}
+.empty-planner:not(.home-app) .date-picker,.empty-planner:not(.home-app) .top-actions>button,.empty-planner:not(.home-app) .save-control{display:none;}
+.empty-planner:not(.home-app) .top-actions{margin-left:auto;}
+.home-app{display:block;overflow-y:auto;overflow-x:hidden;background:var(--bg);}
+.home-page{position:relative;isolation:isolate;min-height:100dvh;padding:40px 5vw 70px;background:radial-gradient(ellipse at 85% 0%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 65%);}
+.home-page>.auth-map-background{position:fixed;inset:0;opacity:.21;background-size:cover;background-position:center;}
+.home-content{max-width:1120px;margin:0 auto;}
+.home-masthead{display:flex;align-items:center;justify-content:space-between;gap:24px;}
+.home-brand strong{font-size:40px;letter-spacing:-1.5px;}
+.home-brand svg{width:40px;height:40px;}
+.home-account{display:flex;align-items:center;gap:12px;}
+.home-account .profile-avatar{width:42px;height:42px;min-width:42px;}
+.home-account>span:not(.avatar){display:flex;flex-direction:column;gap:4px;max-width:180px;}
+.home-account strong{font-size:14px;overflow-wrap:anywhere;}
+.home-account small{font-size:11px;color:var(--muted);}
+.home-account>.icon{width:36px;height:36px;border-radius:6px;}
+.home-intro{padding:56px 0 46px;}
+.home-eyebrow{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1.7px;}
+.home-intro h1{font:700 clamp(38px,5vw,62px)/1.16 Manrope,sans-serif;letter-spacing:-2px;margin:10px 0 14px;}
+.home-intro p{color:var(--muted);font-size:17px;margin:0 0 25px;}
+.home-primary-actions{display:flex;align-items:center;gap:16px;}
+.home-continue{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:19px 23px;min-width:370px;background:var(--accent);color:white;border-radius:8px;box-shadow:0 5px 18px color-mix(in srgb,var(--accent) 20%,transparent);text-align:left;}
+.home-continue>span{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.home-continue strong{font-size:17px;}
+.home-continue small{font-size:12px;opacity:.86;overflow-wrap:anywhere;}
+.home-create{min-height:46px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
+.home-section{margin-bottom:30px;min-width:0;}
+.home-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px;}
+.home-section-heading h2{display:flex;align-items:center;gap:9px;font:700 17px Manrope,sans-serif;margin:0;}
+.home-section-heading h2 svg{color:var(--accent);}
+.home-section-heading>span{font-size:12px;color:var(--muted);}
+.home-section-heading .text-button{display:inline-flex;align-items:center;gap:5px;font-size:12px;}
+.home-pins{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.home-tile{position:relative;border:1px solid color-mix(in srgb,var(--line) 70%,var(--accent) 10%);border-radius:7px;background:color-mix(in srgb,var(--surface) 94%,transparent);min-width:0;}
+.home-tile-main{width:100%;min-height:84px;display:flex;align-items:center;gap:13px;text-align:left;padding:16px 43px 16px 14px;border-radius:7px;}
+.home-tile-main>span:not(.trip-badge){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0;}
+.home-tile-main strong{font-size:14px;line-height:1.35;overflow-wrap:anywhere;}
+.home-tile-main small{font-size:11px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere;}
+.home-tile-main>svg{color:var(--accent);flex-shrink:0;width:15px;}
+.home-tile-menu{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:28px;height:32px;border-radius:4px;}
+.home-tile-menu:hover,.home-tile-menu:active{transform:translateY(-50%);}
+.trip-badge{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:9px;color:white;overflow:hidden;}
+.trip-badge img{width:100%;height:100%;object-fit:cover;}
+.trip-badge svg{width:23px;height:23px;}
+.date-badge{background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent);}
+.home-pin-create{min-height:84px;display:flex;align-items:center;justify-content:center;gap:9px;border:1px dashed color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:7px;color:var(--accent);background:color-mix(in srgb,var(--surface) 72%,transparent);font-size:13px;font-weight:600;}
+.home-recents{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:38px;}
+.home-list{display:grid;gap:9px;}
+.home-list-empty{font-size:13px;color:var(--muted);line-height:1.6;padding:20px 0;margin:0;}
+.home-tile .removal-warning{color:#c87612;font-weight:600;}
+.home-context-menu{position:fixed;width:226px;padding:5px;border:1px solid var(--line);background:var(--surface);box-shadow:0 8px 24px #0002;border-radius:7px;z-index:150;animation:panel-in 120ms ease-out;}
+.home-context-menu button{width:100%;display:flex;align-items:center;gap:9px;text-align:left;padding:10px;font-size:12px;border-radius:4px;}
+.home-context-menu button.danger{color:#dc3545;}
+.home-pin-modal{width:420px;}
+.home-pin-modal form{display:grid;gap:12px;}
+.home-continue:not(:disabled):hover{background:color-mix(in srgb,var(--accent) 83%,var(--ink));box-shadow:0 7px 22px color-mix(in srgb,var(--accent) 27%,transparent);}
+.home-continue:not(:disabled):active{background:color-mix(in srgb,var(--accent) 75%,var(--ink));}
+.trip-appearance-editor{display:flex;align-items:flex-start;gap:16px;margin:8px 0 14px;}
+.trip-appearance-editor>.trip-badge{width:58px;height:58px;flex-basis:58px;border-radius:9px;margin-top:6px;}
+.trip-appearance-options{flex:1;min-width:0;}
+.trip-logo-mode{display:flex;margin-bottom:10px;width:max-content;border:1px solid var(--line);border-radius:5px;overflow:hidden;}
+.trip-logo-mode button{padding:7px 16px;font-size:12px;border-radius:0;}
+.trip-logo-mode button+button{border-left:1px solid var(--line);}
+.trip-logo-mode button.active{background:color-mix(in srgb,var(--accent) 15%,var(--surface));color:var(--accent);}
+.trip-logo-fields{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.trip-logo-fields>.field{margin:0;}
+@media(max-width:700px){
+ .home-page{padding:25px 18px 44px;}
+ .home-masthead{align-items:flex-start;gap:15px;}
+ .home-brand strong{font-size:29px;letter-spacing:-1px;}
+ .home-brand svg{width:30px;height:30px;}
+ .home-account{gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:52%;}
+ .home-account>span:not(.avatar){max-width:100px;}
+ .home-account strong{font-size:12px;}
+ .home-account small{display:none;}
+ .home-account .profile-avatar{width:32px;height:32px;min-width:32px;}
+ .home-account>.icon{width:29px;height:29px;}
+ .home-intro{padding:38px 0 32px;}
+ .home-intro h1{font-size:40px;letter-spacing:-1.5px;}
+ .home-intro p{font-size:15px;}
+ .home-primary-actions{align-items:stretch;flex-direction:column;gap:10px;}
+ .home-continue{min-width:0;width:100%;padding:17px;}
+ .home-continue strong{font-size:16px;}
+ .home-create{align-self:flex-start;min-height:40px;}
+ .home-pins{grid-template-columns:1fr 1fr;gap:8px;}
+ .home-pins .home-tile-main{padding:12px 30px 12px 10px;gap:8px;align-items:flex-start;min-height:96px;flex-wrap:wrap;}
+ .home-pins .home-tile-main>span:not(.trip-badge){flex-basis:100%;}
+ .home-pins .home-tile-main>svg{display:none;}
+ .home-pins .home-tile-menu{right:4px;top:20px;}
+ .home-recents{grid-template-columns:1fr;gap:5px;margin-top:30px;}
+ .home-section{margin-bottom:25px;}
+ .empty-planner:not(.home-app) .topbar{display:flex;flex-wrap:wrap;gap:8px;}
+ .empty-planner:not(.home-app) .top-actions{width:auto;}
+ .trip-appearance-editor{gap:10px;}
+ .trip-appearance-editor>.trip-badge{width:42px;height:42px;flex-basis:42px;}
+ .trip-logo-fields .color-swatches>button{width:22px;min-width:22px;}
+}

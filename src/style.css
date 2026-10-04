@@ -1972,3 +1972,6 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .photo-crop-actions{display:flex;justify-content:flex-end;gap:12px;}
 
 .restoring-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--surface);color:var(--ink);z-index:150;}
+
+
+.password-input{position:relative;display:flex;align-items:center;min-width:0;}.password-input input{width:100%;padding-right:44px;}.password-input .password-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:5px;}.password-input .password-eye:hover{transform:translateY(-50%);background:color-mix(in srgb,var(--accent) 18%,var(--surface));color:var(--accent);}

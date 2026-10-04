@@ -31,6 +31,7 @@ import {
   Save,
 } from "lucide-react";
 import tzlookup from "tz-lookup";
+import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {accountPhoto} from "./account-profile";
 import { api, auth, configured } from "./firebase";
@@ -163,6 +164,7 @@ function TripFeatures({ className = "" }: { className?: string }) {
 function AuthScreen({ onError }: { onError: (s: string) => void }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
+    [confirmPassword, setConfirmPassword] = useState(""),
     [register, setRegister] = useState(false),
     [busy, setBusy] = useState(false);
   async function run(fn: () => Promise<unknown>) {
@@ -237,6 +239,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 e.preventDefault();
                 run(async () => {
                   if (register) {
+                    if(password !== confirmPassword) throw new Error("Passwords do not match.");
                     const cred = await createUserWithEmailAndPassword(
                       auth!,
                       email,
@@ -256,15 +259,15 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 value={email}
                 onChange={(e: any) => setEmail(e.target.value)}
               />
-              <Input
+              <PasswordField
                 label="Password"
-                type="password"
                 required
                 minLength={8}
                 autoComplete={register ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e: any) => setPassword(e.target.value)}
               />
+              {register && <PasswordField label="Confirm password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} />}
               <button className="button primary full" disabled={busy}>
                 {busy
                   ? "Please wait…"

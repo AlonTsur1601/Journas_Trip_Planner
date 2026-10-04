@@ -242,6 +242,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 e.preventDefault();
                 run(async () => {
                   if (register) {
+                    if(password.length<6) throw new Error("Use at least 6 characters for your password.");
                     if(password !== confirmPassword) throw new Error("Passwords do not match.");
                     const cred = await createUserWithEmailAndPassword(
                       auth!,
@@ -265,12 +266,12 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
               <PasswordField
                 label="Password"
                 required
-                minLength={8}
+                minLength={6}
                 autoComplete={register ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e: any) => setPassword(e.target.value)}
               />
-              {register && <PasswordField label="Confirm password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} />}
+              {register && <PasswordField label="Confirm password" required minLength={6} autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} />}
               <button className="button primary full" disabled={busy}>
                 {busy
                   ? "Please wait…"

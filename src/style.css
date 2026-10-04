@@ -2086,3 +2086,9 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .loading>svg,.restoring-screen>svg{width:28px;height:28px;flex-shrink:0;}
 .field input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=file]):not(.segmented-date input):not(.segmented-time input):not(.password-input input){min-height:40px;}
 @media(max-width:700px){.home-account .avatar.profile-avatar{flex-basis:32px;}}
+
+/* Equal control rhythm with or without a leading symbol. */
+.button{min-height:36px;line-height:20px;}
+.field>.dropdown .dropdown-trigger{height:40px;min-height:40px;}
+.trip-badge{font-size:30px;line-height:1;}
+.trip-badge svg{width:78%;height:78%;}

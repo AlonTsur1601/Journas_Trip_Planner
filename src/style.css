@@ -1985,12 +1985,6 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .date-field-row{gap:0;align-items:stretch;}
 .date-field-row .segmented-date{border-radius:5px 0 0 5px;}
 .date-field-row>.icon{flex:0 0 40px;width:40px;min-width:40px;border:1px solid var(--line);border-left:0;border-radius:0 5px 5px 0;height:36px;}
-.empty-trip-screen{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:30px;text-align:center;gap:12px;}
-.empty-trip-screen>svg{color:var(--accent);}
-.empty-trip-screen h1{font:700 30px Manrope,sans-serif;margin:0;}
-.empty-trip-screen p{color:var(--muted);max-width:420px;font-size:16px;line-height:1.8;margin:0;}
-.empty-planner:not(.home-app) .date-picker,.empty-planner:not(.home-app) .top-actions>button,.empty-planner:not(.home-app) .save-control{display:none;}
-.empty-planner:not(.home-app) .top-actions{margin-left:auto;}
 .home-app{display:block;overflow-y:auto;overflow-x:hidden;background:var(--bg);}
 .home-page{position:relative;isolation:isolate;min-height:100dvh;padding:40px 5vw 70px;background:radial-gradient(ellipse at 85% 0%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 65%);}
 .home-page>.auth-map-background{position:fixed;inset:0;opacity:.21;background-size:cover;background-position:center;}
@@ -2079,8 +2073,6 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .home-pins .home-tile-menu{right:4px;top:20px;}
  .home-recents{grid-template-columns:1fr;gap:5px;margin-top:30px;}
  .home-section{margin-bottom:25px;}
- .empty-planner:not(.home-app) .topbar{display:flex;flex-wrap:wrap;gap:8px;}
- .empty-planner:not(.home-app) .top-actions{width:auto;}
  .trip-appearance-editor{gap:10px;}
  .trip-appearance-editor>.trip-badge{width:42px;height:42px;flex-basis:42px;}
  .trip-logo-fields .color-swatches>button{width:22px;min-width:22px;}

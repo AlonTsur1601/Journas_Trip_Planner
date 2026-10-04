@@ -462,7 +462,7 @@ export default function App() {
       await saveLayout();
       const selected=target.tripId?trips.find(t=>t.id===target.tripId)??null:target.date?null:trips.find(t=>t.id===lastTarget?.tripId)??trips[0]??null;
       const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
-      if(!selected&&!trips.length){setTrip(null);setDate(nextDate);setDay(emptyDay());setHome(false);setCalendar(false);layoutLoading.current=false;return;}
+      if(!selected&&!trips.length){setHome(true);createTrip();return;}
       let view:Layout,loaded:{trip:Trip;day:Day;layout:Layout|null}|null=null;
       if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate){loaded=await api('trip.get',{tripId:selected.id,date:nextDate});const local=localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`);view=local?JSON.parse(local):loaded!.layout??(selected.id===tripRef.current?.id&&nextDate===dateRef.current?layoutRef.current:await startingLayout(settings,selected.lodging));initialTripRequest.current={tripId:selected.id,date:nextDate,promise:Promise.resolve(loaded)};}else view=await startingLayout(settings,selected?.lodging);
       await loadMapPanel();if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate)persistHome(recordVisit(homeRef.current,{tripId:selected.id,date:nextDate}));layoutLoading.current=true;setTrip(loaded?.trip??selected);setDate(nextDate);setLayout({...defaultLayout(),...view});setDay(loaded?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
@@ -473,7 +473,7 @@ export default function App() {
   function editTrip(selected:Trip){setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
     if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
-    try{await api('trip.remove',{tripId:selected.id});const remaining=await refresh();const next=availableHome(homeRef.current,remaining);setHomeState(next);homeRef.current=next;await api('home.save',{home:next});setHistoryState({undo:null,redo:null});if(trip?.id===selected.id){setTrip(remaining[0]??null);setDate(remaining[0]?.startDate??today());setDay(emptyDay());}if(lastTarget?.tripId===selected.id)setLastTarget(remaining[0]?{tripId:remaining[0].id,date:remaining[0].startDate}:null);setModal(null);}catch(e:any){setMessage(e.message);}
+    try{await api('trip.remove',{tripId:selected.id});const remaining=await refresh();if(!remaining.length)setHome(true);const next=availableHome(homeRef.current,remaining);setHomeState(next);homeRef.current=next;await api('home.save',{home:next});setHistoryState({undo:null,redo:null});if(trip?.id===selected.id){setTrip(remaining[0]??null);setDate(remaining[0]?.startDate??today());setDay(emptyDay());}if(lastTarget?.tripId===selected.id)setLastTarget(remaining[0]?{tripId:remaining[0].id,date:remaining[0].startDate}:null);setModal(null);}catch(e:any){setMessage(e.message);}
   }
   async function refresh() {
     const result = await api<{ trips: Trip[] }>("trip.list");
@@ -509,7 +509,7 @@ export default function App() {
         if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
-        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore?.trip.id===selected?.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
+        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
@@ -650,6 +650,7 @@ export default function App() {
     const lostAccess = () => {
       if (cancelled) return;
       cancelled = true;
+      setHome(true);
       setTrip(null);
       setDay(emptyDay());
       setEdit(null);
@@ -1069,7 +1070,7 @@ export default function App() {
     );
   return (
     <>
-    <div className={`app${home&&!shareTrip?" home-app":""}${!trip&&!trips.length?" empty-planner":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
+    <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
       {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={settings.displayName||user.displayName||'Account'} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={settings.displayName||user.displayName||'Account'}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
@@ -1225,7 +1226,6 @@ export default function App() {
             : "You are approaching your saved-trip limit. Remove old trips to make room."}
         </div>
       )}
-      {!trip&&!shareTrip&&!trips.length&&<div className="empty-trip-screen"><Compass size={44}/><h1>Start with a trip.</h1><p><button className="text-button" onClick={createTrip}>Create your first trip</button> to bring your places, schedule and tasks together.</p></div>}
       {(trip||shareTrip||trips.length>0)&&<>
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">

@@ -20,6 +20,9 @@ export default function MapPanel({
   onCancelMove,
   onConnections,
   placementMode = false,
+  arrowPreference = true,
+  onArrowPreferenceChange,
+  onStartPinSearch,
 }: {
   pins: Pin[];
   connections: Connection[];
@@ -34,10 +37,13 @@ export default function MapPanel({
   onCancelMove?: () => void;
   onConnections?: () => void;
   placementMode?: boolean;
+  arrowPreference?: boolean;
+  onArrowPreferenceChange?: (checked:boolean)=>void;
+  onStartPinSearch?: ()=>void;
 }) {
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
   const [source,setSource]=useState<string|null>(null);
-  const [arrow,setArrow]=useState(true);
+  const arrow=arrowPreference;
   const action=useRef({mode,source,placementMode,arrow}); action.current={mode,source,placementMode,arrow};
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -217,7 +223,7 @@ export default function MapPanel({
       const marker=new maplibregl.Marker({ element: el, draggable: false })
         .setLngLat([pin.lng, pin.lat])
         .addTo(m);
-      if(movingPinId===pin.id || placementMode){
+      if(!readonly && (movingPinId===pin.id || placementMode)){
         el.classList.add('drag-edit');
         let drag: {x:number;y:number;pixel:maplibregl.PointLike;original:[number,number];moved:boolean}|null=null;
         el.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();m.stop();const point=m.project(marker.getLngLat());const original=marker.getLngLat();drag={x:e.clientX,y:e.clientY,pixel:[point.x,point.y],original:[original.lng,original.lat],moved:false};el.setPointerCapture(e.pointerId);});
@@ -344,7 +350,7 @@ export default function MapPanel({
       m.off("style.load", draw);
       m.off("move", updateArrows);
     };
-  }, [pins, connections, movingPinId, placementMode]);
+  }, [pins, connections, movingPinId, placementMode, readonly]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -362,7 +368,7 @@ export default function MapPanel({
   return (
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
       <div ref={container} className="map-canvas" />
-      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>setArrow(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
+      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{if(onStartPinSearch){onStartPinSearch();return;}setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>onArrowPreferenceChange?.(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
       {(mode||movingPinId)&&<div className="map-mode-note">{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}<button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>
   );

@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { ApiError, type Data } from './types.js';
 import { adminAuth, firestoreStore, purgeExpiredRateLimits } from './store.js';
 import { JournasService } from './service.js';
+import {places} from './places.js';
 export type Request = IncomingMessage & {
     body?: unknown;
 };
@@ -65,6 +66,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
                 throw error;
             }
         }
+        if(input.action==='places.search'||input.action==='places.reverse')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
         // Only the platform's network header is used in production; no raw IP or token is persisted.
         const address = process.env.VERCEL ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0] : req.socket.remoteAddress;

@@ -2092,3 +2092,26 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .field>.dropdown .dropdown-trigger{height:40px;min-height:40px;}
 .trip-badge{font-size:30px;line-height:1;}
 .trip-badge svg{width:78%;height:78%;}
+
+/* Place search and synchronized location previews. */
+.location-picker{display:flex;flex-direction:column;gap:7px;min-width:0;margin:8px 0;}
+.location-mode{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
+.location-mode input{cursor:pointer;accent-color:var(--accent);}
+.place-search{position:relative;min-width:0;z-index:3;}
+.place-search .field{margin:0;}
+.place-search-input{position:relative;}
+.place-search-input>svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--accent);}
+.place-search-input input{width:100%;padding-left:38px;min-height:40px;}
+.place-results{position:absolute;top:100%;left:0;right:0;max-height:230px;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 22px #0003;margin-top:4px;}
+.place-results:empty{display:none;}
+.place-results>div{padding:10px;font-size:13px;}
+.place-results>button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;border-radius:0;background:transparent;padding:9px 11px;cursor:pointer;color:var(--ink);}
+.place-results>button:hover,.place-results>button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 18%,var(--surface));}
+.place-results>button>svg{flex-shrink:0;color:var(--accent);}
+.place-results>button>span{min-width:0;display:flex;flex-direction:column;gap:3px;}
+.place-results strong{font-size:14px;}.place-results small{font-size:12px;line-height:1.4;overflow-wrap:anywhere;}
+.location-preview{height:170px;min-height:170px;position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.location-preview>div{width:100%;height:100%;}
+.location-selected{overflow-wrap:anywhere;font-size:12px;line-height:1.4;}
+.location-credit{font-size:10px;opacity:.7;}
+@media(max-width:700px){.location-preview{height:145px;min-height:145px;}.place-results{max-height:190px;}}

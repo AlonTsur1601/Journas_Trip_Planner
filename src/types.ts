@@ -68,6 +68,8 @@ export type Settings = {
   retentionDays: number;
   displayName?: string;
   photoURL?: string;
+  pinPlacementOnMap?: boolean;
+  connectionArrow?: boolean;
   mapStart: "current" | "custom" | "world" | "trip";
   mapCenter: [number, number];
   mapZoom: number;
@@ -114,4 +116,6 @@ export const defaultSettings: Settings = {
   mapStart: "current",
   mapCenter: [0, 0],
   mapZoom: 12,
+  pinPlacementOnMap: true,
+  connectionArrow: true,
 };

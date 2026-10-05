@@ -26,7 +26,7 @@ export interface Settings extends Data {
     displayName?: string;
     photoURL?: string;
 }
-export const defaultSettings: Settings = { theme: 'system', accent: '#8b5cf6', clock: 'lodging', autoDelete: true, retentionDays: 365, timezone: '' };
+export const defaultSettings: Settings = { theme: 'system', accent: '#8b5cf6', clock: 'lodging', autoDelete: true, retentionDays: 365, timezone: '', pinPlacementOnMap:true, connectionArrow:true };
 export interface Transaction {
     get(path: string): Promise<Data | undefined>;
     list(path: string): Promise<Data[]>;

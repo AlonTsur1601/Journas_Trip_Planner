@@ -31,6 +31,7 @@ import {
   Save,
 } from "lucide-react";
 import tzlookup from "tz-lookup";
+import LocationPicker from "./LocationPicker";
 import HomePage, {TripBadge} from "./HomePage";
 import {emptyHome,availableHome,recordVisit,randomTripAppearance,tripAppearance} from "./home-state";
 import type {HomeState,HomeTarget,TripAppearance} from "./types";
@@ -69,6 +70,7 @@ type Edit = {
   kind: "pins" | "blocks" | "tasks" | "connections";
   item: Record<string, any>;
   base?: Record<string, any>;
+  locationSelected?: boolean;
 };
 function ProfileAvatar({src, fallback, name, id}: {src?:string;fallback?:string;name:string;id:string}) {
   const [failed, setFailed] = useState<string[]>([]);
@@ -351,6 +353,7 @@ export default function App() {
   const activePhoto=accountPhoto(user,googleSession,settings.photoURL);
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
+  const placementSaves=useRef(Promise.resolve());
   const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
   const [lodgingView,setLodgingView]=useState(defaultLayout());
   const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
@@ -1035,7 +1038,13 @@ export default function App() {
     setEdit({
       kind,
       item: { id: crypto.randomUUID(), versions: {}, ...base, ...extras },
+      locationSelected:kind!=="pins"||extras.lng!==undefined,
     });
+  }
+  async function savePlacementPreference(key:'pinPlacementOnMap'|'connectionArrow',value:boolean){
+    const previous=settings[key]??true;
+    setSettings(current=>({...current,[key]:value}));
+    try{const pending=placementSaves.current.then(()=>api('settings.save',{settings:{[key]:value}}));placementSaves.current=pending.then(()=>{},()=>{});await pending;}catch(e:any){setSettings(current=>({...current,[key]:previous}));setMessage(e.message);}
   }
   async function saveSettings(next: Settings) {
     try {
@@ -1281,6 +1290,9 @@ export default function App() {
                 layout={layout}
                 readonly={readonly}
                 onConnect={async(from,to,arrow)=>{if(await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow}))setMessage("Connection created.");}}
+                arrowPreference={settings.connectionArrow??true}
+                onArrowPreferenceChange={value=>void savePlacementPreference("connectionArrow",value)}
+                onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
                 onConnections={trip?()=>setModal("connections"):undefined}
                 onCancelMove={()=>setMovingPinId(null)}
@@ -1762,7 +1774,10 @@ export default function App() {
             </div>
             <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><button type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</button><button type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</button></div><div className="trip-logo-fields"><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/>{tripLook.mode==='symbol'?<SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><button type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</button></div>}</div></div></div>
             <span className="lodging-label">Lodging location</span>
-            <div className="lodging-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={lodgingDraft?.lng!==undefined?[{id:"lodging",title:lodgingDraft.name,note:lodgingDraft.note??"",color:lodgingDraft.color??settings.accent,symbol:lodgingDraft.symbol??"icon:stay",lng:lodgingDraft.lng,lat:lodgingDraft.lat,versions:{}}]:[]} connections={[]} readonly={false} placementMode layout={lodgingView} onView={(center,zoom)=>setLodgingView(previous=>({...previous,center,zoom}))} onPin={()=>{}} onAdd={(lng,lat)=>setLodgingDraft(previous=>({...previous,name:previous?.name??'Lodging',lng,lat,timezone:tzlookup(lat,lng)}))}/></Suspense></div>
+            <LocationPicker value={lodgingDraft} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
+              setLodgingDraft(previous=>({...previous,lng:place.lng,lat:place.lat,name:source==='reverse'&&previous?.name&&previous.name!=='Unnamed location'?previous.name:place.name,timezone:tzlookup(place.lat,place.lng)}));
+            }}/>
+
             {lodgingDraft?<div className="lodging-pin-fields"><Input label="Lodging pin name" value={lodgingDraft.name} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,name:e.target.value})}/><Input label="Color" type="color" value={lodgingDraft.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,color:e.target.value})}/><SymbolPicker value={lodgingDraft.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft,symbol:e.target.value})}/></div>:<small>Select your lodging on the map.</small>}
             {modal==='new-trip'&&<small>{trips.length}/100 saved trips</small>}
             <button
@@ -1816,7 +1831,8 @@ export default function App() {
                   }
                 />
               )}
-              {edit.kind === "pins" && Object.keys(edit.item.versions??{}).length>0 && <button type="button" className="button" onClick={()=>{setMovingPinId(edit.item.id);changeLayout({map:true});setEdit(null);}}>Edit location on map</button>}
+              {edit.kind === "pins" && <LocationPicker key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} mapPlacement={settings.pinPlacementOnMap??true} onMapPlacementChange={value=>void savePlacementPreference('pinPlacementOnMap',value)} onChange={(place,source)=>rawSetEdit(current=>current?.kind==='pins'&&current.item.id===edit.item.id?{...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title}}:current)}/>}
+
               {edit.kind === "blocks" && (
                 <>
                   <div className="form-row">
@@ -2107,7 +2123,7 @@ export default function App() {
                     <Trash2 size={15} /> Delete
                   </button>
                 )}
-                <button className="button primary" disabled={saving}>
+                <button className="button primary" disabled={saving||(edit.kind==="pins"&&edit.locationSelected===false)}>
                   {saving ? "Saving…" : Object.keys(edit.item.versions??{}).length ? "Save changes" : edit.kind==="pins" ? "Create pin" : edit.kind==="blocks" ? "Create time block" : edit.kind==="tasks" ? "Create task" : "Create connection"}
                   <Check size={16} />
                 </button>

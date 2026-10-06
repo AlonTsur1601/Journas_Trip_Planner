@@ -47,7 +47,7 @@ export const pinSymbols=[
  ['shop','Shopping','M4 7h16l2 15H2L4 7m4 0V5a4 4 0 018 0v2'],
  ['view','Viewpoint','M2 12c5-9 15-9 20 0-5 9-15 9-20 0m7 0a3 3 0 106 0 3 3 0 10-6 0'],
  ['photo','Photography','M3 7h4l2-4h6l2 4h4v14H3V7m5 6a4 4 0 108 0 4 4 0 10-8 0'],
- ['walk','Walking','M14 3h.01M10 7l5 2 4 4M5 12l5-5 2 8-5 7m5-7l6 7'],
+ ['walk','Walking','M15 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0M13 6l-1 2-2 6M12 8l-4 1-2 3M12 8l4 3h3M10 14l-3 5-2 2M10 14l5 3 2 4'],
  ['cycle','Cycling','M2 17a4 4 0 108 0 4 4 0 10-8 0m12 0a4 4 0 108 0 4 4 0 10-8 0M6 17l5-10 7 10M9 5h5m2-2h3'],
  ['train','Railway','M6 3h12v15H6V3m0 7h12M9 18l-3 4m9-4l3 4M9 14h.01m6 0h.01'],
  ['flight','Airport','M2 13l8-3V3l2-2 2 2v7l8 3v3l-8-2v5l3 2v1H7v-1l3-2v-5l-8 2v-3'],

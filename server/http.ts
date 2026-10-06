@@ -4,6 +4,7 @@ import { ApiError, type Data } from './types.js';
 import { adminAuth, firestoreStore, purgeExpiredRateLimits } from './store.js';
 import { JournasService } from './service.js';
 import {places} from './places.js';
+import {sendVerificationEmail} from './verification-email.js';
 export type Request = IncomingMessage & {
     body?: unknown;
 };
@@ -52,7 +53,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             try {
                 const token = await adminAuth().verifyIdToken(authorization.slice(7), true);
                 uid = token.uid;
-                if (!token.email_verified)
+                if (!token.email_verified && input.action!=='auth.email-verification')
                     throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email address to continue');
             }
             catch (error) {
@@ -66,6 +67,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
                 throw error;
             }
         }
+        if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!));
         if(input.action==='places.search'||input.action==='places.reverse')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
         // Only the platform's network header is used in production; no raw IP or token is persisted.

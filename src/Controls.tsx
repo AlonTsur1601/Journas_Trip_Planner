@@ -1,5 +1,5 @@
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import {Popover} from "./Popover";
 
 export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, ...props }: any) {
@@ -61,7 +61,7 @@ export function ColorPicker({ label, value, onChange, onInput, disabled }: any) 
   </div>;
 }
 
-export function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+export function Toast({ message }: { message: string; onDismiss: () => void }) {
   const [displayed, setDisplayed] = useState(message);
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
@@ -72,6 +72,6 @@ export function Toast({ message, onDismiss }: { message: string; onDismiss: () =
   }, [message]);
   if (!displayed) return null;
   return <div className={`toast${leaving ? " leaving" : ""}`} role="status">
-    {displayed}<button onClick={onDismiss} aria-label="Dismiss"><X size={16} /></button>
+    {displayed}
   </div>;
 }

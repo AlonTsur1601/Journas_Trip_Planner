@@ -1,4 +1,4 @@
-import {EmailAuthProvider,GoogleAuthProvider,linkWithCredential,linkWithPopup,reauthenticateWithCredential,reauthenticateWithPopup,updatePassword,verifyBeforeUpdateEmail,type User} from 'firebase/auth';
+import {EmailAuthProvider,GoogleAuthProvider,linkWithCredential,linkWithPopup,reauthenticateWithCredential,reauthenticateWithPopup,updatePassword,verifyBeforeUpdateEmail,unlink,type User} from 'firebase/auth';
 export const linkGoogleAccount=(user:User)=>linkWithPopup(user,new GoogleAuthProvider());
 export async function linkPasswordAccount(user:User,email:string,password:string){
  try{return await linkWithCredential(user,EmailAuthProvider.credential(email,password));}
@@ -15,3 +15,12 @@ export async function confirmAccountIdentity(user:User,currentPassword:string){
 }
 export async function changeAccountEmail(user:User,email:string,currentPassword:string){await confirmAccountIdentity(user,currentPassword);await verifyBeforeUpdateEmail(user,email);}
 export async function changeAccountPassword(user:User,password:string,currentPassword:string){await confirmAccountIdentity(user,currentPassword);await updatePassword(user,password);}
+
+export async function unlinkAccountProvider(user:User,providerId:'google.com'|'password'){
+ await user.reload();
+ const methods=user.providerData.filter(p=>p.providerId==='google.com'||p.providerId==='password');
+ if(!methods.some(p=>p.providerId===providerId))throw new Error('This sign-in method is already disconnected.');
+ if(methods.length<2)throw new Error('Keep at least one sign-in method linked to your account.');
+ if(providerId==='google.com'&&!user.emailVerified)throw new Error('Verify your email before disconnecting Google.');
+ await unlink(user,providerId);await user.reload();await user.getIdToken(true);
+}

@@ -6,7 +6,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
   type User,
@@ -37,6 +36,7 @@ import {emptyHome,availableHome,recordVisit,randomTripAppearance,tripAppearance}
 import type {HomeState,HomeTarget,TripAppearance} from "./types";
 import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
+import {AccountName} from "./AccountName";
 import {accountPhoto} from "./account-profile";
 import { api, auth, configured } from "./firebase";
 import { observeClock, followCalendarDay } from "./day-clock";
@@ -92,7 +92,7 @@ function Input({ label, ...props }: any) {
 function Select({ label, children, ...props }: any) {
   return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
 }
-function Modal({ title, children, onClose, inactive=false }: any) {
+function Modal({ title, children, onClose, inactive=false, locked=false }: any) {
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
     if(inactive)return;
@@ -104,7 +104,7 @@ function Modal({ title, children, onClose, inactive=false }: any) {
       if (!box.current?.contains(document.activeElement)) return;
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        if (!locked) onClose();
       }
       if (event.key === "Tab") {
         const elements = Array.from(
@@ -128,14 +128,14 @@ function Modal({ title, children, onClose, inactive=false }: any) {
       document.removeEventListener("keydown", handler);
       previous?.focus();
     };
-  }, [inactive]);
+  }, [inactive, locked]);
   return (
     <div
       inert={inactive}
       aria-hidden={inactive||undefined}
       className={`modal-shade${inactive?" inactive-modal":""}`}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!locked && e.target === e.currentTarget) onClose();
       }}
     >
       <section
@@ -147,14 +147,45 @@ function Modal({ title, children, onClose, inactive=false }: any) {
       >
         <header>
           <h2>{title}</h2>
-          <button className="icon" onClick={onClose} aria-label="Close">
+          {!locked && <button className="icon" onClick={onClose} aria-label="Close">
             <X size={20} />
-          </button>
+          </button>}
         </header>
         {children}
       </section>
     </div>
   );
+}
+function EmailVerification({user,onVerified,onLogout}:{user:User;onVerified:()=>void;onLogout:()=>Promise<void>}) {
+  const [notice,setNotice]=useState("Preparing your verification email…");
+  const [busy,setBusy]=useState(false);
+  const checking=useRef(false);
+  const sending=useRef(false);
+  const [resendWait,setResendWait]=useState(0);
+  useEffect(()=>{const update=()=>setResendWait(Math.max(0,Math.ceil((Number(sessionStorage.getItem(`journas-verification-sent:${user.uid}`))+30000-Date.now())/1000)));update();const timer=setInterval(update,1000);return()=>clearInterval(timer);},[user.uid]);
+  async function send(){
+    const sent=Number(sessionStorage.getItem(`journas-verification-sent:${user.uid}`));
+    if(sent&&Date.now()-sent<30000){setResendWait(Math.ceil((sent+30000-Date.now())/1000));return;}
+    if(sending.current)return;sending.current=true;setBusy(true);setNotice("Sending verification email…");
+    try{await api("auth.email-verification");sessionStorage.setItem(`journas-verification-sent:${user.uid}`,String(Date.now()));setResendWait(30);setNotice("Verification email sent. Check your inbox and spam folder.");}
+    catch(e:any){if(e.code==='EMAIL_RATE_LIMIT'){const wait=Math.min(30,Math.max(1,Number(e.details?.retryAfter)||30));sessionStorage.setItem(`journas-verification-sent:${user.uid}`,String(Date.now()-(30-wait)*1000));setResendWait(wait);}setNotice(e.code==='EMAIL_RATE_LIMIT'?'Please wait before sending another verification email.':e.code==='auth/too-many-requests'?"Firebase temporarily limited email requests. Please wait before trying again.":e.code==='auth/network-request-failed'?"The email request could not reach Firebase. Check your connection and try again.":`Unable to send verification email (${e.code??'unknown error'}). Please try again.`);}
+    finally{sending.current=false;setBusy(false);}
+  }
+  useEffect(()=>{const sent=Number(sessionStorage.getItem(`journas-verification-sent:${user.uid}`));if(sent&&Date.now()-sent<30000)setNotice("A verification email was recently sent. Check your inbox and spam folder.");else void send();},[user.uid]);
+  async function check(){
+    if(checking.current)return;checking.current=true;
+    try{await user.reload();if(user.emailVerified){await user.getIdToken(true);onVerified();}}
+    catch{/* Retry automatically on the next check or when the window regains focus. */}
+    finally{checking.current=false;}
+  }
+  useEffect(()=>{const focus=()=>{void check();};const timer=setInterval(focus,5000);window.addEventListener('focus',focus);void check();return()=>{clearInterval(timer);window.removeEventListener('focus',focus);};},[user.uid]);
+  return <main className="home-page email-verification-screen"><div className="auth-map-background" aria-hidden="true"/><Modal title="Verify your email" locked>
+    <p>Verify <strong>{user.email}</strong> before continuing to Journas.</p>
+    <p>Open your inbox and click the verification link. Check your spam folder if the email is missing.</p>
+    <p role="status" aria-live="polite">{notice}</p>
+    <div className="email-verification-actions"><button className="button primary" disabled={busy||resendWait>0} onClick={()=>void send()}>{resendWait>0?`Resend email (${resendWait}s)`:"Resend email"}</button>
+    <button className="button" disabled={busy} onClick={()=>void onLogout()}>Back</button></div>
+  </Modal></main>;
 }
 function TripFeatures({ className = "" }: { className?: string }) {
   return (
@@ -246,12 +277,12 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                   if (register) {
                     if(password.length<6) throw new Error("Use at least 6 characters for your password.");
                     if(password !== confirmPassword) throw new Error("Passwords do not match.");
-                    const cred = await createUserWithEmailAndPassword(
+                    await createUserWithEmailAndPassword(
                       auth!,
                       email,
                       password,
                     );
-                    await sendEmailVerification(cred.user);
+
                   } else
                     await signInWithEmailAndPassword(auth!, email, password);
                 });
@@ -309,7 +340,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
             </p>
           </>
         )}
-        <footer>Your trips and preferences are saved to your account.</footer>
+        <footer>Your trips and preferences are saved to your account. <a href="/privacy.html">Privacy policy</a></footer>
       </section>
     </main>
   );
@@ -340,6 +371,7 @@ export default function App() {
     [conflict, setConflict] = useState<any>(null),
     [saving, setSaving] = useState(false),
     [manualSaving, setManualSaving] = useState(false);
+  const [chooseName,setChooseName]=useState(false);
   const [home,setHome]=useState(!new URLSearchParams(location.search).has('share'));
   const [homeState,setHomeState]=useState<HomeState>(emptyHome);
   const homeRef=useRef(homeState);homeRef.current=homeState;
@@ -366,6 +398,8 @@ export default function App() {
   const [travelers,setTravelers]=useState<any[]>([]);
   const [shareLinks,setShareLinks]=useState<any[]>([]);
   const [,refreshAccount]=useState(0);
+  const [verificationRevision,setVerificationRevision]=useState(0);
+  const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
   const settingsRef=useRef(settings);settingsRef.current=settings;
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
@@ -423,7 +457,8 @@ export default function App() {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       screenReady.current=false;
-      if(u&&!token){try{const saved=JSON.parse(localStorage.getItem(`journas-last-screen:${u.uid}`)??sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
+      setChooseName(false);
+      if(u&&!token&&reloadVisit.current){try{const saved=JSON.parse(sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
       setUser(u);
       setReady(!u);
     });
@@ -446,7 +481,7 @@ export default function App() {
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, [settings.theme, settings.accent]);
-  useEffect(()=>{if(user&&screenReady.current&&!home){const saved=JSON.stringify({uid:user.uid,tripId:trip?.id??null,date,layout});sessionStorage.setItem('journas-current-screen',saved);localStorage.setItem(`journas-last-screen:${user.uid}`,saved);}},[user?.uid,trip?.id,date,layout,home]);
+  useEffect(()=>{if(user&&screenReady.current){const saved=JSON.stringify({uid:user.uid,home,tripId:trip?.id??null,date,layout,modal:["settings","account-settings","trip"].includes(modal??"")?modal:null});sessionStorage.setItem('journas-current-screen',saved);}},[user?.uid,trip?.id,date,layout,home,modal]);
   useEffect(()=>{setHistoryState({undo:null,redo:null});if(!user||!trip||shareTrip)return;let live=true;const update=()=>api<{undo:string|null;redo:string|null}>('history.status',{tripId:trip.id}).then(r=>{if(live)setHistoryState(r);}).catch(()=>{if(live)setHistoryState({undo:null,redo:null});});void update();window.addEventListener('journas-action-saved',update);const timer=setInterval(update,15000);return()=>{live=false;clearInterval(timer);window.removeEventListener('journas-action-saved',update);};},[user?.uid,trip?.id,shareTrip]);
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z'||(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]'))return;e.preventDefault();void restoreHistory(e.shiftKey?'redo':'undo');};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[historyState,user?.uid,historyBusy,saving]);
   useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>{if(live)setTravelers([...new globalThis.Map<string,any>(r.members.map((member:any):[string,any]=>[member.id,member])).values()] as any[]);}).catch(e=>setMessage(e.message));if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>setMessage(e.message));return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
@@ -485,11 +520,11 @@ export default function App() {
     return result.trips;
   }
   useEffect(() => {
-    if (!user) return;
+    if (!user || (!user.emailVerified && user.providerData.some(p=>p.providerId==="password"))) return;
     let cancelled=false;
     let saved:any=null;
     initialTripRequest.current=null;
-    try{saved=JSON.parse(localStorage.getItem(`journas-last-screen:${user.uid}`)??sessionStorage.getItem("journas-current-screen")??"null");}catch{}
+    try{if(reloadVisit.current)saved=JSON.parse(sessionStorage.getItem("journas-current-screen")??"null");}catch{}
     // Start the map download alongside the single authorized screen restore.
     // Neither cached screen data nor preloading grants permission to a trip.
     void loadMapPanel().catch(()=>{});
@@ -503,17 +538,18 @@ export default function App() {
       .then(async ([result, identity]) => {
         if(cancelled)return;
         const list=result.trips,r={settings:result.settings};
+        setChooseName(!result.settings.displayName?.trim());
         setTrips(list);
         const restoredHome=availableHome(result.home??emptyHome(),list);
         const fallback=list.find(t=>t.id===(restoredHome.recentDays[0]?.tripId??restoredHome.recentTrips[0]))??list.find(t=>t.startDate<=today()&&t.endDate>=today())??list[0]??null;
-        const selected=list.find(t=>t.id===saved?.tripId)??fallback;
-        const selectedDate=selected&&saved?.uid===user.uid&&saved?.tripId===selected.id&&saved.date>=selected.startDate&&saved.date<=selected.endDate?saved.date:selected&&restoredHome.recentDays[0]?.tripId===selected.id?restoredHome.recentDays[0].date!:selected?(today()>=selected.startDate&&today()<=selected.endDate?today():selected.startDate):today();
+        const selected=hasSaved&&saved.tripId===null?null:list.find(t=>t.id===saved?.tripId)??fallback;
+        const selectedDate=hasSaved&&(saved.tripId===(selected?.id??null))&&/^\d{4}-\d{2}-\d{2}$/.test(saved.date)?saved.date:selected&&restoredHome.recentDays[0]?.tripId===selected.id?restoredHome.recentDays[0].date!:selected?(today()>=selected.startDate&&today()<=selected.endDate?today():selected.startDate):today();
         setHomeState(restoredHome);
         setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
         if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
-        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);screenReady.current=true;if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
+        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
@@ -527,7 +563,7 @@ export default function App() {
       .catch((e) => {if(!cancelled)setMessage(e.message);})
       .finally(()=>{if(!cancelled)setReady(true);});
     return ()=>{cancelled=true;};
-  }, [user?.uid]);
+  }, [user?.uid,verificationRevision]);
   useEffect(() => {
     if (!token || joinedToken === token) return;
     let cancelled = false;
@@ -1078,13 +1114,15 @@ export default function App() {
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
+  if(user&&!user.emailVerified&&user.providerData.some(p=>p.providerId==="password"))return <EmailVerification user={user} onVerified={()=>setVerificationRevision(n=>n+1)} onLogout={logout}/>;
+  if(user&&chooseName)return <AccountName initialName={user.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
       {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={settings.displayName||user.displayName||'Account'} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={settings.displayName||user.displayName||'Account'}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
-        <a className="brand" href="/" onClick={async e=>{if(user&&!shareTrip){e.preventDefault();await saveLayout();setHome(true);setCalendar(false);}}}>
+        <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();await saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
           <Compass />
           <strong>Journas</strong>
         </a>
@@ -1201,34 +1239,6 @@ export default function App() {
           </div>
         </div>
       </header>
-      {user &&
-        !user.emailVerified &&
-        user.providerData.some((p) => p.providerId === "password") && (
-          <div className="verification">
-            Verify your email to start saving trips.{" "}
-            <span className="verification-actions">
-            <button
-              onClick={() =>
-                sendEmailVerification(user)
-                  .then(() => setMessage("Verification email sent."))
-                  .catch((e) => setMessage(e.message))
-              }
-            >
-              Resend email
-            </button>
-            <button
-              onClick={() =>
-                user
-                  .reload()
-                  .then(() => user.getIdToken(true))
-                  .then(() => location.reload())
-              }
-            >
-              I have verified
-            </button>
-            </span>
-          </div>
-        )}
       {trips.length >= 80 && (
         <div className="verification">
           {trips.length >= 100

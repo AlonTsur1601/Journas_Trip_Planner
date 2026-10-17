@@ -44,7 +44,7 @@ import type {HomeState,HomeTarget,TripAppearance} from "./types";
 import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {AccountName} from "./AccountName";
-import {accountPhoto} from "./account-profile";
+import {accountPhoto,accountName} from "./account-profile";
 import { api as profileApi, auth, configured } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
 import {changeBlockPlace} from './block-link';
@@ -516,7 +516,7 @@ function PlannerApp({practice}:{practice:boolean}) {
     if(!trip||shareTrip||!user){setTravelers([]);return;}
     let live=true;
     const participating=trip.ownerId===user.uid||trip.memberIds.includes(user.uid);
-    setTravelers(participating?[{id:user.uid,displayName:settingsRef.current.displayName||user.displayName||'Traveler',photoURL:user.photoURL,owner:trip.ownerId===user.uid,permission:trip.ownerId===user.uid?'Owner':'Editor'}]:[]);
+    setTravelers(participating?[{id:user.uid,displayName:accountName(settingsRef.current.displayName,'Traveler'),photoURL:activePhoto,owner:trip.ownerId===user.uid,permission:trip.ownerId===user.uid?'Owner':'Editor'}]:[]);
     api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>{
       if(live)setTravelers([...new globalThis.Map<string,any>(r.members.map((member:any):[string,any]=>[member.id,member])).values()] as any[]);
     }).catch(e=>{if(live)setMessage(e.message);});
@@ -1191,11 +1191,11 @@ function PlannerApp({practice}:{practice:boolean}) {
     );
   if(user&&verified===null)return <LoadingScreen text="Checking your email confirmation…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{setVerified(true);setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
-  if(user&&chooseName)return <AccountName initialName={user.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
+  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
-      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={settings.displayName||user.displayName||'Account'} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={settings.displayName||user.displayName||'Account'}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();await saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1310,7 +1310,7 @@ function PlannerApp({practice}:{practice:boolean}) {
             </button>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} fallback={user?.photoURL||user?.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined} name={settings.displayName||user?.displayName||'Account'}/><span>{settings.displayName||user?.displayName||'Account'}</span><ChevronDown size={14}/></button>
+            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></button>
             {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
           </div>
         </div>
@@ -2316,7 +2316,7 @@ function PlannerApp({practice}:{practice:boolean}) {
             <div className="settings-identity">
             <Input
               label="Display name"
-              value={settings.displayName ?? user?.displayName ?? ""}
+              value={settings.displayName ?? ""}
               maxLength={80}
               onChange={(e: any) =>
                 setSettings({ ...settings, displayName: e.target.value })
@@ -2326,7 +2326,7 @@ function PlannerApp({practice}:{practice:boolean}) {
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
-              <div className="settings-photo-preview"><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={settings.displayName||user?.displayName||"Account"}/></div>
+              <div className="settings-photo-preview"><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
               <span>Profile photo</span>
               <input
                 aria-label="Choose profile photo"
@@ -2346,7 +2346,7 @@ function PlannerApp({practice}:{practice:boolean}) {
                 }}
               />
               <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
-              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&<small>Using your Google profile photo</small>}
+              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&!settings.photoURL&&<small>Using your Google profile photo</small>}
             </div>
             </div>
             <div className="form-row">
@@ -2533,11 +2533,11 @@ function PlannerApp({practice}:{practice:boolean}) {
       )}
       {tripCrop&&<Modal title="Crop trip image" onClose={()=>setTripCrop(null)}><Suspense fallback={<Compass/>}><ProfilePhotoCropper file={tripCrop} onCancel={()=>setTripCrop(null)} onError={setMessage} onApply={image=>{setTripLook(previous=>({...previous,image,mode:'image'}));setTripCrop(null);}}/></Suspense></Modal>}
       {photoCrop&&<Modal title="Crop profile photo" onClose={()=>setPhotoCrop(null)}><Suspense fallback={<div>Loading photo editor...</div>}><ProfilePhotoCropper file={photoCrop} onCancel={()=>setPhotoCrop(null)} onError={setMessage} onApply={photo=>{setSettings(previous=>({...previous,photoURL:photo}));setPhotoCrop(null);}}/></Suspense></Modal>}
-      {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);setSettings(previous=>({...previous,photoURL:previous.photoURL||user.photoURL||user.providerData.find(p=>p.providerId==='google.com')?.photoURL||undefined}));}}/></Modal>}
+      {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);}}/></Modal>}
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {practice&&<aside className="practice-banner">Practice mode · This trip and all changes are temporary and are not saved to your profile.<button className="text-button" onClick={()=>window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}))}>Exit practice</button></aside>}
+      {practice&&<aside className="practice-banner">Practice · Not saved to your profile.<button className="text-button" onClick={()=>window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}))}>Exit practice</button></aside>}
       {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{void saveLayout().then(()=>{setModal(null);setEdit(null);setHome(true);});}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}

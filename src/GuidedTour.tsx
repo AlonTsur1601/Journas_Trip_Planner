@@ -73,7 +73,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    <button className="icon tour-close" aria-label="Close guide" onClick={close}><X size={18}/></button>
    <div className="tour-eyebrow"><Compass size={17}/>{welcome?'Welcome to Journas':`Step ${step+1} of ${tourSteps.length}`}</div>
    <h2>{welcome?'Plan your first trip together':current.title}</h2>
-   {practice&&<small>Practice only - not saved to your profile.</small>}<p aria-live="polite">{welcome?'Follow the highlighted controls to build a simple trip and learn the map, schedule, tasks and sharing tools. This is a temporary practice trip. It and all changes made during the guide are NOT saved to your profile. Everything is discarded when you exit. You can restart from Help.':current.text}</p>
+   <p aria-live="polite">{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime from Help.':current.text}</p>
    {!welcome&&!box&&<small>Open the relevant panel to continue, or skip this step.</small>}
    <div className="tour-actions"><button className="text-button" onClick={welcome?close:next}>{welcome?'Not now':'Skip step'}</button><button className="button primary" disabled={!welcome&&Boolean(current.done)&&!current.done?.(context)} onClick={()=>{if(welcome){remember(userId);setStep(0);if(practice)setStatus('running');else window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}else next();}}>{welcome?'Start guide':step===tourSteps.length-1?'Finish':current.done?'Follow the highlight':'Next'}<ArrowRight size={15}/></button></div>
   </section>

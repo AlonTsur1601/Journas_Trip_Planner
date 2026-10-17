@@ -596,3 +596,4 @@ describe("Shared time blocks across calendar days",()=>{
     await expect(write(day,{startDate:"2026-10-04"},item.versions)).rejects.toMatchObject({code:"INVALID_TIME"});
   });
 });
+it('changing only the Journas display name preserves the uploaded profile photo',async()=>{const {service}=await setup();const photo='data:image/png;base64,aGVsbG8=';await service.execute('alice',{action:'settings.save',settings:{displayName:'Alice',photoURL:photo}});await service.execute('alice',{action:'settings.save',settings:{displayName:'Bob'}});expect((await service.execute('alice',{action:'settings.get'})).settings).toMatchObject({displayName:'Bob',photoURL:photo});});

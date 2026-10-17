@@ -97,10 +97,6 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore(),version='practice-2026-10-17';return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion:version});return {seen:user.tourVersion===version};}));}
         if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
         const result=await new JournasService(firestoreStore()).execute(uid,input);
-        if(input.action==='trip.members'){
-            const members=result.members as any[];const profiles=(await Promise.all(Array.from({length:Math.ceil(members.length/100)},(_,i)=>adminAuth().getUsers(members.slice(i*100,(i+1)*100).map(m=>({uid:m.id})))))).flatMap(r=>r.users);
-            result.members=members.map(m=>{const profile=profiles.find(p=>p.uid===m.id);return {...m,displayName:m.displayName==='Traveler'?(profile?.displayName??'Traveler'):m.displayName,photoURL:m.photoURL??profile?.photoURL??null};});
-        }
         send(res,200,result);
     }
     catch (error) {

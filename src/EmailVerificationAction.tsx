@@ -1,14 +1,16 @@
 import {useEffect,useState} from 'react';
 import {Compass,Check,AlertCircle} from 'lucide-react';
 import {signInWithCustomToken} from 'firebase/auth';
-import {auth} from './firebase';
+import {auth,api} from './firebase';
 import {createEmailVerification,verificationFailure} from './email-verification-action';
 import {returnAfterVerification} from './email-verification-return';
 
 const parameters=new URLSearchParams(window.location.search);
 const code=parameters.get('oobCode');
 const returnClientId=parameters.get('returnClientId');
-const verify=createEmailVerification(auth,code);
+const legacyVerify=createEmailVerification(auth,code);
+let proofRequest:Promise<string|undefined>|undefined;
+const verify=()=>parameters.get('proof')?(proofRequest??=api<{email:string}>('auth.confirm-verification',{proof:parameters.get('proof')}).then(result=>result.email).catch(error=>{proofRequest=undefined;throw error;})):legacyVerify();
 export default function EmailVerificationAction(){
   const [message,setMessage]=useState('Verifying your email…');
   const [phase,setPhase]=useState<'verifying'|'opening'|'complete'|'error'>('verifying');

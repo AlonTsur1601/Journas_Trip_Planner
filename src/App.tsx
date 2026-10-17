@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import LocationPicker from "./LocationPicker";
+import {practiceActive,getPracticeSession,setPractice,practiceLocal,practiceSession} from "./practice";
 import GuidedTour from './GuidedTour';
 import HomePage, {TripBadge} from "./HomePage";
 import LoadingScreen from './LoadingScreen';
@@ -44,7 +45,7 @@ import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {AccountName} from "./AccountName";
 import {accountPhoto} from "./account-profile";
-import { api, auth, configured } from "./firebase";
+import { api as profileApi, auth, configured } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
 import {changeBlockPlace} from './block-link';
 import {blockRange} from './block-range';
@@ -165,6 +166,7 @@ function Modal({ title, children, onClose, inactive=false, locked=false }: any) 
     </div></MotionSurface>
   );
 }
+const api=profileApi;
 function EmailVerification({user,onVerified,onLogout}:{user:User;onVerified:()=>void;onLogout:()=>Promise<void>}) {
   const [notice,setNotice]=useState("Preparing your verification email…");
   const [busy,setBusy]=useState(false);
@@ -184,14 +186,14 @@ function EmailVerification({user,onVerified,onLogout}:{user:User;onVerified:()=>
   useEffect(()=>{const sent=Number(sessionStorage.getItem(`journas-verification-sent:${user.uid}`));if(sent&&Date.now()-sent<30000)setNotice("A verification email was recently sent. Check your inbox and spam folder.");else void send();},[user.uid]);
   async function check(){
     if(checking.current)return;checking.current=true;
-    try{await user.reload();if(user.emailVerified){await user.getIdToken(true);onVerified();}}
+    try{await user.reload();if((await api<{verified:boolean}>('auth.verification-status')).verified){await user.getIdToken(true);onVerified();}}
     catch{/* Retry automatically on the next check or when the window regains focus. */}
     finally{checking.current=false;}
   }
   useEffect(()=>{const focus=()=>{void check();};const message=(event:MessageEvent)=>{if(event.data?.type==='journas-email-verified')void check();};const storage=(event:StorageEvent)=>{if(event.key==='journas-email-verified')void check();};const timer=setInterval(focus,5000);window.addEventListener('focus',focus);window.addEventListener('storage',storage);navigator.serviceWorker?.addEventListener('message',message);void check();return()=>{clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('storage',storage);navigator.serviceWorker?.removeEventListener('message',message);};},[user.uid]);
   return <main className="home-page email-verification-screen"><div className="auth-map-background" aria-hidden="true"/><Modal title="Verify your email" locked>
     <p>Verify <strong>{user.email}</strong> before continuing to Journas.</p>
-    <p>Open your inbox and click the verification link. Check your spam folder if the email is missing.</p>
+    <p>We are asking everyone to confirm their email once more. After confirmation, you will not be asked again for this check.</p><p>Open your inbox and click the verification link. Check your spam folder if the email is missing.</p>
     <p role="status" aria-live="polite">{notice}</p>
     <div className="email-verification-actions"><button className="button primary" disabled={busy||resendWait>0} onClick={()=>void send()}>{resendWait>0?`Resend email (${resendWait}s)`:"Resend email"}</button>
     <button className="button" disabled={busy} onClick={()=>void onLogout()}>Back</button></div>
@@ -357,7 +359,18 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
     </main>
   );
 }
-export default function App() {
+export default function App(){
+ const [practice,setPracticeMode]=useState(practiceActive());
+ useEffect(()=>{const change=(event:Event)=>{const value=Boolean((event as CustomEvent).detail);setPractice(value);setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
+ return <PlannerApp key={practice?'practice':'profile'} practice={practice}/>;
+}
+function PlannerApp({practice}:{practice:boolean}) {
+ const [practiceData]=useState(()=>practice?getPracticeSession():null);
+ const api:typeof profileApi=(action,data,signal,background)=>profileApi(action,data,signal,background,practiceData);
+ const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
+ const [verified,setVerified]=useState<boolean|null>(null);
+ useEffect(()=>{let live=true;const refresh=()=>{if(!auth?.currentUser)return;void api<{verified:boolean}>('auth.verification-status').then(async result=>{if(result.verified)await auth?.currentUser?.getIdToken(true);if(live)setVerified(result.verified);}).catch(()=>{if(live)setVerified(false);});};const stop=auth?onAuthStateChanged(auth,()=>{setVerified(null);refresh();}):()=>{};window.addEventListener('journas-email-confirmed',refresh);return()=>{live=false;stop();window.removeEventListener('journas-email-confirmed',refresh);};},[]);
+
   const [user, setUser] = useState<User | null>(null),
     [ready, setReady] = useState(!configured),
     [trips, setTrips] = useState<Trip[]>([]),
@@ -547,7 +560,7 @@ export default function App() {
     return result.trips;
   }
   useEffect(() => {
-    if (!user || (!user.emailVerified && user.providerData.some(p=>p.providerId==="password"))) return;
+    if (!user || verified!==true) return;
     let cancelled=false;
     let saved:any=null;
     initialTripRequest.current=null;
@@ -565,7 +578,7 @@ export default function App() {
       .then(async ([result, identity]) => {
         if(cancelled)return;
         const list=result.trips,r={settings:result.settings};
-        setChooseName(!result.settings.displayName?.trim());
+        setChooseName(!practice&&!result.settings.displayName?.trim());
         setTrips(list);
         const restoredHome=availableHome(result.home??emptyHome(),list);
         const fallback=list.find(t=>t.id===(restoredHome.recentDays[0]?.tripId??restoredHome.recentTrips[0]))??list.find(t=>t.startDate<=today()&&t.endDate>=today())??list[0]??null;
@@ -590,7 +603,7 @@ export default function App() {
       .catch((e) => {if(!cancelled)setMessage(e.message);})
       .finally(()=>{if(!cancelled)setReady(true);});
     return ()=>{cancelled=true;};
-  }, [user?.uid,verificationRevision]);
+  }, [user?.uid,verificationRevision,verified]);
   useEffect(() => {
     if (!token || joinedToken === token) return;
     let cancelled = false;
@@ -693,6 +706,7 @@ export default function App() {
       })
       .catch((e) => {layoutLoading.current=false;setMessage(e.message);});
     let stop=()=>{},stopTrip=()=>{};
+    if(practice){const update=()=>{void api<{day:Day}>('trip.get',{tripId:trip.id,date}).then(result=>{if(!cancelled)setDay(result.day);});};window.addEventListener('journas-practice-updated',update);return()=>{cancelled=true;window.removeEventListener('journas-practice-updated',update);};}
     void import('./live-database').then(({db,collection,doc,onSnapshot})=>{
       if(cancelled)return;
     stop = onSnapshot(
@@ -1095,7 +1109,7 @@ export default function App() {
       if(e.code==='CONFLICT')setConflict({draft,current:e.current,fields:e.details?.fields??[]});
     }finally{setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
   }
-  async function logout(){const finish=beginActivity('Saving your plan and signing out…');try{sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setHome(true);setHomeState(emptyHome());setLastTarget(null);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}finally{finish();}}
+  async function logout(){if(practice){window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));return;}const finish=beginActivity('Saving your plan and signing out…');try{sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setHome(true);setHomeState(emptyHome());setLastTarget(null);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}finally{finish();}}
   function newItem(kind: Edit["kind"], extras: any = {}) {
     setAmbiguousTime(false);
     if (readonly) {
@@ -1175,7 +1189,8 @@ export default function App() {
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&!user.emailVerified&&user.providerData.some(p=>p.providerId==="password"))return <EmailVerification user={user} onVerified={()=>setVerificationRevision(n=>n+1)} onLogout={logout}/>;
+  if(user&&verified===null)return <LoadingScreen text="Checking your email confirmation…"/>;
+  if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{setVerified(true);setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={user.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
@@ -2308,7 +2323,7 @@ export default function App() {
               }
             />
             <button type="button" className="button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Start guided tour</button>
-            <button type="button" className="button account-methods-button" onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
+            <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
               <div className="settings-photo-preview"><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={settings.displayName||user?.displayName||"Account"}/></div>
@@ -2522,7 +2537,8 @@ export default function App() {
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{void saveLayout().then(()=>{setModal(null);setEdit(null);setHome(true);});}}/>}
+      {practice&&<aside className="practice-banner">Practice mode · This trip and all changes are temporary and are not saved to your profile.<button className="text-button" onClick={()=>window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}))}>Exit practice</button></aside>}
+      {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{void saveLayout().then(()=>{setModal(null);setEdit(null);setHome(true);});}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<LoadingScreen text="Loading your schedule…"/>}

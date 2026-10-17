@@ -17,6 +17,7 @@ export function createEmailVerification(auth:Auth|null,code:string|null){
 }
 export function verificationFailure(error:unknown){
   const code=(error as {code?:string})?.code;
+  if(code==='INVALID_VERIFICATION')return {retryable:false,message:'This verification link is invalid or has expired. Request a new email in your original Journas window.'};
   if(code==='auth/expired-action-code'||code==='auth/invalid-action-code')return {retryable:false,message:'This verification link has expired or was already used. Request a new email in your original Journas window and open the newest message.'};
   if(code==='auth/user-disabled'||code==='auth/user-not-found')return {retryable:false,message:'This account is unavailable. Return to Journas to sign in or create an account.'};
   if(code==='auth/too-many-requests')return {retryable:true,message:'Too many verification attempts. Wait a little, then try again using the button below.'};

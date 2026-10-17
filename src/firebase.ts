@@ -1,3 +1,4 @@
+import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
 import { connectAuthEmulator, initializeAuth, browserSessionPersistence, browserPopupRedirectResolver } from "firebase/auth";
@@ -30,11 +31,17 @@ export async function api<T = unknown>(
   data: Record<string, unknown> = {},
   signal?:AbortSignal,
   background=false,
+  practice:PracticeData|null=getPracticeSession(),
 ): Promise<T> {
+  if(practice&&!action.startsWith('auth.')&&!action.startsWith('tour.')&&!action.startsWith('places.'))return practiceRequest<T>(practice,async practiceDocuments=>{
+    const token=await auth?.currentUser?.getIdToken();
+    const response=await fetch('/api/journas',{method:'POST',signal,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({action,...data,practiceDocuments,screen:null})});
+    const result=await response.json();if(!response.ok)throw Object.assign(new Error(result.error?.message??'Practice request failed'),{code:result.error?.code});if(result.practiceResult?.historyId)window.dispatchEvent(new Event('journas-action-saved'));if(!['trip.get','trip.list','history.status','planner.restore','settings.get'].includes(action))setTimeout(()=>window.dispatchEvent(new Event('journas-practice-updated')),0);return result;
+  });
   const description=background?undefined:actionDescription(action,data);
   const finish=description?beginActivity(description,action==='item.patch'&&['pins','blocks','tasks'].includes(String(data.kind))?'overlay':undefined):()=>{};
   try{
-  const token = await auth?.currentUser?.getIdToken();
+  const token = action==='auth.confirm-verification'?undefined:await auth?.currentUser?.getIdToken();
   const response = await fetch("/api/journas", {
     signal,
     method: "POST",

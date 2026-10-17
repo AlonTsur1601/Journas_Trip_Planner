@@ -3,6 +3,8 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { ApiError, type Data } from './types.js';
 import { adminAuth, firestoreStore, purgeExpiredRateLimits } from './store.js';
 import { JournasService } from './service.js';
+import {practiceExecute} from './practice.js';
+import {verificationStatus,confirmVerification} from './verification-campaign.js';
 import {places} from './places.js';
 import {sendVerificationEmail} from './verification-email.js';
 export type Request = IncomingMessage & {
@@ -45,6 +47,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json'))
             throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json');
         const input = await body(req);
+        if(input.action==='auth.confirm-verification')return send(res,200,await confirmVerification(input.proof));
         let uid: string | null = null;
         if (input.action !== 'share.read') {
             const authorization = req.headers.authorization ?? '';
@@ -53,7 +56,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             try {
                 const token = await adminAuth().verifyIdToken(authorization.slice(7), true);
                 uid = token.uid;
-                if (!token.email_verified && input.action!=='auth.email-verification')
+                if (!token.email_verified && !['auth.email-verification','auth.verification-status'].includes(String(input.action)))
                     throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email address to continue');
             }
             catch (error) {
@@ -67,6 +70,8 @@ export async function journasHandler(req: Request, res: ServerResponse) {
                 throw error;
             }
         }
+        if(input.action==='auth.verification-status')return send(res,200,await verificationStatus(uid!));
+        if(input.action!=='auth.email-verification'&&!(await verificationStatus(uid!)).verified)throw new ApiError(403,'EMAIL_UNVERIFIED','Confirm your email again to continue.');
         if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId));
         if(input.action==='places.search'||input.action==='places.reverse'||input.action==='places.landmarks')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
@@ -89,6 +94,8 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             if(!account.emailVerified||account.disabled)throw new ApiError(403,'EMAIL_UNVERIFIED','Verify your email address to continue');
             return send(res,200,{sessionToken:await adminAuth().createCustomToken(uid!)});
         }
+        if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore(),version='practice-2026-10-17';return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion:version});return {seen:user.tourVersion===version};}));}
+        if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
         const result=await new JournasService(firestoreStore()).execute(uid,input);
         if(input.action==='trip.members'){
             const members=result.members as any[];const profiles=(await Promise.all(Array.from({length:Math.ceil(members.length/100)},(_,i)=>adminAuth().getUsers(members.slice(i*100,(i+1)*100).map(m=>({uid:m.id})))))).flatMap(r=>r.users);

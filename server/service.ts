@@ -74,11 +74,12 @@ function validTimezone(value: unknown) {
     }
 }
 function validateSettings(value: Data) {
-    const allowed = ['pinPlacementOnMap', 'connectionArrow', 'clockConfigured', 'theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL', 'mapStart', 'mapCenter', 'mapZoom'];
+    const allowed = ['pinPlacementOnMap', 'connectionArrow', 'clockConfigured', 'mapStartConfigured', 'theme', 'accent', 'clock', 'autoDelete', 'retentionDays', 'timezone', 'displayName', 'photoURL', 'mapStart', 'mapCenter', 'mapZoom'];
     for(const key of ['pinPlacementOnMap','connectionArrow'])if(value[key]!==undefined&&typeof value[key]!=='boolean')fail(400,'INVALID_SETTINGS','Invalid placement preference');
     for (const key of Object.keys(value))
         if (!allowed.includes(key))
             fail(400, 'INVALID_SETTINGS', `Unknown setting ${key}`);
+    if(value.mapStartConfigured!==undefined&&typeof value.mapStartConfigured!=='boolean')fail(400,'INVALID_SETTINGS','Invalid map preference');
     if(value.clockConfigured!==undefined&&typeof value.clockConfigured!=='boolean')fail(400,'INVALID_SETTINGS','Invalid clock preference');
     if (value.theme !== undefined && !['light', 'dark', 'system'].includes(String(value.theme)))
         fail(400, 'INVALID_SETTINGS', 'Invalid theme');

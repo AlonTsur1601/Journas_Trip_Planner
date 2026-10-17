@@ -47,7 +47,7 @@ import { api, auth, configured } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
 import {blockRange} from './block-range';
 import { observeClock, followCalendarDay } from "./day-clock";
-import { startingLayout } from "./map-start";
+import { startingLayout, lodgingForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import { DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
@@ -528,7 +528,7 @@ export default function App() {
       const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
       if(!selected&&!trips.length){setHome(true);createTrip();return;}
       let view:Layout,loaded:{trip:Trip;day:Day;layout:Layout|null}|null=null;
-      if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate){loaded=await api('trip.get',{tripId:selected.id,date:nextDate});const local=localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`);view=local?JSON.parse(local):loaded!.layout??(selected.id===tripRef.current?.id&&nextDate===dateRef.current?layoutRef.current:await startingLayout(settings,selected.lodging));initialTripRequest.current={tripId:selected.id,date:nextDate,promise:Promise.resolve(loaded)};}else view=await startingLayout(settings,selected?.lodging);
+      if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate){loaded=await api('trip.get',{tripId:selected.id,date:nextDate});const local=localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`);view=local?JSON.parse(local):loaded!.layout??(selected.id===tripRef.current?.id&&nextDate===dateRef.current?layoutRef.current:await startingLayout(settings,selected.lodging));initialTripRequest.current={tripId:selected.id,date:nextDate,promise:Promise.resolve(loaded)};}else view=await startingLayout(settings,lodgingForDate(selected,nextDate));
       await loadMapPanel();if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate)persistHome(recordVisit(homeRef.current,{tripId:selected.id,date:nextDate}));layoutLoading.current=true;setTrip(loaded?.trip??selected);setDate(nextDate);setLayout({...defaultLayout(),...view});setDay(loaded?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
       if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});
     }catch(e:any){setMessage(e.message);}finally{finish();setHomeBusy(false);}
@@ -573,7 +573,7 @@ export default function App() {
         setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
         if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
-        const preferences = { ...defaultSettings, ...r.settings,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
+        const preferences = { ...defaultSettings, ...r.settings,mapStart:r.settings.mapStart==="current"&&!r.settings.mapStartConfigured?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
@@ -630,7 +630,7 @@ export default function App() {
         const local = localStorage.getItem(
           `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
-        const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, tripRef.current?.lodging);
+        const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
       })
@@ -667,7 +667,7 @@ export default function App() {
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
-        const nextLayout = restored ?? await startingLayout(settingsRef.current, tripRef.current?.lodging);
+        const nextLayout = restored ?? await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
         dirty.current = Boolean(local);
@@ -874,7 +874,7 @@ export default function App() {
       );
   }
   async function plannedInitialLayout(prefs:Settings,selected:Trip|null,nextDate:string){
-    if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,selected?.lodging);
+    if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,lodgingForDate(selected,nextDate));
   }
   async function plannedLayout(selected:Trip|null,nextDate:string){
     if(selected&&user&&nextDate>=selected.startDate&&nextDate<=selected.endDate){
@@ -884,7 +884,7 @@ export default function App() {
       if(saved.layout)return saved.layout;
     }
 
-    return startingLayout(settings,selected?.lodging);
+    return startingLayout(settings,lodgingForDate(selected,nextDate));
   }
   async function switchDate(value: string) {
     if(historyBusy)return;
@@ -904,8 +904,8 @@ export default function App() {
     setDay(emptyDay());
     setLayout(targetLayout??(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout()));
     setCalendar(false);
-    if (!trip || value < trip.startDate || value > trip.endDate) {
-      const initial = await startingLayout(settingsRef.current, tripRef.current?.lodging);
+    if (!targetLayout && (!trip || value < trip.startDate || value > trip.endDate)) {
+      const initial = await startingLayout(settingsRef.current);
       if (dateRef.current === value) setLayout(initial);
     }
     }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
@@ -914,7 +914,7 @@ export default function App() {
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
-  else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){if(trip?.lodging)timezone=tzlookup(trip.lodging.lat,trip.lodging.lng);}
+  else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){const lodging=lodgingForDate(trip,date);if(lodging)timezone=tzlookup(lodging.lat,lodging.lng);}
   try {
     new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
@@ -1147,7 +1147,7 @@ export default function App() {
     try {
       await api("settings.save", { settings: next });
       setSettings(next);
-      const view=await startingLayout(next,trip?.lodging);
+      const view=await startingLayout(next,lodgingForDate(trip,date));
       changeLayout({center:view.center,zoom:view.zoom});
       setMessage("Preferences saved.");
     } catch (e: any) {
@@ -2376,7 +2376,7 @@ export default function App() {
             <Select
               label="Starting map view"
               value={settings.mapStart}
-              onChange={(e: any) => setSettings({ ...settings, mapStart: e.target.value })}
+              onChange={(e: any) => setSettings({ ...settings, mapStart: e.target.value,mapStartConfigured:true })}
             >
               <option value="trip">Trip lodging</option>
               <option value="current">My current location</option>

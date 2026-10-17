@@ -1,8 +1,12 @@
-import { defaultLayout, type Layout, type Settings } from "./types";
+import { defaultLayout, type Layout, type Settings, type Trip } from "./types";
+
+export function lodgingForDate(trip:Trip|null|undefined,date:string){
+  return trip&&date>=trip.startDate&&date<=trip.endDate?trip.lodging:undefined;
+}
 
 export async function startingLayout(settings: Settings, lodging?: {lng:number;lat:number}): Promise<Layout> {
   const layout = defaultLayout();
-  if(settings.mapStart === "trip")return lodging?{...layout,center:[lodging.lng,lodging.lat],zoom:14}:layout;
+  if(settings.mapStart === "trip" && lodging)return {...layout,center:[lodging.lng,lodging.lat],zoom:14};
   if (settings.mapStart === "world") return layout;
   if (settings.mapStart === "custom")
     return { ...layout, center: settings.mapCenter, zoom: settings.mapZoom };

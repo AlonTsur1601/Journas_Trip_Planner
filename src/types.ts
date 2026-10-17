@@ -73,6 +73,7 @@ export type Settings = {
   pinPlacementOnMap?: boolean;
   connectionArrow?: boolean;
   mapStart: "current" | "custom" | "world" | "trip";
+  mapStartConfigured?: boolean;
   mapCenter: [number, number];
   mapZoom: number;
 };
@@ -115,7 +116,7 @@ export const defaultSettings: Settings = {
   timezone: "",
   autoDelete: true,
   retentionDays: 365,
-  mapStart: "current",
+  mapStart: "trip",
   mapCenter: [0, 0],
   mapZoom: 12,
   pinPlacementOnMap: true,

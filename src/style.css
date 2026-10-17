@@ -2191,6 +2191,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @media(min-width:701px){
  .trip-details-column{align-self:stretch;gap:20px;}
  .trip-details-column .trip-appearance-editor{flex:1;flex-direction:column;align-items:center;justify-content:space-between;gap:20px;margin:4px 0 0;}
+ .trip-details-column .trip-appearance-editor:has(.trip-logo-fields input[type="file"]){justify-content:flex-start;}
  .trip-details-column .trip-appearance-editor>.trip-badge{width:128px;height:128px;flex-basis:128px;border-radius:18px;margin:0;}
  .trip-details-column .trip-appearance-editor>.trip-badge svg{width:88px;height:88px;}
  .trip-details-column .trip-appearance-options{flex:0;width:100%;}

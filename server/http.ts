@@ -67,8 +67,8 @@ export async function journasHandler(req: Request, res: ServerResponse) {
                 throw error;
             }
         }
-        if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!));
-        if(input.action==='places.search'||input.action==='places.reverse')return send(res,200,await places(input,uid!));
+        if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId));
+        if(input.action==='places.search'||input.action==='places.reverse'||input.action==='places.landmarks')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
         // Only the platform's network header is used in production; no raw IP or token is persisted.
         const address = process.env.VERCEL ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0] : req.socket.remoteAddress;
@@ -84,6 +84,11 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             tx.set(path, { minute, count, expiresAt: Date.now() + 86400000 });
             return null;
         });
+        if(input.action==='auth.verification-session'){
+            const account=await adminAuth().getUser(uid!);
+            if(!account.emailVerified||account.disabled)throw new ApiError(403,'EMAIL_UNVERIFIED','Verify your email address to continue');
+            return send(res,200,{sessionToken:await adminAuth().createCustomToken(uid!)});
+        }
         const result=await new JournasService(firestoreStore()).execute(uid,input);
         if(input.action==='trip.members'){
             const members=result.members as any[];const profiles=(await Promise.all(Array.from({length:Math.ceil(members.length/100)},(_,i)=>adminAuth().getUsers(members.slice(i*100,(i+1)*100).map(m=>({uid:m.id})))))).flatMap(r=>r.users);

@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import {actionDescription,beginActivity} from './activity';
 import { connectAuthEmulator, initializeAuth, browserSessionPersistence, browserPopupRedirectResolver } from "firebase/auth";
 const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
@@ -27,9 +28,15 @@ if (emulators && auth) {
 export async function api<T = unknown>(
   action: string,
   data: Record<string, unknown> = {},
+  signal?:AbortSignal,
+  background=false,
 ): Promise<T> {
+  const description=background?undefined:actionDescription(action,data);
+  const finish=description?beginActivity(description):()=>{};
+  try{
   const token = await auth?.currentUser?.getIdToken();
   const response = await fetch("/api/journas", {
+    signal,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -54,4 +61,5 @@ export async function api<T = unknown>(
     );
   if(result.historyId)window.dispatchEvent(new Event('journas-action-saved'));
   return result as T;
+  }finally{finish();}
 }

@@ -1,3 +1,4 @@
+import {MotionSurface} from "./MotionSurface";
 import {useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 /** Position the overlay using its actual content height. */
@@ -12,5 +13,5 @@ export function Popover({anchor,width=280,height=300,onClose,children,className=
   const outside=(e:PointerEvent)=>{if(!anchor.current?.contains(e.target as Node)&&!box.current?.contains(e.target as Node)&&!(e.target as Element)?.closest?.('.bounded-popover'))onClose?.();};document.addEventListener('pointerdown',outside);
   return()=>{observer.disconnect();window.removeEventListener('resize',place);document.removeEventListener('pointerdown',outside);document.removeEventListener('journas-picker-open',exclusive);};
  },[anchor,width,height,onClose]);
- return createPortal(<div {...props} ref={box} className={'bounded-popover '+className} style={{position:'fixed',...position,maxHeight:'calc(100dvh - 24px)',zIndex:80}} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose?.();}}}>{children}</div>,document.body);
+ return createPortal(<MotionSurface><div {...props} ref={box} className={'bounded-popover '+className} style={{position:'fixed',...position,maxHeight:'calc(100dvh - 24px)',zIndex:80}} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose?.();}}}>{children}</div></MotionSurface>,document.body);
 }

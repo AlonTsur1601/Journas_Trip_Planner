@@ -1,3 +1,4 @@
+import {MotionSurface} from "./MotionSurface";
 import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -6,19 +7,27 @@ import {Popover} from './Popover';
 import type emojiData from 'emojibase-data/en/compact.json';
 
 const iso = (d: Date) => d.toLocaleDateString('en-CA');
-export function MonthCalendar({value,onChange,min,max}:any) {
+export function MonthCalendar({value,onChange,min,max,focusValue,rangeStart,rangeEnd}:any) {
   const validDate=(v:string)=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(new Date(`${v}T12:00:00`).getTime())&&iso(new Date(`${v}T12:00:00`))===v;
-  const [month,setMonth]=useState((validDate(value??'') ? value : iso(new Date())).slice(0,7));
+  const [month,setMonth]=useState((validDate(focusValue??'')?focusValue:validDate(value??'')?value:iso(new Date())).slice(0,7));
+  const today=iso(new Date());
+  useEffect(()=>{if(validDate(focusValue??''))setMonth(focusValue.slice(0,7));},[focusValue]);
   const shift=(n:number)=>{const d=new Date(`${month}-15T12:00:00`);d.setMonth(d.getMonth()+n);setMonth(iso(d).slice(0,7));};
-  return <div className="month-calendar"><header><button type="button" className="icon" aria-label="Next month" onClick={()=>shift(1)}><ChevronLeft size={18}/></button><strong>{new Date(`${month}-15T12:00:00`).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</strong><button type="button" className="icon" aria-label="Previous month" onClick={()=>shift(-1)}><ChevronRight size={18}/></button></header><div className="calendar-grid">{['S','M','T','W','T','F','S'].map((x,i)=><small key={i}>{x}</small>)}{Array.from({length:new Date(`${month}-01T12:00:00`).getDay()},(_,i)=><span key={'b'+i}/>)}{Array.from({length:new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()},(_,i)=>{const d=`${month}-${String(i+1).padStart(2,'0')}`;return <button type="button" key={d} disabled={Boolean(min&&d<min||max&&d>max)} className={value===d?'selected':''} onClick={()=>onChange(d)}>{i+1}</button>;})}</div></div>;
+  return <div className="month-calendar"><header><button type="button" className="icon" aria-label="Next month" onClick={()=>shift(1)}><ChevronLeft size={18}/></button><strong>{new Date(`${month}-15T12:00:00`).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</strong><button type="button" className="icon" aria-label="Previous month" onClick={()=>shift(-1)}><ChevronRight size={18}/></button></header><div className="calendar-grid">{['S','M','T','W','T','F','S'].map((x,i)=><small key={i}>{x}</small>)}{Array.from({length:new Date(`${month}-01T12:00:00`).getDay()},(_,i)=><span key={'b'+i}/>)}{Array.from({length:new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()},(_,i)=>{const d=`${month}-${String(i+1).padStart(2,'0')}`;return <button type="button" key={d} disabled={Boolean(min&&d<min||max&&d>max)} aria-current={today===d?'date':undefined} title={[d,today===d?'Today':'',rangeStart===d?'Start date':'',rangeEnd===d?'End date':''].filter(Boolean).join(' · ')} className={[value===d?'selected':'',today===d?'today':'',rangeStart===d||rangeEnd===d?'range-boundary':'',rangeStart&&rangeEnd&&d>rangeStart&&d<rangeEnd?'in-range':''].filter(Boolean).join(' ')} onClick={()=>onChange(d)}>{i+1}</button>;})}</div></div>;
 }
-export function DateField({label,value,defaultValue,name,onChange,min,max,required}:any) {
+export function DateField({label,value,defaultValue,name,onChange,min,max,required,focusValue,rangeStart,rangeEnd}:any) {
  const initial=defaultValue??value??'';const [parts,setParts]=useState(initial?initial.split('-').slice(0,3):['','','']);const [open,setOpen]=useState(false);const root=useRef<HTMLDivElement>(null);const inputs=useRef<(HTMLInputElement|null)[]>([]);
  useEffect(()=>{if(value!==undefined)setParts(value?value.split('-'):['','','']);},[value]);
  const current=parts.join('-'),valid=/^\d{4}-\d{2}-\d{2}$/.test(current)&&!Number.isNaN(Date.parse(current))&&iso(new Date(current+'T12:00:00'))===current&&(!min||current>=min)&&(!max||current<=max);
  const update=(index:number,v:string)=>{if(!/^\d*$/.test(v)||v.length>(index===0?4:2)||index===1&&Number(v)>12||index===2&&Number(v)>31)return;const next=[...parts];next[index]=v;setParts(next);const full=next.join('-');if(next[0].length===4&&next[1].length===2&&next[2].length===2)onChange?.({target:{value:full},currentTarget:{value:full}});if(v.length===(index===0?4:2)){const order=[1,2,0],following=order[order.indexOf(index)+1];if(following===undefined)inputs.current[index]?.blur();else inputs.current[following]?.focus();}};
  useEffect(()=>{inputs.current[0]?.setCustomValidity(parts.every((p:string)=>p.length)&&!valid?'Choose a valid date within the trip limits.':'');},[current,valid]);
- return <div className="field date-field" ref={root}><label>{label}</label><div className="date-field-row"><div className="segmented-date" role="group" aria-label={label}>{[1,2,0].map((index,i)=><span className="date-segment" key={index}>{i>0&&<span>/</span>}<input ref={e=>{inputs.current[index]=e;}} aria-label={`${label} ${['year','month','day'][index]}`} type="text" inputMode="numeric" required={required} maxLength={index===0?4:2} placeholder={['YYYY','MM','DD'][index]} value={parts[index]??''} onFocus={e=>e.currentTarget.select()} onClick={e=>e.currentTarget.select()} onChange={e=>update(index,e.target.value)} onKeyDown={e=>{const order=[1,2,0],at=order.indexOf(index);if(e.key==='ArrowRight'&&at<2||e.key==='ArrowLeft'&&at>0){e.preventDefault();inputs.current[order[at+(e.key==='ArrowRight'?1:-1)]]?.focus();}}}/></span>)}<input type="hidden" name={name} value={valid?current:''}/></div><button type="button" className="icon" aria-label={`Choose ${label.toLowerCase()}`} aria-expanded={open} onClick={()=>setOpen(!open)}><CalendarDays size={18}/></button></div>{open&&<Popover anchor={root} className="field-calendar" width={280} height={292} onClose={()=>setOpen(false)}><MonthCalendar value={valid?current:initial} min={min} max={max} onChange={(v:string)=>{setParts(v.split('-'));onChange?.({target:{value:v},currentTarget:{value:v}});setOpen(false);}}/></Popover>}</div>;
+ return <div className="field date-field" ref={root}><label>{label} <span className="date-format">(MM/DD/YYYY)</span></label><div className="date-field-row"><div className="segmented-date" role="group" aria-label={label}>{[1,2,0].map((index,i)=><span className="date-segment" key={index}>{i>0&&<span>/</span>}<input ref={e=>{inputs.current[index]=e;}} aria-label={`${label} ${['year','month','day'][index]}`} type="text" inputMode="numeric" required={required} maxLength={index===0?4:2} placeholder={['YYYY','MM','DD'][index]} value={parts[index]??''} onFocus={e=>e.currentTarget.select()} onClick={e=>e.currentTarget.select()} onChange={e=>update(index,e.target.value)} onKeyDown={e=>{const order=[1,2,0],at=order.indexOf(index);if(e.key==='ArrowRight'&&at<2||e.key==='ArrowLeft'&&at>0){e.preventDefault();inputs.current[order[at+(e.key==='ArrowRight'?1:-1)]]?.focus();}}}/></span>)}<input type="hidden" name={name} value={valid?current:''}/></div><button type="button" className="icon" aria-label={`Choose ${label.toLowerCase()}`} aria-expanded={open} onClick={()=>setOpen(!open)}><CalendarDays size={18}/></button></div>{open&&<Popover anchor={root} className="field-calendar" width={280} height={292} onClose={()=>setOpen(false)}><MonthCalendar value={valid?current:initial} min={min} max={max} focusValue={focusValue} rangeStart={rangeStart} rangeEnd={rangeEnd} onChange={(v:string)=>{setParts(v.split('-'));onChange?.({target:{value:v},currentTarget:{value:v}});setOpen(false);}}/></Popover>}</div>;
+}
+export function DateRangeFields({startValue,endValue,min,max}:any){
+ const [start,setStart]=useState(startValue??''),[end,setEnd]=useState(endValue??''),[focusValue,setFocusValue]=useState<string>();
+ const select=(setter:(value:string)=>void)=>(event:any)=>{const date=event.target.value;setter(date);if(/^\d{4}-\d{2}-\d{2}$/.test(date)&&iso(new Date(date+'T12:00:00'))===date)setFocusValue(date);};
+ const shared={min,max,required:true,focusValue,rangeStart:start,rangeEnd:end};
+ return <div className="form-row"><DateField label="First day" name="start" value={start} onChange={select(setStart)} {...shared}/><DateField label="Last day" name="end" value={end} onChange={select(setEnd)} {...shared}/></div>;
 }
 export function TimeField({label,value='',onChange,onInput,required,name}:any){
  const inputs=useRef<(HTMLInputElement|null)[]>([]);const parts=String(value).split(':');
@@ -26,38 +35,39 @@ export function TimeField({label,value='',onChange,onInput,required,name}:any){
  return <div className="field"><span>{label}</span><div className="time-field segmented-time" role="group" aria-label={label}>{[0,1].map(index=><input key={index} ref={e=>{inputs.current[index]=e;}} aria-label={`${label} ${index?'minute':'hour'}`} type="text" inputMode="numeric" maxLength={2} required={required} pattern={index?'[0-5][0-9]':'(?:[01][0-9]|2[0-4])'} value={parts[index]??''} onFocus={e=>e.currentTarget.select()} onClick={e=>e.currentTarget.select()} onChange={e=>{update(index,e.target.value);if(/^\d{2}$/.test(e.target.value)&&Number(e.target.value)<=(index?59:label==='Ends at'?24:23)){if(index===0)inputs.current[1]?.focus();else e.currentTarget.blur();}}} onBlur={e=>{if(e.target.value)update(index,e.target.value.padStart(2,'0'));}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();inputs.current[index?0:1]?.focus();}if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();const max=index?60:label==='Ends at'?25:24;update(index,String((Number(parts[index])+(e.key==='ArrowUp'?1:max-1))%max).padStart(2,'0'));}}}/>).flatMap((input,index)=>index?[<span key="colon">:</span>,input]:[input])}<Clock3 size={17} aria-hidden="true"/>{name&&<input type="hidden" name={name} value={value}/>}</div></div>;
 }
 
-// Thirty original compact line symbols, sharing the map's 24-unit drawing grid.
+// Thirty compact line symbols, sharing the map's 24-unit drawing grid.
+// Lucide, Tabler, Phosphor and original Journas geometry; see symbol-sources.md.
 export const pinSymbols=[
- ['stay','Lodging','M3 20V8h18v12M7 8V4h10v4M8 20v-5h8v5M7 11h2m6 0h2'],
- ['camp','Camping','M2 20L12 4l10 16H2m6 0l4-8 4 8M12 4V2'],
- ['peak','Mountain','M2 20l7-14 4 8 3-6 6 12H2m4-8l3 2 2-2'],
- ['coast','Beach','M3 10c4-8 14-8 18 0H3m9-8v16m0-8l5 12M2 21h20'],
- ['coffee','Coffee','M4 7h12v8a6 6 0 01-12 0V7m12 1h2a3 3 0 010 6h-2M3 22h16M7 2v2m5-2v2'],
- ['meal','Restaurant','M4 2v7c0 4 6 4 6 0V2M7 2v20M18 2c-4 4-4 9 0 9h2V2m0 9v11'],
- ['museum','Museum','M2 7l10-5 10 5H2m2 3v9m5-9v9m6-9v9m5-9v9M2 22h20'],
- ['gallery','Gallery','M3 3h18v18H3V3m0 14l6-6 5 5 3-3 4 4M16 7h.01'],
- ['garden','Garden','M12 22V10M12 14C2 14 2 3 2 3s10 0 10 11m0-4c0-8 10-8 10-8s0 10-10 10'],
- ['forest','Forest','M12 2L5 10h3l-5 8h18l-5-8h3L12 2m0 16v4'],
- ['waterfall','Waterfall','M3 3h18M7 3v11c0 4-4 4-4 7m9-18v19m5-19v11c0 4 4 4 4 7M2 22h20'],
- ['lake','Lake','M2 9l6-6 4 5 4-6 6 7M2 13c3-3 5 3 8 0s5 3 8 0 3 0 4 0M2 19c3-3 5 3 8 0s5 3 8 0 3 0 4 0'],
- ['bridge','Bridge','M2 19h20M5 19V4m14 15V4M5 8c3 8 11 8 14 0M9 13v6m6-6v6'],
- ['castle','Castle','M3 21V5h4V2h3v5h4V2h3v3h4v16H3m6 0v-6a3 3 0 016 0v6'],
- ['temple','Temple','M2 9h20M4 9l8-7 8 7M5 9v12m14-12v12M3 22h18M10 13h4v8'],
- ['market','Market','M3 9l2-6h14l2 6M3 9c0 5 6 5 6 0 0 5 6 5 6 0 0 5 6 5 6 0M4 12v9h16v-9M8 21v-6h8v6'],
- ['shop','Shopping','M4 7h16l2 15H2L4 7m4 0V5a4 4 0 018 0v2'],
- ['view','Viewpoint','M2 12c5-9 15-9 20 0-5 9-15 9-20 0m7 0a3 3 0 106 0 3 3 0 10-6 0'],
- ['photo','Photography','M3 7h4l2-4h6l2 4h4v14H3V7m5 6a4 4 0 108 0 4 4 0 10-8 0'],
- ['walk','Walking','M15 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0M13 6l-1 2-2 6M12 8l-4 1-2 3M12 8l4 3h3M10 14l-3 5-2 2M10 14l5 3 2 4'],
- ['cycle','Cycling','M2 17a4 4 0 108 0 4 4 0 10-8 0m12 0a4 4 0 108 0 4 4 0 10-8 0M6 17l5-10 7 10M9 5h5m2-2h3'],
- ['train','Railway','M6 3h12v15H6V3m0 7h12M9 18l-3 4m9-4l3 4M9 14h.01m6 0h.01'],
- ['flight','Airport','M2 13l8-3V3l2-2 2 2v7l8 3v3l-8-2v5l3 2v1H7v-1l3-2v-5l-8 2v-3'],
- ['boat','Harbor','M3 13l9-3 9 3-3 7H6l-3-7m5-2V5h8v6m-4-6V2M2 22c3-2 5 2 8 0s5 2 8 0h4'],
- ['bus','Bus stop','M4 4h16v15H4V4m0 8h16M7 19v3m10-3v3M8 16h.01m8 0h.01'],
- ['music','Music','M10 17V4l10-2v13M4 18a3 3 0 106 0 3 3 0 10-6 0m10-2a3 3 0 106 0 3 3 0 10-6 0'],
- ['ticket','Tickets','M2 6h20v4a2 2 0 000 4v4H2v-4a2 2 0 000-4V6m12 0v2m0 2v4m0 2v2'],
- ['spa','Spa','M12 20C0 17 2 8 2 8c4 0 7 3 10 7m0 5c12-3 10-12 10-12-4 0-7 3-10 7m0 5c-7-6-4-15 0-18 4 3 7 12 0 18'],
- ['sport','Sports','M12 2a10 10 0 100 20 10 10 0 100-20m0 0v20M2 12h20M5 5c9 3 9 11 0 14m14-14c-9 3-9 11 0 14'],
- ['star','Favorite','M12 2l3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1 3-7']
+ ['stay','Lodging','M 10.5 15.75 V 7.5 H 20.25 a 3 3 0 0 1 3 3 v 5.25 M2.25 19.5 L2.25 4.5 M2.25 15.75 23.25 15.75 23.25 19.5 M10.5 7.5 L2.25 7.5'],
+ ['camp','Camping','M6.75 4.5 0.75 18 12.75 18 6.75 4.5 Z M12.75 18 23.25 18 17.25 4.5 6.75 4.5 6.75 18'],
+ ['peak','Mountain','M3 20h18l-6.921 -14.612a2.3 2.3 0 0 0 -4.158 0l-6.921 14.612 M7.5 11l2 2.5l2.5 -2.5l2 3l2.5 -2'],
+ ['coast','Beach','M17.553 16.75a7.5 7.5 0 0 0 -10.606 0 M18 3.804a6 6 0 0 0 -8.196 2.196l10.392 6a6 6 0 0 0 -2.196 -8.196 M16.732 10c1.658 -2.87 2.225 -5.644 1.268 -6.196c-.957 -.552 -3.075 1.326 -4.732 4.196 M15 9l-3 5.196 M3 19.25a2.4 2.4 0 0 1 1 -.25a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 1 .25'],
+ ['coffee','Coffee','M8.25 2.25 L8.25 5.25 M11.25 2.25 L11.25 5.25 M14.25 2.25 L14.25 5.25 M3 20.25 L19.5 20.25 M 7.80937 20.25 A 8.25 8.25 0 0 1 3 12.75 V 8.25 H 19.5 v 4.5 a 8.25 8.25 0 0 1 -4.80937 7.5 M 19.5 8.25 h 0 a 3 3 0 0 1 3 3 v 0.75 a 3 3 0 0 1 -3 3 h -0.316875'],
+ ['meal','Restaurant','M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2 M7 2v20 M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7'],
+ ['museum','Museum','M10 18v-7 M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z M14 18v-7 M18 18v-7 M3 22h18 M6 18v-7'],
+ ['gallery','Gallery','M3.75 4.5 H20.25 Q21 4.5 21 5.25 V18.75 Q21 19.5 20.25 19.5 H3.75 Q3 19.5 3 18.75 V5.25 Q3 4.5 3.75 4.5 Z M13.5 9.375 a1.125 1.125 0 1 0 2.25 0 a1.125 1.125 0 1 0 -2.25 0 M 13.8103 15.375 16.2188 12.9694 a 0.75 0.75 0 0 1 1.06031 0 L 21 16.6931 M 3 15.8147 l 5.09438 -5.09531 a 0.75 0.75 0 0 1 1.06125 0 L 17.9353 19.5'],
+ ['garden','Garden','M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3h-1m-2 3v-1 M10.0 8.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0 M12 10v12 M12 22c4.2 0 7-1.667 7-5-4.2 0-7 1.667-7 5Z M12 22c-4.2 0-7-1.667-7-5 4.2 0 7 1.667 7 5Z'],
+ ['forest','Forest','M16 5l3 3l-2 1l4 4l-3 1l4 4h-9 M15 21l0 -3 M8 13l-2 -2 M8 12l2 -2 M8 21v-13 M5.824 16a3 3 0 0 1 -2.743 -3.69a3 3 0 0 1 .304 -4.833a3 3 0 0 1 4.615 -3.707a3 3 0 0 1 4.614 3.707a3 3 0 0 1 .305 4.833a3 3 0 0 1 -2.919 3.695h-4l-.176 -.005'],
+ ['waterfall','Sun','M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M4.93 4.93l1.42 1.42 M17.65 17.65l1.42 1.42 M4.93 19.07l1.42-1.42 M17.65 6.35l1.42-1.42'],
+ ['lake','Lake','M2 11l6-8 6 8 M14 11l4-4 4 4 M2 11h20 M4 15h6m4 0h6 M7 19h10'],
+ ['bridge','Bridge','M2 19h20 M5 19V4 M19 19V4 M2 9l3-3q7 12 14 0l3 3 M8 10v9 M12 12v7 M16 10v9'],
+ ['castle','Castle','M10 5V3 M14 5V3 M15 21v-3a3 3 0 0 0-6 0v3 M18 3v8 M18 5H6 M22 11H2 M22 9v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9 M6 3v8'],
+ ['temple','Temple','M3 21h7v-3a2 2 0 0 1 4 0v3h7 M6 21l0 -9 M18 21l0 -9 M6 12h12a3 3 0 0 0 3 -3a9 8 0 0 1 -9 -6a9 8 0 0 1 -9 6a3 3 0 0 0 3 3'],
+ ['market','Market','M3 21l18 0 M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4 M5 21l0 -10.15 M19 21l0 -10.15 M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4'],
+ ['shop','Shopping','M6.331 8h11.339a2 2 0 0 1 1.977 2.304l-1.255 8.152a3 3 0 0 1 -2.966 2.544h-6.852a3 3 0 0 1 -2.965 -2.544l-1.255 -8.152a2 2 0 0 1 1.977 -2.304 M9 11v-5a3 3 0 0 1 6 0v5'],
+ ['view','Viewpoint','M9.75 8.25 L14.25 8.25 M 21.5241 14.4675 17.4319 5.15625 A 2.25 2.25 0 0 0 14.25 5.15625 V 15.75 M 9.75 15.75 V 5.15625 a 2.25 2.25 0 0 0 -3.18187 0 L 2.47594 14.4675 M2.25 15.75 a3.75 3.75 0 1 0 7.5 0 a3.75 3.75 0 1 0 -7.5 0 M14.25 15.75 a3.75 3.75 0 1 0 7.5 0 a3.75 3.75 0 1 0 -7.5 0'],
+ ['photo','Photography','M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z M9.0 13.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0'],
+ ['walk','Walking','M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M7 21l3 -4 M16 21l-2 -4l-3 -3l1 -6 M6 12l2 -3l4 -1l3 3l3 1'],
+ ['cycle','Cycling','M15.0 17.5a3.5 3.5 0 1 0 7.0 0a3.5 3.5 0 1 0 -7.0 0 M2.0 17.5a3.5 3.5 0 1 0 7.0 0a3.5 3.5 0 1 0 -7.0 0 M14.0 5.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0 M12 17.5V14l-3-3 4-3 2 3h2'],
+ ['train','Railway','M21 13c0 -3.87 -3.37 -7 -10 -7h-8 M3 15h16a2 2 0 0 0 2 -2 M3 6v5h17.5 M3 11v4 M8 11v-5 M13 11v-4.5 M3 19h18'],
+ ['flight','Airport','M 14.25 9 l 7.5 3.75 v 3 l -7.5 -1.5 v 3 l 1.5 1.5 v 3 l -3.75 -1.5 L 8.25 21.75 V 18.75 l 1.5 -1.5 V 14.25 L 2.25 15.75 V 12.75 l 7.5 -3.75 V 4.5 a 2.25 2.25 0 0 1 4.5 0 Z'],
+ ['boat','Harbor','M12 2v2 M12 9.189V13 M19 12V6a2 2 0 00-2-2H7a2 2 0 00-2 2v6 M19.38 19A11.6 11.6 0 0021 13l-8.188-3.639a2 2 0 00-1.624 0L3 13.001a11.6 11.6 0 002.81 7.76 M2 20c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1'],
+ ['bus','Bus stop','M4 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M16 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 17h-2v-11a1 1 0 0 1 1 -1h14a5 7 0 0 1 5 7v5h-2m-4 0h-8 M16 5l1.5 7l4.5 0 M2 10l15 0 M7 5l0 5 M12 5l0 5'],
+ ['music','Music','M9 18V5l12-2v13 M3.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0 M15.0 16.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0'],
+ ['ticket','Tickets','M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z M13 5v2 M13 17v2 M13 11v2'],
+ ['spa','Spa','M 12 18.75 s 3.75 -2.0625 3.75 -7.57687 c 0 -4.3125 -2.30156 -6.51938 -3.29906 -7.27125 a 0.75 0.75 0 0 0 -0.901875 0 C 10.5516 4.65375 8.25 6.85688 8.25 11.1731 8.25 16.6875 12 18.75 12 18.75 Z M 8.86875 7.575 C 7.62 6.5625 6.4275 6.16781 5.71875 6.01688 a 0.76875 0.76875 0 0 0 -0.8925 0.5175 c -0.36375 1.125 -0.823125 3.71812 1.04156 6.96281 s 4.97531 5.00625 6.12844 5.25 M 15.1313 7.575 c 1.24875 -1.01438 2.4375 -1.40625 3.14625 -1.55812 a 0.76875 0.76875 0 0 1 0.8925 0.5175 c 0.36375 1.125 0.823125 3.71812 -1.04156 6.96281 S 13.1531 18.5034 12 18.75 M 12 18.75 c 1.44094 0 3.82219 -0.016875 6.5625 -1.65375 s 3.62719 -3.68813 3.91125 -4.73813 a 0.744375 0.744375 0 0 0 -0.511875 -0.916875 6.52406 6.52406 0 0 0 -2.88938 -0.06 M 4.9275 11.3813 a 6.52406 6.52406 0 0 0 -2.88938 0.06 0.744375 0.744375 0 0 0 -0.511875 0.916875 c 0.28125 1.05 1.17094 3.10031 3.91125 4.73813 S 10.5591 18.75 12 18.75'],
+ ['sport','Sports','M7.5 4.20562 L12 12 M7.5 19.7944 L12 12 M21 12 L12 12 M 10.9294 3.06187 A 9 9 0 0 1 16.2244 12 M 4.79438 17.3963 A 9 9 0 0 1 9.88781 8.34375 M 20.2763 15.5419 A 9 9 0 0 1 9.88781 15.6562 M3 12 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0'],
+ ['star','Favorite','M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z']
 ] as const;
 export function symbolMarkup(value:string){const item=pinSymbols.find(x=>`icon:${x[0]}`===value);return item?`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${item[2]}"/></svg>`:null;}
 export function SymbolIcon({value}: {value:string}){const item=pinSymbols.find(x=>`icon:${x[0]}`===value);return item?<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={item[2]}/></svg>:<>{value}</>;}
@@ -73,4 +83,4 @@ export function SymbolPicker({value,onChange}:any){
 }
 export function TimezonePicker({value,onChange}:any){const zones=Array.from(new Set(['', 'UTC',value,...Intl.supportedValuesOf('timeZone')]));return <div className="field"><span>Destination time zone</span><Dropdown aria-label="Destination time zone" searchable value={value} onChange={onChange}>{zones.map(zone=><option key={zone} value={zone}>{zone?zone.replaceAll('_',' '):'Automatic from planned places'}</option>)}</Dropdown></div>;}
 
-export function FloatingChecklist({children,layout}:any){const [,refresh]=useState(0);useEffect(()=>{const resize=()=>refresh(n=>n+1);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);const topbar=document.querySelector('.topbar')?.getBoundingClientRect().bottom??48;const mobile=innerWidth<=700;const x=mobile?0:Math.max(0,Math.min(layout.todoX,innerWidth-Math.min(layout.todoWidth,innerWidth))),y=mobile?topbar:Math.max(topbar,Math.min(topbar+layout.todoY,innerHeight-Math.min(layout.todoHeight,innerHeight-topbar)));return createPortal(<section className="todo-panel panel" style={{position:'fixed',left:x,top:y,width:mobile?innerWidth:Math.min(layout.todoWidth,innerWidth),height:mobile?innerHeight-topbar:Math.min(layout.todoHeight,innerHeight-topbar),'--todo-left':x+'px','--todo-top':y+'px','--todo-width':(mobile?innerWidth:Math.min(layout.todoWidth,innerWidth))+'px'} as React.CSSProperties}>{children({x,y,topbar})}</section>,document.body);}
+export function FloatingChecklist({children,layout}:any){const [,refresh]=useState(0);useEffect(()=>{const resize=()=>refresh(n=>n+1);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);const topbar=document.querySelector('.topbar')?.getBoundingClientRect().bottom??48;const mobile=innerWidth<=700;const x=mobile?0:Math.max(0,Math.min(layout.todoX,innerWidth-Math.min(layout.todoWidth,innerWidth))),y=mobile?topbar:Math.max(topbar,Math.min(topbar+layout.todoY,innerHeight-Math.min(layout.todoHeight,innerHeight-topbar)));return createPortal(<MotionSurface><section className="todo-panel panel" style={{position:'fixed',left:x,top:y,width:mobile?innerWidth:Math.min(layout.todoWidth,innerWidth),height:mobile?innerHeight-topbar:Math.min(layout.todoHeight,innerHeight-topbar),'--todo-left':x+'px','--todo-top':y+'px','--todo-width':(mobile?innerWidth:Math.min(layout.todoWidth,innerWidth))+'px'} as React.CSSProperties}>{children({x,y,topbar})}</section></MotionSurface>,document.body);}

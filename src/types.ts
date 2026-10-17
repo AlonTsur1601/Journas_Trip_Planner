@@ -12,6 +12,8 @@ export type Block = {
   id: string;
   start: string;
   end: string;
+  startDate?: string;
+  endDate?: string;
   title: string;
   detail: string;
   color: string;

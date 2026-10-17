@@ -1,5 +1,6 @@
 import {PasswordField} from './PasswordField';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import {beginActivity} from './activity';
 import {Mail, ShieldCheck, KeyRound} from 'lucide-react';
 import type {User} from 'firebase/auth';
 import {linkGoogleAccount,linkPasswordAccount,changeAccountEmail,changeAccountPassword,unlinkAccountProvider} from './account-auth';
@@ -9,6 +10,7 @@ export function AccountCredentials({user,onMessage,onChanged}: {user:User;onMess
  const [mode,setMode]=useState<'link'|'email'|'password'|null>(null);
  const [busy,setBusy]=useState(false);
  const [disconnect,setDisconnect]=useState<'google.com'|'password'|null>(null);
+ useEffect(()=>{if(!busy)return;return beginActivity(disconnect?'Disconnecting your sign-in method…':mode==='email'?'Sending confirmation to your new email…':mode==='password'?'Updating your password…':'Linking your sign-in method…');},[busy]);
  const providers=user.providerData.map(p=>p.providerId);
  const password=providers.includes('password'),google=providers.includes('google.com');
  const canDisconnect=password&&google;

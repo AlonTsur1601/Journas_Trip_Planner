@@ -3,18 +3,13 @@ export function followCalendarDay(selected: string, previous: string, current: s
 }
 
 export function observeClock(tick: () => void) {
-  const interval = setInterval(tick, 30000);
-  let midnight: ReturnType<typeof setTimeout>;
-  const schedule = () => {
-    const next = new Date();
-    next.setHours(24, 0, 0, 0);
-    midnight = setTimeout(() => { tick(); schedule(); }, next.getTime() - Date.now() + 10);
+  let boundary: ReturnType<typeof setTimeout>;
+  const schedule=()=>{
+    boundary=setTimeout(()=>{tick();schedule();},60000-Date.now()%60000+10);
   };
+  const resume=()=>{clearTimeout(boundary);tick();schedule();};
   schedule();
-  document.addEventListener("visibilitychange", tick);
-  return () => {
-    clearInterval(interval);
-    clearTimeout(midnight);
-    document.removeEventListener("visibilitychange", tick);
-  };
+  document.addEventListener("visibilitychange",resume);
+  window.addEventListener("focus",resume);
+  return()=>{clearTimeout(boundary);document.removeEventListener("visibilitychange",resume);window.removeEventListener("focus",resume);};
 }

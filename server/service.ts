@@ -4,7 +4,7 @@ import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store,
 import { resolveWallTime } from './time.js';
 import tzlookup from 'tz-lookup';
 const kinds: Kind[] = ['pins', 'blocks', 'tasks', 'connections'];
-const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'title', 'detail', 'color', 'symbol', 'pinId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId'], connections: ['from', 'to', 'arrow'] };
+const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'startDate', 'endDate', 'title', 'detail', 'color', 'symbol', 'pinId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId'], connections: ['from', 'to', 'arrow'] };
 function fail(status: number, code: string, message: string, details?: unknown): never { throw new ApiError(status, code, message, details); }
 const identifier = (value: unknown): string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value) ? value : fail(400, 'INVALID_ID', 'Invalid identifier');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.length <= max ? value : fail(400, 'INVALID_TEXT', `Text must contain at most ${max} characters`);
@@ -17,6 +17,15 @@ const date = (value: unknown): string => {
         return fail(400, 'INVALID_DATE', 'Invalid calendar date');
     return value;
 };
+function blockDays(item:Data,fallback:string){
+    const first=String(item.startDate??fallback),last=String(item.endDate??first),days:string[]=[];
+    for(let d=new Date(first+'T12:00:00Z');d.toISOString().slice(0,10)<=last;d.setUTCDate(d.getUTCDate()+1)){
+        const value=d.toISOString().slice(0,10);
+        if(value===last&&item.end==='00:00')break;
+        days.push(value);
+    }
+    return days;
+}
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const tripPath = (id: string) => `trips/${id}`;
 const userPath = (uid: string) => `users/${uid}`;
@@ -119,8 +128,8 @@ function validateItem(kind: Kind, item: Data) {
         if (item.disambiguation !== null && item.disambiguation !== 'earlier' && item.disambiguation !== 'later')
             fail(400, 'INVALID_ITEM', 'Choose an occurrence for a repeated hour');
         const time = /^([01]\d|2[0-3]):[0-5]\d$/;
-        if (!time.test(String(item.start)) || !(time.test(String(item.end)) || item.end === '24:00') || String(item.start) >= String(item.end))
-            fail(400, 'INVALID_TIME', 'End time must follow start time within this day');
+        if (!time.test(String(item.start)) || !(time.test(String(item.end)) || item.end === '24:00') || String(item.startDate) > String(item.endDate) || item.startDate === item.endDate && String(item.start) >= String(item.end))
+            fail(400, 'INVALID_TIME', 'End date and time must follow start date and time');
         if (!Array.isArray(item.overrides) || item.overrides.length > 4 || item.overrides.some(x => !['title', 'detail', 'color', 'symbol'].includes(String(x))))
             fail(400, 'INVALID_ITEM', 'Invalid overrides');
     }
@@ -377,7 +386,9 @@ export class JournasService {
             const all = await tx.list(itemsPath(id, day)) as Item[];
             if(trip.lodging){const place=trip.lodging as Data;all.push({id:'trip-lodging',kind:'pins',title:place.name,note:place.note??'',color:place.color??'#7c5ce7',symbol:place.symbol??'icon:stay',lng:place.lng,lat:place.lat,versions:{}});}
             if (action === 'item.delete') {
-                if (current)
+                if (current?.kind==='blocks') {
+                    for(const blockDay of blockDays(current,day))await this.deleteItem(tx,id,blockDay,current,await tx.list(itemsPath(id,blockDay)) as Item[]);
+                } else if (current)
                     await this.deleteItem(tx, id, day, current, all);
                 return { ok: true };
             }
@@ -385,13 +396,19 @@ export class JournasService {
                 fail(409, 'DAY_LIMIT', 'This day has reached its item limit (200 per type, 400 total)');
             let item = bump(current ?? { id: itemId, kind, versions: {} }, patch);
             if (kind === 'blocks') {
+                if (!('startDate' in item))item=bump(item,{startDate:day});
+                if (!('endDate' in item))item=bump(item,{endDate:item.startDate});
+                const first=date(item.startDate),last=date(item.endDate);
+                this.dayWithin(trip,first);this.dayWithin(trip,last);
+                if(first>last)fail(400,'INVALID_TIME','End date must follow start date');
                 if (!('timezone' in item))
                     item = bump(item, { timezone: (trip.lodging as Data|undefined)?.timezone ?? input.clientTimezone ?? 'UTC' });
                 if (!('disambiguation' in item))
                     item = bump(item, { disambiguation: null });
             }
             if (kind === 'blocks' && item.pinId) {
-                const pin = all.find(x => x.id === item.pinId && x.kind === 'pins');
+                const sourcePins=item.startDate===day?all:await tx.list(itemsPath(id,String(item.startDate))) as Item[];
+                const pin = [...sourcePins,...all.filter(x=>x.id==='trip-lodging')].find(x => x.id === item.pinId && x.kind === 'pins');
                 if (!pin)
                     fail(400, 'INVALID_LINK', 'Linked place does not exist');
                 const overrides = Array.isArray(item.overrides) ? item.overrides as string[] : [];
@@ -402,8 +419,8 @@ export class JournasService {
             }
             validateItem(kind, item);
             if (kind === 'blocks') {
-                const startEpoch = resolveWallTime(day, String(item.start), String(item.timezone), item.disambiguation);
-                const endEpoch = resolveWallTime(day, String(item.end), String(item.timezone), item.disambiguation);
+                const startEpoch = resolveWallTime(String(item.startDate), String(item.start), String(item.timezone), item.disambiguation);
+                const endEpoch = resolveWallTime(String(item.endDate), String(item.end), String(item.timezone), item.disambiguation);
                 if (endEpoch <= startEpoch)
                     fail(400, 'INVALID_TIME', 'End time must follow start time');
                 const derived: Data = {};
@@ -426,8 +443,9 @@ export class JournasService {
                 linked('from', 'pins');
                 linked('to', 'pins');
             }
-            tx.set(path, item);
-            tx.set(`trips/${id}/days/${day}`, { date: day, updatedAt: this.now() });
+            if(kind==='blocks')await this.syncBlock(tx,id,item,current,day);
+            else {tx.set(path, item);
+            tx.set(`trips/${id}/days/${day}`, { date: day, updatedAt: this.now() });}
             if (kind === 'pins')
                 for (const block of all.filter(x => x.kind === 'blocks' && x.pinId === itemId)) {
                     const inherited: Data = {};
@@ -436,10 +454,22 @@ export class JournasService {
                         if (!(block.overrides as string[]).includes(key) && block[key] !== values[key])
                             inherited[key] = values[key];
                     if (Object.keys(inherited).length)
-                        tx.set(`${itemsPath(id, day)}/${block.id}`, bump(block, inherited));
+                        await this.syncBlock(tx,id,bump(block, inherited),block,day);
                 }
             return { item };
         });
+    }
+    private async syncBlock(tx:Transaction,id:string,item:Item,previous:Item|undefined,day:string){
+        const active=new Set(blockDays(item,day));
+        for(const target of new Set([...active,...(previous?blockDays(previous,day):[])])){
+            const existing=await tx.list(itemsPath(id,target)) as Item[];
+            if(!active.has(target)){await this.deleteItem(tx,id,target,item,existing);continue;}
+            const collision=existing.find(other=>other.id===item.id);
+            if(collision&&(collision.kind!=='blocks'||String(collision.startDate??target)!==String(previous?.startDate??day)))fail(409,'ITEM_KIND','This identifier belongs to another item');
+            if(!collision&&(existing.filter(x=>x.kind==='blocks').length>=200||existing.length>=400))fail(409,'DAY_LIMIT','A day in this time block has reached its item limit');
+            tx.set(`${itemsPath(id,target)}/${item.id}`,item);
+            tx.set(`trips/${id}/days/${target}`,{date:target,updatedAt:this.now()});
+        }
     }
     private async share(tx: Transaction, tokenInput: unknown) {
         const token = text(tokenInput, 100);
@@ -468,8 +498,10 @@ export class JournasService {
             }
             if (item.kind === 'blocks' && related.blockId === item.id)
                 patch.blockId = null;
-            if (Object.keys(patch).length)
-                tx.set(`${itemsPath(id, day)}/${related.id}`, bump(related, patch));
+            if (Object.keys(patch).length){
+                if(related.kind==='blocks')await this.syncBlock(tx,id,bump(related,patch),related,day);
+                else tx.set(`${itemsPath(id, day)}/${related.id}`, bump(related, patch));
+            }
         }
         tx.set(`trips/${id}/days/${day}`, { date: day, updatedAt: this.now() });
     }

@@ -45,6 +45,7 @@ export default function MapPanel({
   const [source,setSource]=useState<string|null>(null);
   const arrow=arrowPreference;
   const action=useRef({mode,source,placementMode,arrow}); action.current={mode,source,placementMode,arrow};
+  const viewport = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
@@ -52,7 +53,23 @@ export default function MapPanel({
   const restoringView = useRef(false);
   callbacks.current = { onView, onPin, onAdd, readonly, onConnect, onMovePin };
   useEffect(() => {
-    if (!container.current) return;
+    if (!container.current || !viewport.current) return;
+    const visible = viewport.current;
+    const surface = container.current;
+    // Reserve only the splitter range, without an additional outer margin. Splitter
+    // movement changes only this window into an already rendered map surface.
+    const sizeSurface = () => {
+      const workspace = visible.closest('.workspace');
+      const width = Math.ceil((workspace?.clientWidth ?? visible.clientWidth));
+      const height = Math.ceil((workspace?.clientHeight ?? visible.clientHeight));
+      const x = (width-visible.clientWidth)/2, y = (height-visible.clientHeight)/2;
+      const changed = surface.style.width !== `${width}px` || surface.style.height !== `${height}px`;
+      Object.assign(surface.style,{width:`${width}px`,height:`${height}px`,left:`${-x}px`,top:`${-y}px`,right:'auto',bottom:'auto'});
+      surface.style.setProperty('--map-inset-x',`${x}px`);
+      surface.style.setProperty('--map-inset-y',`${y}px`);
+      return changed;
+    };
+    sizeSurface();
     restoringView.current = false;
     const m = new maplibregl.Map({
       container: container.current,
@@ -60,7 +77,18 @@ export default function MapPanel({
       center: layout.center,
       zoom: layout.zoom,
       attributionControl: { compact: true },
+      trackResize: false,
       canvasContextAttributes: {preserveDrawingBuffer:true},
+      transformConstrain:(center,zoom)=>{
+        const workspace=visible.closest('.workspace')??visible;
+        const bounds=workspace.getBoundingClientRect();
+        const bearing=map.current?.getBearing()??0;
+        const y=maplibregl.MercatorCoordinate.fromLngLat(center).y;
+        const minimum=worldViewportLimits(bounds.width,bounds.height,bearing,zoom,y).minZoom;
+        const constrainedZoom=Math.max(minimum,Math.min(22,zoom));
+        const limits=worldViewportLimits(visible.clientWidth,visible.clientHeight,bearing,constrainedZoom,y);
+        return {center:new maplibregl.LngLat(center.lng,new maplibregl.MercatorCoordinate(0,limits.centerY).toLngLat().lat),zoom:constrainedZoom};
+      },
     });
     map.current = m;
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
@@ -72,14 +100,16 @@ export default function MapPanel({
     compass.querySelector("span")!.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,5 11,16 21,16" fill="var(--accent)"/><polygon points="16,27 21,16 11,16" fill="currentColor"/></svg>';
     let constraining = false;
     const containWorld = () => {
-      if (constraining) return;
+      if (constraining || visible.closest('[aria-hidden="true"]')) return;
       constraining = true;
-      const { width, height } = m.getCanvas().getBoundingClientRect();
+      // Keep world bounds independent of the splitter. Recomputing the minimum
+      // zoom from the visible crop zoomed the map in/out while it was resized.
+      const { width, height } = (visible.closest('.workspace') ?? visible).getBoundingClientRect();
       const center = m.getCenter();
       const y = maplibregl.MercatorCoordinate.fromLngLat(center).y;
       const limits = worldViewportLimits(width, height, m.getBearing(), m.getZoom(), y);
       if(Math.abs(m.getMinZoom()-limits.minZoom)>.001)m.setMinZoom(limits.minZoom);
-      const bounded = limits.centerY;
+      const bounded = worldViewportLimits(visible.clientWidth,visible.clientHeight,m.getBearing(),m.getZoom(),y).centerY;
       if (Math.abs(y - bounded) > 0.0000001) m.setCenter([center.lng, new maplibregl.MercatorCoordinate(0, bounded).toLngLat().lat]);
       constraining = false;
     };
@@ -119,6 +149,36 @@ export default function MapPanel({
       if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
     }, true);
     let attributionInitialized = false;
+    const attributionControl=surface.querySelector<HTMLDetailsElement>('.maplibregl-ctrl-attrib');
+    const attributionButton=attributionControl?.querySelector<HTMLElement>('summary');
+    let attributionOpen=false;
+    let attributionMotion:Animation|undefined;
+    const toggleAttribution=(event:MouseEvent)=>{
+      if(!attributionControl)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      const inner=attributionControl.querySelector<HTMLElement>('.maplibregl-ctrl-attrib-inner');
+      if(!inner)return;
+      const left=Boolean(attributionControl.closest('.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-left'));
+      const collapsed=`inset(0 ${left?'100%':'0'} 0 ${left?'0':'100%'} round 12px)`;
+      const expanded='inset(0 0 0 0 round 12px)';
+      const previousClip=attributionMotion?getComputedStyle(inner).clipPath:attributionOpen?expanded:collapsed;
+      attributionMotion?.cancel();
+      attributionOpen=!attributionOpen;
+      if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+        attributionControl.open=attributionOpen;
+        attributionControl.classList.toggle('maplibregl-compact-show',attributionOpen);return;
+      }
+      attributionControl.open=true;attributionControl.classList.add('maplibregl-compact-show');
+      const opening=attributionOpen;
+      const motion=inner.animate([{clipPath:previousClip},{clipPath:opening?expanded:collapsed}],{duration:220,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});
+      attributionMotion=motion;
+      motion.finished.then(()=>{
+        if(attributionMotion!==motion)return;
+        attributionControl.open=opening;attributionControl.classList.toggle('maplibregl-compact-show',opening);
+        motion.cancel();attributionMotion=undefined;
+      },()=>{});
+    };
+    attributionButton?.addEventListener('click',toggleAttribution,true);
     m.on("sourcedata", () => {
       const attribution = container.current?.querySelector(".maplibregl-ctrl-attrib-inner");
       if (!attribution) return;
@@ -139,7 +199,7 @@ export default function MapPanel({
         m.setLayoutProperty(layer.id,'text-field',['coalesce',['get','name:en'],['get','name_en'],'']);
     });
     m.on("moveend", () => {
-      if (restoringView.current) return;
+      if (restoringView.current || visible.closest('[aria-hidden="true"]')) return;
       const c = m.getCenter();
       callbacks.current.onView([c.lng, c.lat], m.getZoom());
     });
@@ -155,6 +215,11 @@ export default function MapPanel({
     retainedFrame.className='map-retained-frame';
     retainedFrame.setAttribute('aria-hidden','true');
     let retaining=false, awaitingResize=false, renderedFrame=false;
+    // A buffered resize snapshot must never cover the live map during a gesture.
+    const revealInteractiveMap=()=>{retainedFrame.remove();retaining=false;};
+    m.on('touchstart',revealInteractiveMap);
+    m.on('dragstart',revealInteractiveMap);
+    m.on('zoomstart',revealInteractiveMap);
     const revealRenderedMap=()=>{
       if(!retaining)renderedFrame=true;
       if(retaining && !awaitingResize && m.areTilesLoaded()){
@@ -165,29 +230,41 @@ export default function MapPanel({
     m.on('render',revealRenderedMap);
     const observer = new ResizeObserver(() => {
       awaitingResize=true;
-      // Resizing a WebGL drawing buffer clears it. Keep its last complete image
-      // stretched over the new dimensions until the replacement render is ready.
+      // Window-size changes can require a new buffer. Retain the old pixels at
+      // their original size, centered and clipped, until the new tiles are ready.
+      const workspace=visible.closest('.workspace');
+      const needsBuffer=surface.clientWidth!==Math.ceil((workspace?.clientWidth??visible.clientWidth))||surface.clientHeight!==Math.ceil((workspace?.clientHeight??visible.clientHeight));
+      if(!needsBuffer){sizeSurface();containWorld();awaitingResize=false;return;}
       if(!retaining && renderedFrame){
         const canvas=m.getCanvas();
         retainedFrame.width=canvas.width;
         retainedFrame.height=canvas.height;
+        retainedFrame.style.width=`${surface.clientWidth}px`;
+        retainedFrame.style.height=`${surface.clientHeight}px`;
         retainedFrame.getContext('2d')!.drawImage(canvas,0,0);
-        canvas.parentElement!.append(retainedFrame);
+        visible.append(retainedFrame);
         retaining=true;
       }
       cancelAnimationFrame(resizeFrame);
       resizeFrame=requestAnimationFrame(()=>{
         restoringView.current=true;
+        sizeSurface();
         m.resize();
         awaitingResize=false;
         m.triggerRepaint();
         restoringView.current=false;
       });
     });
-    observer.observe(container.current);
+    observer.observe(visible);
+    if(visible.closest('.workspace'))observer.observe(visible.closest('.workspace')!);
     return () => {
+      attributionButton?.removeEventListener('click',toggleAttribution,true);
+      attributionMotion?.cancel();
       observer.disconnect();
       retainedFrame.remove();
+      m.off('touchstart',revealInteractiveMap);
+      m.off('dragstart',revealInteractiveMap);
+      m.off('zoomstart',revealInteractiveMap);
       m.off('render',revealRenderedMap);
       cancelAnimationFrame(resizeFrame);
       restoringView.current = true;
@@ -367,7 +444,7 @@ export default function MapPanel({
   }, [layout.center[0], layout.center[1], layout.zoom]);
   return (
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
-      <div ref={container} className="map-canvas" />
+      <div ref={viewport} className="map-viewport"><div ref={container} className="map-canvas" /></div>
       {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{if(onStartPinSearch){onStartPinSearch();return;}setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>onArrowPreferenceChange?.(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
       {(mode||movingPinId)&&<div className="map-mode-note">{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}<button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>

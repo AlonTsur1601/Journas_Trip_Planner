@@ -3,7 +3,7 @@ import {Compass} from 'lucide-react';
 import {activitySnapshot,subscribeActivity,type Activity} from './activity';
 
 export default function LoadingScreen({text='Getting your trips ready…',activity}:{text?:string;activity?:Activity}){
-  return <div className="activity-screen" role="status" aria-live="polite" aria-busy="true"><div className="auth-map-background" aria-hidden="true"/><section className="activity-card" tabIndex={-1}><Compass aria-hidden="true"/><h2>{activity?.text??text}</h2></section></div>;
+  return <div className={`activity-screen${activity?.presentation==='overlay'?' activity-translucent':''}`} role="status" aria-live="polite" aria-busy="true"><div className="auth-map-background" aria-hidden="true"/><section className="activity-card" tabIndex={-1}><Compass aria-hidden="true"/><h2>{activity?.text??text}</h2></section></div>;
 }
 export function ActivityOverlay(){
   const tasks=useSyncExternalStore(subscribeActivity,activitySnapshot);

@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import LocationPicker from "./LocationPicker";
+import GuidedTour from './GuidedTour';
 import HomePage, {TripBadge} from "./HomePage";
 import LoadingScreen from './LoadingScreen';
 import {beginActivity} from './activity';
@@ -45,6 +46,7 @@ import {AccountName} from "./AccountName";
 import {accountPhoto} from "./account-profile";
 import { api, auth, configured } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
+import {changeBlockPlace} from './block-link';
 import {blockRange} from './block-range';
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout, lodgingForDate } from "./map-start";
@@ -1948,25 +1950,7 @@ export default function App() {
                   <Select
                     label="Linked place"
                     value={edit.item.pinId ?? ""}
-                    onChange={(e: any) => {
-                      const p = day.pins.find((p) => p.id === e.target.value);
-                      setEdit({
-                        ...edit,
-                        item: {
-                          ...edit.item,
-                          pinId: p?.id ?? null,
-                          ...(p
-                            ? {
-                                title: p.title,
-                                detail: p.note,
-                                color: p.color,
-                                symbol: p.symbol,
-                                overrides: [],
-                              }
-                            : {title:"",detail:"",color:settings.accent,symbol:"icon:stay",overrides:[]}),
-                        },
-                      });
-                    }}
+                    onChange={(e:any)=>setEdit({...edit,item:changeBlockPlace(edit.item as any,day.pins.find(p=>p.id===e.target.value))})}
                   >
                     <option value="">Independent time block</option>
                     {day.pins.map((p) => (
@@ -2323,6 +2307,7 @@ export default function App() {
                 setSettings({ ...settings, displayName: e.target.value })
               }
             />
+            <button type="button" className="button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Start guided tour</button>
             <button type="button" className="button account-methods-button" onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
@@ -2537,6 +2522,7 @@ export default function App() {
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
+      {user&&ready&&!shareTrip&&<GuidedTour userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{void saveLayout().then(()=>{setModal(null);setEdit(null);setHome(true);});}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<LoadingScreen text="Loading your schedule…"/>}

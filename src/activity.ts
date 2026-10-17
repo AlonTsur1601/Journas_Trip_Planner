@@ -1,12 +1,12 @@
-export type Activity = {id:number; text:string};
+export type Activity = {id:number; text:string;presentation?:"overlay"};
 let nextId=0;
 let active:Activity[]=[];
 const listeners=new Set<()=>void>();
 export const activitySnapshot=()=>active;
 export const subscribeActivity=(listener:()=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
 const emit=()=>listeners.forEach(listener=>listener());
-export function beginActivity(text:string){
-  const task={id:++nextId,text};
+export function beginActivity(text:string,presentation?:"overlay"){
+  const task:Activity={id:++nextId,text,...(presentation?{presentation}:{})};
   active=[...active,task];emit();
   let ended=false;
   return ()=>{

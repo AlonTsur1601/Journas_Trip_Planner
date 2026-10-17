@@ -32,7 +32,7 @@ export async function api<T = unknown>(
   background=false,
 ): Promise<T> {
   const description=background?undefined:actionDescription(action,data);
-  const finish=description?beginActivity(description):()=>{};
+  const finish=description?beginActivity(description,action==='item.patch'&&['pins','blocks','tasks'].includes(String(data.kind))?'overlay':undefined):()=>{};
   try{
   const token = await auth?.currentUser?.getIdToken();
   const response = await fetch("/api/journas", {

@@ -2357,3 +2357,42 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @media(hover:hover) and (pointer:fine){.home-resume-card:not(:disabled):hover::after{opacity:1;}}
 .home-resume-card:not(:disabled):active::after{opacity:1;}
 @media(prefers-reduced-motion:reduce){.home-resume-card::after{transition:none;}}
+
+/* Saving an item keeps the surrounding planner visible, as dialogs do. */
+.activity-screen.activity-translucent{background:#19132780;}
+.activity-translucent>.auth-map-background{display:none;}
+.segmented-time>.time-picker-toggle{margin-left:auto;display:grid;place-items:center;width:28px;height:28px;min-width:28px;padding:0;border-radius:4px;background:var(--accent);color:#fff;}
+.segmented-time>.time-picker-toggle>svg{position:static;translate:none;margin:0;color:#fff;}
+.time-picker-popover{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #0003;}
+.time-picker{display:grid;gap:14px;text-align:center;}
+.time-picker>strong{font-size:16px;}
+.time-picker-wheels{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;}
+.time-wheel-column{width:76px;min-width:0;}
+.time-wheel-column>span{font-size:11px;color:var(--muted);}
+.time-wheel{height:200px;overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none;padding:80px 0;position:relative;mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);}
+.time-wheel::-webkit-scrollbar{display:none;}
+.time-wheel>button{display:block;width:100%;height:40px;min-height:40px;padding:0;scroll-snap-align:center;font-size:22px;font-variant-numeric:tabular-nums;border-radius:7px;color:var(--muted);}
+.time-wheel>button.selected{color:var(--accent);font-weight:700;background:color-mix(in srgb,var(--accent) 12%,var(--surface));}
+.time-wheel:focus-visible{outline:1px solid var(--accent);border-radius:8px;}
+.time-picker-colon{font-size:26px;margin-top:16px;}
+.time-picker-actions{display:flex;gap:10px;}
+.time-picker-actions>.button{flex:1;}
+
+.guided-tour{position:fixed;inset:0;z-index:250;pointer-events:none;}
+.tour-shade{position:absolute;inset:0;overflow:visible;pointer-events:none;}
+.tour-card{position:fixed;pointer-events:auto;max-height:calc(100dvh - 24px);overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--accent);border-radius:12px;padding:18px;box-shadow:0 12px 45px #0004;}
+.tour-card h2{margin:10px 22px 10px 0;font-size:18px;line-height:1.3;}
+.tour-card p{font-size:13px;line-height:1.6;margin:0 0 14px;}
+.tour-card small{color:var(--muted);display:block;margin-bottom:12px;}
+.tour-eyebrow{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--accent);}
+.tour-close{position:absolute;right:8px;top:8px;}
+.tour-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.tour-actions .button{font-size:12px;padding:7px 10px;}
+@media(max-width:700px){.tour-card{padding:14px;}.tour-card h2{font-size:16px;}.tour-card p{font-size:12px;}.home-account{gap:6px;}}
+
+body:has(.guided-tour[data-modal="true"]) .modal-shade{padding-bottom:var(--tour-space,280px);}
+body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - var(--tour-space,280px) - 24px);}
+
+body:has(.guided-tour) .bounded-popover:not([inert]){z-index:270!important;}
+
+.time-wheel[aria-disabled="true"]{overflow:hidden;}

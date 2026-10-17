@@ -1,7 +1,7 @@
 import {MotionSurface} from "./MotionSurface";
 import {useEffect,useRef,useState,type ReactNode,type CSSProperties,type SyntheticEvent} from 'react';
 
-import {CalendarDays,Compass,Settings,Pin,Plus,MoreHorizontal,Trash2,X,LogOut,ChevronDown} from 'lucide-react';
+import {CircleHelp,CalendarDays,Compass,Settings,Pin,Plus,MoreHorizontal,Trash2,X,LogOut,ChevronDown} from 'lucide-react';
 
 import {Dropdown} from './Controls';
 
@@ -72,7 +72,7 @@ export default function HomePage({trips,state,preferences,name,avatar,resume,bus
 
  return <main className="home-page"><div className="auth-map-background" aria-hidden="true"/><div className="home-content">
 
-  <div className="home-masthead"><div className="brand home-brand"><Compass/><strong>Journas</strong></div><div className="home-account">{avatar}<span><strong>{name}</strong></span><button className="icon" aria-label="Settings" title="Settings" onClick={onSettings}><Settings size={21}/></button><button className="icon" aria-label="Sign out" title="Sign out" onClick={onLogout}><LogOut size={20}/></button></div></div>
+  <div className="home-masthead"><div className="brand home-brand"><Compass/><strong>Journas</strong></div><div className="home-account">{avatar}<span><strong>{name}</strong></span><button className="icon" aria-label="Start guided tour" title="Start guided tour" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}><CircleHelp size={21}/></button><button className="icon" aria-label="Settings" title="Settings" onClick={onSettings}><Settings size={21}/></button><button className="icon" aria-label="Sign out" title="Sign out" onClick={onLogout}><LogOut size={20}/></button></div></div>
 
   <section className="home-intro"><div className="home-intro-copy"><h1>Where will you go next?</h1><p>Pick up your plans or start a new trip.</p></div></section><div className="home-featured"><div className="home-resume-column"><button className="home-continue home-resume-card" style={{"--resume-color":resumeLook?.color??preferences.accent} as CSSProperties} disabled={busy} onContextMenu={event=>{if(resume)context(event,resume,'resume');}} onClick={()=>onOpen(resume??{tripId:null,date:null})}><span className="home-resume-art" aria-hidden="true">{resumeLook?.mode==='image'&&resumeLook.image?<img src={resumeLook.image} alt="" onLoad={applyImageTint}/>:resumeLook?<SymbolIcon value={resumeLook.symbol}/>:<Compass/>}</span><span className="home-resume-content"><span className="home-resume-label">{busy?'Opening your plan…':'Continue where you left off'}</span><strong>{resumeTrip?.name??(resume?.date?dateLabel(resume.date):'Your next adventure')}</strong><small><CalendarDays size={14}/>{resumeTrip?dateRangeLabel(resumeTrip.startDate,resumeTrip.endDate):resume?.date?dateLabel(resume.date):'Pick up your plans'}{resumeTrip&&resume?.date&&<span className="home-resume-day">Resume {dateLabel(resume.date)}</span>}</small></span></button><button className="button home-create" disabled={trips.length>=100} onClick={onCreate}><Plus size={18}/>Create new trip</button><button className="home-browse-trips" disabled={!trips.length} onClick={()=>setShowAll(true)}><span><strong>All trips</strong><small>{trips.length} {trips.length===1?'trip':'trips'} saved</small></span></button></div>
 

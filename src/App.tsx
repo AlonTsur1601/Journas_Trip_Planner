@@ -1,7 +1,7 @@
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import tzlookup from "tz-lookup";
 import LocationPicker from "./LocationPicker";
+import {useSessionVerification} from "./session-verification";
 import {practiceActive,getPracticeSession,setPractice,practiceLocal,practiceSession} from "./practice";
 import GuidedTour from './GuidedTour';
 import HomePage, {TripBadge} from "./HomePage";
@@ -361,18 +362,19 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
 }
 export default function App(){
  const [practice,setPracticeMode]=useState(practiceActive());
+ const verification=useSessionVerification();
+ const cachedIdentity=useRef(verification.accountId);
+ useEffect(()=>{if(cachedIdentity.current!==verification.accountId){cachedIdentity.current=verification.accountId;if(practice){setPractice(false);setPracticeMode(false);}}},[verification.accountId,practice]);
  useEffect(()=>{const change=(event:Event)=>{const value=Boolean((event as CustomEvent).detail);setPractice(value);setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
- return <PlannerApp key={practice?'practice':'profile'} practice={practice}/>;
+ return <><Activity mode={practice?'hidden':'visible'}><PlannerApp key={verification.accountId??"signed-out"} practice={false} verified={verification.verified} onVerified={verification.confirm}/></Activity>{practice&&<PlannerApp practice verified={verification.verified} onVerified={verification.confirm}/>}</>;
 }
-function PlannerApp({practice}:{practice:boolean}) {
+function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:boolean|null;onVerified:()=>void}) {
  const [practiceData]=useState(()=>practice?getPracticeSession():null);
  const api:typeof profileApi=(action,data,signal,background)=>profileApi(action,data,signal,background,practiceData);
  const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
- const [verified,setVerified]=useState<boolean|null>(null);
- useEffect(()=>{let live=true;const refresh=()=>{if(!auth?.currentUser)return;void api<{verified:boolean}>('auth.verification-status').then(async result=>{if(result.verified)await auth?.currentUser?.getIdToken(true);if(live)setVerified(result.verified);}).catch(()=>{if(live)setVerified(false);});};const stop=auth?onAuthStateChanged(auth,()=>{setVerified(null);refresh();}):()=>{};window.addEventListener('journas-email-confirmed',refresh);return()=>{live=false;stop();window.removeEventListener('journas-email-confirmed',refresh);};},[]);
-
-  const [user, setUser] = useState<User | null>(null),
-    [ready, setReady] = useState(!configured),
+ const loadedAccount=useRef('');
+  const [user, setUser] = useState<User | null>(()=>practice?auth?.currentUser??null:null),
+    [ready, setReady] = useState(practice||!configured),
     [trips, setTrips] = useState<Trip[]>([]),
     [trip, setTrip] = useState<Trip | null>(null),
     [date, setDate] = useState(today()),
@@ -482,11 +484,13 @@ function PlannerApp({practice}:{practice:boolean}) {
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
+      if(u&&loadedAccount.current===u.uid){setUser(u);return;}
+      loadedAccount.current="";
       screenReady.current=false;
       setChooseName(false);
       if(u&&!token&&reloadVisit.current){try{const saved=JSON.parse(sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
       setUser(u);
-      setReady(!u);
+      setReady(practice||!u);
     });
   }, []);
   useEffect(() => {
@@ -560,7 +564,7 @@ function PlannerApp({practice}:{practice:boolean}) {
     return result.trips;
   }
   useEffect(() => {
-    if (!user || verified!==true) return;
+    if (!user || verified!==true || loadedAccount.current===user.uid) return;
     let cancelled=false;
     let saved:any=null;
     initialTripRequest.current=null;
@@ -577,6 +581,7 @@ function PlannerApp({practice}:{practice:boolean}) {
     Promise.all([bootstrap,user.getIdTokenResult()])
       .then(async ([result, identity]) => {
         if(cancelled)return;
+        loadedAccount.current=user.uid;
         const list=result.trips,r={settings:result.settings};
         setChooseName(!practice&&!result.settings.displayName?.trim());
         setTrips(list);
@@ -1190,7 +1195,7 @@ function PlannerApp({practice}:{practice:boolean}) {
       </>
     );
   if(user&&verified===null)return <LoadingScreen text="Checking your email confirmation…"/>;
-  if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{setVerified(true);setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
+  if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
@@ -2322,7 +2327,7 @@ function PlannerApp({practice}:{practice:boolean}) {
                 setSettings({ ...settings, displayName: e.target.value })
               }
             />
-            <button type="button" className="button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Start guided tour</button>
+            <button type="button" className="button account-methods-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Help and guided tour <ChevronRight size={16}/></button>
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">

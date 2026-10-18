@@ -1,3 +1,4 @@
+import {defaultSettings} from './types';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
@@ -33,6 +34,7 @@ export async function api<T = unknown>(
   background=false,
   practice:PracticeData|null=getPracticeSession(),
 ): Promise<T> {
+  if(practice&&action==='planner.restore'&&practice.documents.length===0)return {trips:[],settings:{...defaultSettings},home:{pins:[],recentTrips:[],recentDays:[]},restore:null} as T;
   if(practice&&!action.startsWith('auth.')&&!action.startsWith('tour.')&&!action.startsWith('places.'))return practiceRequest<T>(practice,async practiceDocuments=>{
     const token=await auth?.currentUser?.getIdToken();
     const response=await fetch('/api/journas',{method:'POST',signal,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({action,...data,practiceDocuments,screen:null})});

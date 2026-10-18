@@ -2397,8 +2397,6 @@ body:has(.guided-tour) .bounded-popover:not([inert]){z-index:270!important;}
 
 .time-wheel[aria-disabled="true"]{overflow:hidden;}
 
-.practice-banner{position:fixed;bottom:0;left:0;right:0;z-index:240;background:var(--surface);color:var(--ink);border-top:2px solid var(--accent);padding:8px 16px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:12px;}
-@media(max-width:700px){.practice-banner{font-size:11px;padding:6px 10px;gap:8px;}.practice-banner button{flex-shrink:0;}}
 
 .tour-highlight{animation:tour-highlight-breathe 2.4s ease-in-out infinite;}
 @keyframes tour-highlight-breathe{0%,100%{opacity:.6;filter:drop-shadow(0 0 2px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 4px var(--accent));}}

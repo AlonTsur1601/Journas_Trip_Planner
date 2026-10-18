@@ -2439,7 +2439,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Save preferences
             </button>
             <div className="settings-footer">
-              <button type="button" className="text-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Guided tour</button>
+              <button type="button" className="button settings-tour-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Guided tour</button>
               <small>
                 Journas · Version 1.0.0
               </small>

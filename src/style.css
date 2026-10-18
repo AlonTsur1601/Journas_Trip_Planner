@@ -2401,3 +2401,5 @@ body:has(.guided-tour) .bounded-popover:not([inert]){z-index:270!important;}
 .tour-highlight{animation:tour-highlight-breathe 2.4s ease-in-out infinite;}
 @keyframes tour-highlight-breathe{0%,100%{opacity:.6;filter:drop-shadow(0 0 2px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 4px var(--accent));}}
 @media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
+
+.settings-footer .settings-tour-button{min-height:30px;padding:5px 12px;font-size:12px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}

@@ -28,7 +28,7 @@ export const tourSteps:Step[]=[
  {title:'Pin a shortcut',text:'Use Create pin to pin your trip, one trip day, or a date to the home page. Choose a type and save it. Right-click or use the three dots on a home card to manage shortcuts.',target:c=>document.querySelector('.home-pin-modal')?'.home-pin-modal':'.home-pins-section',done:c=>c.homePins>=1},
  {title:'Find your plans again',text:'Continue resumes where you left off. Recent trips and dates reopen your plans; All trips lists every saved trip. Each card has an options menu.',target:'.home-featured'},
  {title:'Personalize Journas',text:'Open Settings to finish the tour with your preferences.',target:'.home-account [aria-label="Settings"]',done:c=>c.modal==='settings'},
- {title:'Choose your preferences',text:'Choose a theme and accent, map starting view, clock and retention preferences. By default, trip dates use the lodging location and time zone; dates outside the trip use your current location and local time. Account settings manages your sign-in methods. Save changes if you adjust anything. You can restart this guide from Guided tour in Settings.',target:'.settings-modal'},
+ {title:'Choose your preferences',text:'Choose a theme and accent, map starting view, clock and retention preferences. By default, trip dates use the lodging location and time zone; dates outside the trip use your current location and local time. Account settings manages your sign-in methods. Save changes if you adjust anything. To restart, open Settings and choose Guided tour at the bottom.',target:'.settings-modal'},
 ];
 const keyFor=(uid:string)=>`journas-guided-tour:practice-2026-10-17:${uid}`;
 function remember(uid:string){void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
@@ -73,7 +73,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    <button className="icon tour-close" aria-label="Close guide" onClick={close}><X size={18}/></button>
    <div className="tour-eyebrow"><Compass size={17}/>{welcome?'Welcome to Journas':`Step ${step+1} of ${tourSteps.length}`}</div>
    <h2>{welcome?'Plan your first trip together':current.title}</h2>
-   <p aria-live="polite">{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime from Settings.':current.text}</p>
+   <p aria-live="polite">{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':current.text}</p>
    {!welcome&&!box&&<small>Open the relevant panel to continue, or skip this step.</small>}
    <div className="tour-actions"><button className="text-button" onClick={welcome?close:next}>{welcome?'Not now':'Skip step'}</button>{(welcome||!current.done)&&<button className="button primary" onClick={()=>{if(welcome){remember(userId);setStep(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':step===tourSteps.length-1?'Finish':'Next'}<ArrowRight size={15}/></button>}</div>
   </section>

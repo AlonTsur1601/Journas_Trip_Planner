@@ -3,7 +3,7 @@ import {adminAuth,firestoreStore} from './store.js';
 import {ApiError} from './types.js';
 export const verificationCampaign='email-confirmation-2026-10-17';
 const proofPath=(proof:string)=>`rateLimits/verification_proof_${createHash('sha256').update(proof).digest('hex')}`;
-export async function verificationStatus(uid:string){const account=await adminAuth().getUser(uid);const record=await firestoreStore().transaction(tx=>tx.get(`users/${uid}`));return {verified:!account.disabled&&account.emailVerified&&record?.verificationCampaign===verificationCampaign&&record?.verifiedEmail===account.email};}
+export async function verificationStatus(uid:string){const [account,record]=await Promise.all([adminAuth().getUser(uid),firestoreStore().transaction(tx=>tx.get(`users/${uid}`))]);return {verified:!account.disabled&&account.emailVerified&&record?.verificationCampaign===verificationCampaign&&record?.verifiedEmail===account.email};}
 export async function createVerificationProof(uid:string,email:string){const proof=randomBytes(32).toString('hex');await firestoreStore().transaction(async tx=>{tx.set(proofPath(proof),{uid,email,expiresAt:Date.now()+3600000});});return proof;}
 export async function confirmVerification(value:unknown){
  if(typeof value!=='string'||!/^[a-f0-9]{64}$/.test(value))throw new ApiError(400,'INVALID_VERIFICATION','This verification link is invalid or has expired.');

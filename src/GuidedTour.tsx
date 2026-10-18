@@ -31,7 +31,7 @@ export const tourSteps:Step[]=[
  {title:'Choose your preferences',text:'Choose a theme and accent, map starting view, clock and retention preferences. By default, trip dates use the lodging location and time zone; dates outside the trip use your current location and local time. Account settings manages your sign-in methods. Save changes if you adjust anything. To restart, open Settings and choose Guided tour at the bottom.',target:'.settings-modal'},
 ];
 const keyFor=(uid:string)=>`journas-guided-tour:practice-2026-10-17:${uid}`;
-function remember(uid:string){void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
+function remember(uid:string){if(seen(uid))return;void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
 function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));}catch{return false;}}
 export default function GuidedTour({userId,ready,context,onHome,practice}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'>('closed'),[step,setStep]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
@@ -40,7 +40,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  useEffect(()=>{if(!card.current)return;const observer=new ResizeObserver(()=>setCardHeight(card.current?.getBoundingClientRect().height??250));observer.observe(card.current);return()=>observer.disconnect();},[status,inModal]);
  useEffect(()=>{if(!inModal)return;document.body.style.setProperty('--tour-space',`${cardHeight+32}px`);return()=>{document.body.style.removeProperty('--tour-space');};},[inModal,cardHeight]);
  const initialized=useRef('');const current=tourSteps[step];const activity=useSyncExternalStore(subscribeActivity,activitySnapshot);
- useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(!live)return;initialized.current=userId;if(!result.seen){remember(userId);onHome();setStatus('welcome');}}).catch(()=>{if(live&&!seen(userId)){initialized.current=userId;onHome();setStatus('welcome');}});return()=>{live=false;};},[ready,userId,practice]);
+ useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}if(seen(userId)){initialized.current=userId;return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(!live)return;initialized.current=userId;if(result.seen){try{localStorage.setItem(keyFor(userId),'seen');}catch{}}if(!result.seen){remember(userId);onHome();setStatus('welcome');}}).catch(()=>{if(live&&!seen(userId)){initialized.current=userId;onHome();setStatus('welcome');}});return()=>{live=false;};},[ready,userId,practice]);
  useEffect(()=>{const start=()=>{onHome();setStep(0);setStatus('welcome');};window.addEventListener('journas-start-tour',start);return()=>window.removeEventListener('journas-start-tour',start);},[onHome]);
  const close=()=>{remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));};
  useEffect(()=>{if(status!=='closed'){const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));}};window.addEventListener('keydown',escape,true);return()=>window.removeEventListener('keydown',escape,true);}},[status,userId,practice]);
@@ -59,7 +59,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
   const update=()=>{if(!frame)frame=requestAnimationFrame(place);};place();const observer=new MutationObserver(update);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});window.addEventListener('resize',update);window.addEventListener('scroll',update,true);
   return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};
  },[status,selector,step,activity.length,cardHeight,inModal]);
- if(status==='closed'||activity.length)return null;
+ if(status==='closed')return null;
  const welcome=status==='welcome',width=Math.min(inModal?700:340,innerWidth-24),height=cardHeight;
  const below=Boolean(box&&box.y+box.height+height+24<innerHeight);
  const side=!inModal&&box&&!below&&box.y<height+24?(box.x+box.width+width+24<innerWidth?'right':box.x>width+24?'left':null):null;

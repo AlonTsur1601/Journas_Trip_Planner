@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {onIdTokenChanged,type User} from 'firebase/auth';
-import {api,auth} from './firebase';
+import {auth} from './firebase';
+import {startSession} from './startup';
 import {VerificationCache} from './verification-cache';
 const cache=new VerificationCache();
 const keyFor=(user:User)=>`${user.uid}:${user.email?.toLowerCase()??''}`;
@@ -16,9 +17,9 @@ export function useSessionVerification(){
    const key=keyFor(user);
    setIdentity(current=>({key,accountId:user.uid,verified:cache.has(key)?true:current.key===key?current.verified:null}));
    void cache.check(key,async()=>{
-    const result=await api<{verified:boolean}>('auth.verification-status',{},undefined,true,null);
-    if(result.verified)await user.getIdToken(true);
-    return result.verified;
+    const verified=await startSession(user.uid);
+    if(verified&&!user.emailVerified)await user.getIdToken(true);
+    return verified;
    }).then(verified=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified});})
    .catch(()=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified:false});});
   };

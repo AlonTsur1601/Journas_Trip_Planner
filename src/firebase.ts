@@ -1,3 +1,4 @@
+import {ConcurrentReads,isReadAction} from './request-cache';
 import {defaultSettings} from './types';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
@@ -27,7 +28,7 @@ export const auth = app ? initializeAuth(app, { persistence: browserSessionPersi
 if (emulators && auth) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 }
-export async function api<T = unknown>(
+async function request<T = unknown>(
   action: string,
   data: Record<string, unknown> = {},
   signal?:AbortSignal,
@@ -71,4 +72,10 @@ export async function api<T = unknown>(
   if(result.historyId)window.dispatchEvent(new Event('journas-action-saved'));
   return result as T;
   }finally{finish();}
+}
+
+const concurrentReads=new ConcurrentReads();
+export function api<T=unknown>(action:string,data:Record<string,unknown>={},signal?:AbortSignal,background=false,practice:PracticeData|null=getPracticeSession()):Promise<T>{
+ if(!signal&&!practice&&isReadAction(action))return concurrentReads.run(JSON.stringify([auth?.currentUser?.uid??null,action,data]),()=>request<T>(action,data,undefined,background,practice));
+ return request<T>(action,data,signal,background,practice);
 }

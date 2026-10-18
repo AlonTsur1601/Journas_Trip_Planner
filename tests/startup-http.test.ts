@@ -1,0 +1,15 @@
+import {beforeAll,afterAll,beforeEach,it,expect,vi} from 'vitest';
+import {createServer,type Server} from 'node:http';
+const state=vi.hoisted(()=>({verified:true,disabled:false,campaign:true,getUser:vi.fn(),execute:vi.fn()}));
+vi.mock('../server/store.js',()=>({adminAuth:()=>({verifyIdToken:async(token:string)=>{if(!['verified','stale-email'].includes(token))throw Object.assign(Error(),{code:'auth/invalid-id-token'});return {uid:'qa',email_verified:token==='verified'};},getUser:async()=>{state.getUser();return {email:'qa@example.test',emailVerified:state.verified,disabled:state.disabled};}}),firestoreStore:()=>({transaction:async(fn:any)=>fn({get:async()=>state.campaign?{verificationCampaign:'email-confirmation-2026-10-17',verifiedEmail:'qa@example.test'}:undefined,set:()=>{}})}),purgeExpiredRateLimits:vi.fn()}));
+vi.mock('../server/service.js',()=>({JournasService:class{execute=state.execute;}}));
+import {journasHandler} from '../server/http';
+let server:Server,url:string;
+beforeAll(async()=>{server=createServer((req,res)=>void journasHandler(req,res));await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));url='http://127.0.0.1:'+(server.address() as any).port;});
+afterAll(async()=>{await new Promise<void>(r=>server.close(()=>r()));});
+beforeEach(()=>{state.verified=true;state.disabled=false;state.campaign=true;state.getUser.mockClear();state.execute.mockReset().mockResolvedValue({trips:[],settings:{displayName:'QA'},home:{pins:[]},restore:null});});
+const post=(token='verified')=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'auth.session',date:'2026-10-18',uid:'forged-user'})});
+it('checks confirmation once and returns the authorized profile in the same request',async()=>{const response=await post();expect(response.status).toBe(200);expect(await response.json()).toMatchObject({verified:true,trips:[],settings:{displayName:'QA'}});expect(state.getUser).toHaveBeenCalledTimes(1);expect(state.execute).toHaveBeenCalledWith('qa',expect.objectContaining({action:'planner.restore',date:'2026-10-18'}));});
+it('returns no profile before the inbox campaign is confirmed',async()=>{state.campaign=false;const response=await post();expect(await response.json()).toEqual({verified:false});expect(state.execute).not.toHaveBeenCalled();});
+it('rejects forged identity and withholds data from disabled or unverified accounts',async()=>{expect((await post('forged')).status).toBe(401);state.verified=false;expect(await (await post()).json()).toEqual({verified:false});state.verified=true;state.disabled=true;expect(await (await post()).json()).toEqual({verified:false});expect(state.execute).not.toHaveBeenCalled();});
+it('uses current server verification even when the old token has a stale email flag',async()=>{expect(await (await post('stale-email')).json()).toMatchObject({verified:true});});

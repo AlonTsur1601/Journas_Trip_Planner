@@ -38,7 +38,8 @@ import {useSessionVerification} from "./session-verification";
 import {practiceActive,getPracticeSession,setPractice,practiceLocal,practiceSession} from "./practice";
 import GuidedTour from './GuidedTour';
 import HomePage, {TripBadge} from "./HomePage";
-import LoadingScreen from './LoadingScreen';
+import LoadingScreen,{BackgroundStatus,hasOpenedWorkspace,finishStartup} from './LoadingScreen';
+import {initialProfile,releaseInitialProfile} from './startup';
 import {beginActivity} from './activity';
 import {emptyHome,availableHome,recordVisit,randomTripAppearance,tripAppearance} from "./home-state";
 import type {HomeState,HomeTarget,TripAppearance} from "./types";
@@ -374,6 +375,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
  const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
  const loadedAccount=useRef('');
  const loadedDay=useRef('');
+ const navigationVersion=useRef(0);
+ const dayCache=useRef(new globalThis.Map<string,{day:Day;layout:Layout|null}>());
+ const layoutWrites=useRef(new globalThis.Map<string,Promise<unknown>>());
   const [user, setUser] = useState<User | null>(()=>practice?auth?.currentUser??null:null),
     [ready, setReady] = useState(practice||!configured),
     [trips, setTrips] = useState<Trip[]>([]),
@@ -397,15 +401,20 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [shareReady, setShareReady] = useState(false),
     [joinedToken, setJoinedToken] = useState<string | null>(null),
     [conflict, setConflict] = useState<any>(null),
-    [saving, setSaving] = useState(false),
+    [pendingItems,setPendingItems] = useState<string[]>([]),
     [manualSaving, setManualSaving] = useState(false);
+  const pendingItemWrites=useRef(new Set<string>());
+  const saving=Boolean(edit&&pendingItems.includes(`${trip?.id}:${date}:${edit.kind}:${edit.item.id}`));
   const [chooseName,setChooseName]=useState(false);
   const [home,setHome]=useState(!new URLSearchParams(location.search).has('share'));
   const [homeState,setHomeState]=useState<HomeState>(emptyHome);
   const homeRef=useRef(homeState);homeRef.current=homeState;
   const homeWrites=useRef<Promise<unknown>>(Promise.resolve());
-  const [homeBusy,setHomeBusy]=useState(false);
+  const homeLastQueued=useRef('');
+  const homeBusy=false;
   const [lastTarget,setLastTarget]=useState<HomeTarget|null>(null);
+  const pendingTripForms=useRef(new WeakSet<HTMLFormElement>());
+  const [tripSaving,setTripSaving]=useState(false);
   const [tripLook,setTripLook]=useState<TripAppearance>(randomTripAppearance);
   const [tripCrop,setTripCrop]=useState<File|null>(null);
   const tripPhoto=useRef<HTMLInputElement>(null);
@@ -428,6 +437,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [,refreshAccount]=useState(0);
   const [verificationRevision,setVerificationRevision]=useState(0);
   useEffect(()=>user?listenForVerificationSession(user):undefined,[user?.uid]);
+  useEffect(()=>{if(user&&ready&&verified===true&&!practice)finishStartup();},[user?.uid,ready,verified]);
   const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
   const settingsRef=useRef(settings);settingsRef.current=settings;
@@ -448,6 +458,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline]);
   const calendarBox = useRef<HTMLDivElement>(null);
   const initialTripRequest=useRef<{tripId:string;date:string;promise:Promise<{trip:Trip;day:Day;layout:Layout|null}|null>}|null>(null);
+  useEffect(()=>{if(trip&&loadedDay.current===`${trip.id}:${date}`){const key=loadedDay.current;dayCache.current.delete(key);dayCache.current.set(key,{day,layout});if(dayCache.current.size>24)dayCache.current.delete(dayCache.current.keys().next().value!);}},[trip?.id,date,day,layout]);
   const profilePhoto = useRef<HTMLInputElement>(null);
   const [photoCrop,setPhotoCrop]=useState<File|null>(null);
   useEffect(() => {
@@ -531,30 +542,37 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>{if(live)setMessage(e.message);});return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
    if(!trip||shareTrip||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
-   try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+   const version=navigationVersion.current;
+   try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();if(version!==navigationVersion.current)return;const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});if(version!==navigationVersion.current)return;setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
   function persistHome(next:HomeState,availableTrips=trips){
-    const clean=availableHome(next,availableTrips);setHomeState(clean);homeRef.current=clean;
+    const clean=availableHome(next,availableTrips),signature=JSON.stringify(clean);if(signature===homeLastQueued.current)return;setHomeState(clean);homeRef.current=clean;homeLastQueued.current=signature;
     if(!user)return;const uid=user.uid;
-    homeWrites.current=homeWrites.current.catch(()=>{}).then(async()=>{if(auth?.currentUser?.uid===uid)await api('home.save',{home:clean});}).catch((e:any)=>setMessage(e.message));
+    homeWrites.current=homeWrites.current.catch(()=>{}).then(async()=>{if(auth?.currentUser?.uid===uid)await api('home.save',{home:clean});}).catch((e:any)=>{if(homeLastQueued.current===signature)homeLastQueued.current='';setMessage(e.message);});
   }
   useEffect(()=>{if(!ready||home||!user||shareTrip||!trip||date<trip.startDate||date>trip.endDate)return;const target={tripId:trip.id,date};setLastTarget(target);persistHome(recordVisit(homeRef.current,target));},[home,ready,user?.uid,trip?.id,date,trips.map(t=>t.id).join(',')]);
+  function rememberDay(){
+    if(tripRef.current&&loadedDay.current===`${tripRef.current.id}:${dateRef.current}`){
+      const key=loadedDay.current;dayCache.current.delete(key);dayCache.current.set(key,{day,layout:layoutRef.current});
+      if(dayCache.current.size>24)dayCache.current.delete(dayCache.current.keys().next().value!);
+    }
+  }
+  function showPlanner(selected:Trip|null,nextDate:string){
+    ++navigationVersion.current;
+    rememberDay();void saveLayout();
+    const key=selected?`${selected.id}:${nextDate}`:'',cached=dayCache.current.get(key);
+    let local:Layout|null=null;try{local=selected?JSON.parse(localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`)??'null'):null;}catch{}
+    const lodging=lodgingForDate(selected,nextDate);
+    const view=local??cached?.layout??{...defaultLayout(),...(settings.mapStart==='custom'?{center:settings.mapCenter,zoom:settings.mapZoom}:lodging?{center:[lodging.lng,lodging.lat] as [number,number],zoom:14}:{})};
+    initialTripRequest.current=cached&&selected?{tripId:selected.id,date:nextDate,promise:Promise.resolve({trip:selected,day:cached.day,layout:view})}:null;
+    layoutLoading.current=true;setTrip(selected);setDate(nextDate);setLayout(view);setDay(cached?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
+    if(!selected||nextDate<selected.startDate||nextDate>selected.endDate){layoutLoading.current=false;void startingLayout(settings,lodging).then(view=>{if(tripRef.current?.id===selected?.id&&dateRef.current===nextDate&&!dirty.current)setLayout(view);});}
+  }
   async function openPlanner(target:HomeTarget){
-    if(homeBusy)return;setHomeBusy(true);
-    const resumeTrip=target.tripId??(target.date?null:lastTarget?.tripId??trips[0]?.id??null);
-    const resumeDate=target.date??(resumeTrip===lastTarget?.tripId?lastTarget?.date:null)??trips.find(t=>t.id===resumeTrip)?.startDate??today();
-    if(resumeTrip&&loadedDay.current===`${resumeTrip}:${resumeDate}`&&tripRef.current?.id===resumeTrip&&dateRef.current===resumeDate){initialTripRequest.current={tripId:resumeTrip,date:resumeDate,promise:Promise.resolve({trip:tripRef.current,day,layout:layoutRef.current})};setShareTrip(false);setHome(false);setCalendar(false);setHomeBusy(false);return;}
-    const finish=beginActivity('Opening your trip and schedule…');
-    try{
-      await saveLayout();
-      const selected=target.tripId?trips.find(t=>t.id===target.tripId)??null:target.date?null:trips.find(t=>t.id===lastTarget?.tripId)??trips[0]??null;
-      const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
-      if(!selected&&!trips.length){setHome(true);createTrip();return;}
-      let view:Layout,loaded:{trip:Trip;day:Day;layout:Layout|null}|null=null;
-      if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate){loaded=await api('trip.get',{tripId:selected.id,date:nextDate});const local=localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`);view=local?JSON.parse(local):loaded!.layout??(selected.id===tripRef.current?.id&&nextDate===dateRef.current?layoutRef.current:await startingLayout(settings,selected.lodging));initialTripRequest.current={tripId:selected.id,date:nextDate,promise:Promise.resolve(loaded)};}else view=await startingLayout(settings,lodgingForDate(selected,nextDate));
-      await loadMapPanel();if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate)persistHome(recordVisit(homeRef.current,{tripId:selected.id,date:nextDate}));layoutLoading.current=true;setTrip(loaded?.trip??selected);setDate(nextDate);setLayout({...defaultLayout(),...view});setDay(loaded?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
-      if(!selected)requestAnimationFrame(()=>{layoutLoading.current=false;});
-    }catch(e:any){setMessage(e.message);}finally{finish();setHomeBusy(false);}
+    const selected=target.tripId?trips.find(t=>t.id===target.tripId)??null:target.date?null:trips.find(t=>t.id===lastTarget?.tripId)??trips[0]??null;
+    const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
+    if(!selected&&!trips.length){setHome(true);createTrip();return;}
+    showPlanner(selected,nextDate);
   }
   function createTrip(){setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
   function editTrip(selected:Trip){setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
@@ -578,7 +596,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     void loadMapPanel().catch(()=>{});
     if(saved?.uid===user.uid&&saved.tripId&&!token)void import('./live-database').catch(()=>{});
     const hasSaved=saved?.uid===user.uid&&!token;
-    const bootstrap=api<{trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
+    const bootstrap=initialProfile(user.uid)?Promise.resolve(initialProfile(user.uid)!):api<{trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
       date:hasSaved?saved.date:today(),
       ...(hasSaved&&saved.tripId?{tripId:saved.tripId}:token?{tripId:null}:{})
     });
@@ -586,6 +604,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       .then(async ([result, identity]) => {
         if(cancelled)return;
         loadedAccount.current=user.uid;
+        releaseInitialProfile(user.uid);
         const list=result.trips,r={settings:result.settings};
         setChooseName(!practice&&!result.settings.displayName?.trim());
         setTrips(list);
@@ -594,8 +613,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         const selected=hasSaved&&saved.tripId===null?null:list.find(t=>t.id===saved?.tripId)??fallback;
         const selectedDate=hasSaved&&(saved.tripId===(selected?.id??null))&&/^\d{4}-\d{2}-\d{2}$/.test(saved.date)?saved.date:selected&&restoredHome.recentDays[0]?.tripId===selected.id?restoredHome.recentDays[0].date!:selected?(today()>=selected.startDate&&today()<=selected.endDate?today():selected.startDate):today();
         setHomeState(restoredHome);
+        homeLastQueued.current=JSON.stringify(restoredHome);
         setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
-        if(result.restore){initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
+        if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${hasSaved?saved.date:today()}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,mapStart:r.settings.mapStart==="current"&&!r.settings.mapStartConfigured?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
@@ -680,22 +700,25 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       return;
     let cancelled = false;
     layoutLoading.current=true;
+    const layoutAtRequest=layoutRef.current;
+    let liveDay=false;
     const prepared=initialTripRequest.current;
-    initialTripRequest.current=null;
     const readDay=()=>api<{trip:Trip;day:Day;layout:Layout|null}>("trip.get",{tripId:trip.id,date});
     (prepared?.tripId===trip.id&&prepared.date===date ? prepared.promise.then(result=>result??readDay()) : readDay())
       .then(async (r) => {
         if (cancelled) return;
         loadedDay.current=`${trip.id}:${date}`;
-        setDay(r.day);
+        if(initialTripRequest.current===prepared)initialTripRequest.current=null;
+        if(!liveDay)setDay(r.day);
         const local = localStorage.getItem(
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
         const nextLayout = restored ?? await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
         if (cancelled) return;
-        setLayout({ ...defaultLayout(), ...nextLayout });
-        dirty.current = Boolean(local);
+        const layoutChanged=layoutRef.current!==layoutAtRequest;
+        if(!layoutChanged)setLayout({ ...defaultLayout(), ...nextLayout });
+        dirty.current = Boolean(local)||layoutChanged;
         requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!cancelled)layoutLoading.current=false;}));
         const draft = localStorage.getItem(
           `journas-drafts:${user.uid}:${trip.id}:${date}`,
@@ -710,7 +733,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           }
         }
         setTimeout(() => {
-          if (!cancelled && scroller.current)
+          if (!cancelled && !layoutChanged && scroller.current)
             scroller.current.scrollTop = nextLayout.scroll ?? 400;
         }, 0);
       })
@@ -728,6 +751,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           if (["pins", "blocks", "tasks", "connections"].includes(item.kind))
             (next as any)[item.kind].push(item);
         });
+        if(!snap.metadata.fromCache)liveDay=true;
         if (!cancelled) setDay(next);
       },
       (e) => {
@@ -779,7 +803,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       stop();
       stopTrip();
     };
-  }, [trip?.id, date, user?.uid, shareTrip,home]);
+  }, [trip?.id,trip?.startDate,trip?.endDate, date, user?.uid, shareTrip,home]);
   useEffect(() => {
     if (!token || !shareTrip || !shareReady || joinedToken === token) return;
     const id = setInterval(
@@ -812,11 +836,15 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       const savedDate=dateRef.current;
       const savedLayout=layoutRef.current;
       setStatus("Saving workspace…");
-      await api("layout.save", {
+      localStorage.setItem(`journas-layout:${user.uid}:${savedTrip.id}:${savedDate}`,JSON.stringify(savedLayout));
+      const writeKey=JSON.stringify([savedTrip.id,savedDate,savedLayout]);
+      let write=layoutWrites.current.get(writeKey);
+      if(!write){write=api("layout.save", {
         tripId: savedTrip.id,
         date: savedDate,
         layout: savedLayout,
-      });
+      });layoutWrites.current.set(writeKey,write);const clear=()=>layoutWrites.current.delete(writeKey);void write.then(clear,clear);}
+      await write;
       const unchanged=tripRef.current?.id===savedTrip.id && dateRef.current===savedDate && layoutRef.current===savedLayout;
       if(unchanged)dirty.current = false;
       if(unchanged)localStorage.setItem(
@@ -875,7 +903,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     return()=>window.removeEventListener("keydown",key);
   },[user,saving]);
   function changeLayout(patch: Partial<Layout>) {
-    if(!screenReady.current||layoutLoading.current)return;
+    if(!screenReady.current)return;
     if (
       Object.entries(patch).every(
         ([key, value]) =>
@@ -902,39 +930,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   async function plannedInitialLayout(prefs:Settings,selected:Trip|null,nextDate:string){
     if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,lodgingForDate(selected,nextDate));
   }
-  async function plannedLayout(selected:Trip|null,nextDate:string){
-    if(selected&&user&&nextDate>=selected.startDate&&nextDate<=selected.endDate){
-      const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);
-      if(local)return JSON.parse(local) as Layout;
-      const saved=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});
-      if(saved.layout)return saved.layout;
-    }
-
-    return startingLayout(settings,lodgingForDate(selected,nextDate));
-  }
-  async function switchDate(value: string) {
-    if(historyBusy)return;
-    setHistoryBusy(true);
-    try{
-    if (shareTrip && trip)
-      value =
-        value < trip.startDate
-          ? trip.startDate
-          : value > trip.endDate
-            ? trip.endDate
-            : value;
-    await saveLayout();
-    let targetLayout:Layout|undefined; if(user&&value!==date&&!shareTrip)targetLayout=await plannedLayout(trip,value);
-    layoutLoading.current=true;
-    setDate(value);
-    setDay(emptyDay());
-    setLayout(targetLayout??(trip?.lodging ? { ...defaultLayout(), center:[trip.lodging.lng,trip.lodging.lat],zoom:14 } : defaultLayout()));
-    setCalendar(false);
-    if (!targetLayout && (!trip || value < trip.startDate || value > trip.endDate)) {
-      const initial = await startingLayout(settingsRef.current);
-      if (dateRef.current === value) setLayout(initial);
-    }
-    }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+  async function switchDate(value:string){
+    if(shareTrip&&trip){value=value<trip.startDate?trip.startDate:value>trip.endDate?trip.endDate:value;if(value===date)return;void saveLayout();setDate(value);setDay(emptyDay());setCalendar(false);return;}
+    if(value===date)return;
+    showPlanner(trip,value);
   }
   const readonly =
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
@@ -987,26 +986,31 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     background=false,
   ) {
     if (!trip) return false;
+    const saveKey=`${trip.id}:${date}:${kind}:${item.id}`;
+    if(pendingItemWrites.current.has(saveKey))return false;
+    pendingItemWrites.current.add(saveKey);setPendingItems([...pendingItemWrites.current]);
+    const finishSave=()=>{pendingItemWrites.current.delete(saveKey);setPendingItems([...pendingItemWrites.current]);};
+
     if (kind === "pins" && item.id === "trip-lodging") {
-      if(!background)setSaving(true);
+
       setStatus("Saving…");
       try {
         const r = await api<{trip:Trip}>("trip.update", {
           tripId:trip.id, name:trip.name, startDate:trip.startDate, endDate:trip.endDate,
           lodging:{...trip.lodging,name:item.title,lng:item.lng,lat:item.lat,note:item.note,color:item.color,symbol:item.symbol},
         },undefined,background);
-        setTrip(r.trip);
-        await refresh();
-        if(!background)setEdit(null);
+        if(tripRef.current?.id===r.trip.id)setTrip(r.trip);
+        void refresh().catch(e=>setMessage(e.message));
+        if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
         setStatus("All changes saved");
         return true;
       } catch (e:any) {
         setMessage(e.message);
         setStatus("Changes could not be saved");
         return false;
-      } finally { if(!background)setSaving(false); }
+      } finally { finishSave(); }
     }
-    if(!background)setSaving(true);
+
     setStatus("Saving…");
     const { id, versions, ...fields } = item;
     if (kind === "blocks" && !fields.timezone) fields.timezone = timezone;
@@ -1031,8 +1035,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     const base = force ? (conflict?.current?.versions ?? {}) : (versions ?? {});
     if (!Object.keys(patch).length) {
-      if(!background)setEdit(null);
-      if(!background)setSaving(false);
+      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
+      finishSave();
       return true;
     }
     const draft: Edit = { kind: kind as Edit["kind"], item, base: original };
@@ -1053,7 +1057,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       if (Object.keys(pending).length)
         localStorage.setItem(draftKey, JSON.stringify(pending));
       else localStorage.removeItem(draftKey);
-      if(!background)setEdit(null);
+      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
       if(!background)setConflict(null);
       setTime(new Date());
       setStatus("All changes saved");
@@ -1083,7 +1087,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       }
       return false;
     } finally {
-      if(!background)setSaving(false);
+      finishSave();
     }
   }
   async function remove(kind: string, item: any) {
@@ -1097,7 +1101,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         id: item.id,
         baseVersions: item.versions ?? {},
       });
-      setEdit(null);
+      rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
     } catch (e: any) {
       setMessage(e.message);
     }
@@ -1171,10 +1175,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   async function saveSettings(next: Settings) {
     try {
+      const savedTrip=tripRef.current?.id,savedDate=dateRef.current,savedView=layoutRef.current;
       await api("settings.save", { settings: next });
-      setSettings(next);
+
       const view=await startingLayout(next,lodgingForDate(trip,date));
-      changeLayout({center:view.center,zoom:view.zoom});
+      if(settingsRef.current===next&&tripRef.current?.id===savedTrip&&dateRef.current===savedDate&&layoutRef.current===savedView)changeLayout({center:view.center,zoom:view.zoom});
       setMessage("Preferences saved.");
     } catch (e: any) {
       setMessage(e.message);
@@ -1188,7 +1193,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const taskPageSize=Math.max(1,Math.floor(((innerWidth<=700?innerHeight-90:layout.todoHeight)-112)/52));
   const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
   const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
-  if (!ready && !user)
+  if (!ready && !user && !hasOpenedWorkspace())
     return (
       <LoadingScreen text="Getting Journas ready…"/>
     );
@@ -1199,16 +1204,16 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&verified===null)return <LoadingScreen text="Getting Journas ready…"/>;
+  if(user&&verified===null&&!hasOpenedWorkspace())return <LoadingScreen text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
-    <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready} aria-busy={!ready} style={!ready?{visibility:"hidden"}:undefined}>
+    <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
       {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
-        <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();await saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
+        <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
           <Compass />
           <strong>Journas</strong>
         </a>
@@ -1217,27 +1222,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             aria-label="Choose trip"
             placeholder="Choose a trip"
             value={trip?.id ?? ""}
-            onChange={async (e: any) => {
-              if(historyBusy)return;setHistoryBusy(true);try{
-              const chosen=trips.find(t=>t.id===e.target.value)??null;
-              const chosenDate=chosen&&(date<chosen.startDate||date>chosen.endDate)?chosen.startDate:date;
-              await saveLayout();
-              const chosenLayout=await plannedLayout(chosen,chosenDate);
-              layoutLoading.current=true;
-              setShareTrip(false);
-              history.replaceState({}, "", location.pathname);
-              const selected =
-                trips.find((t) => t.id === e.target.value) ?? null;
-              setTrip(selected);
-              if (
-                selected &&
-                (date < selected.startDate || date > selected.endDate)
-              )
-                setDate(selected.startDate);
-              setDay(emptyDay());
-              setLayout(chosenLayout);
-              }catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
-            }}
+            onChange={(e:any)=>{const chosen=trips.find(t=>t.id===e.target.value)??null;const chosenDate=chosen&&(date<chosen.startDate||date>chosen.endDate)?chosen.startDate:date;history.replaceState({},"",location.pathname);showPlanner(chosen,chosenDate);}}
           >
             {shareTrip && trip && (
               <option value={trip.id}>{trip.name}</option>
@@ -1304,7 +1289,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <button className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
           <button className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
           <div className="save-control">
-          <span className={`save-indicator${manualSaving || status.startsWith("Saving") ? " saving" : status.startsWith("All") ? " saved" : " pending"}`} role="status" title={manualSaving?"Saving…":status} aria-label={manualSaving?"Saving…":status} />
+          <span className={`save-indicator${manualSaving || pendingItems.length>0 || status.startsWith("Saving") ? " saving" : status.startsWith("All") ? " saved" : " pending"}`} role="status" title={manualSaving||pendingItems.length?"Saving…":status} aria-label={manualSaving||pendingItems.length?"Saving…":status} />
           <button className="icon" aria-label="Save planning" title="Save planning (Ctrl+S)" disabled={!user || manualSaving || saving} onClick={saveManually}>
             <Save size={18} />
           </button>
@@ -1393,7 +1378,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onConnections={trip?()=>setModal("connections"):undefined}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
-                onView={(center, zoom) => {if(!layoutLoading.current)changeLayout({ center, zoom });}}
+                onView={(center, zoom) => changeLayout({ center, zoom })}
                 onPin={(pin) => setEdit({kind:"pins",item:pin})}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
@@ -1811,7 +1796,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              const f = new FormData(e.currentTarget);
+              const form=e.currentTarget;if(pendingTripForms.current.has(form))return;pendingTripForms.current.add(form);setTripSaving(true);
+              const originTrip=tripRef.current?.id,originDate=dateRef.current,editing=modal==='edit-trip';
+              const f = new FormData(form);
               const finish=beginActivity(modal==='edit-trip'?'Saving your trip details…':'Creating your trip and opening your plan…');
               try {
                 const r = await api<{ trip: Trip }>(modal === "edit-trip" ? "trip.update" : "trip.create", {
@@ -1824,21 +1811,15 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   startDate: f.get("start"),
                   endDate: f.get("end"),
                 });
-                await saveLayout();
-                setTrip(r.trip);
-                setDate(r.trip.startDate);
-                setShareTrip(false);
-                history.replaceState({}, "", location.pathname);
-                const availableTrips=await refresh();
-                const loaded=await api<{trip:Trip;day:Day;layout:Layout|null}>('trip.get',{tripId:r.trip.id,date:r.trip.startDate});
-                initialTripRequest.current={tripId:r.trip.id,date:r.trip.startDate,promise:Promise.resolve(loaded)};
-                setDay(loaded.day);
-                await loadMapPanel();
-                if(modal==='new-trip'){persistHome(recordVisit(homeRef.current,{tripId:r.trip.id,date:r.trip.startDate}),availableTrips);setHome(false);}
-                setModal(null);
+                void saveLayout();
+                setTrips(current=>current.some(t=>t.id===r.trip.id)?current.map(t=>t.id===r.trip.id?r.trip:t):[...current,r.trip]);
+                if(form.isConnected&&tripRef.current?.id===originTrip&&dateRef.current===originDate){
+                  if(editing){setModal(null);if(dateRef.current<r.trip.startDate||dateRef.current>r.trip.endDate)showPlanner(r.trip,r.trip.startDate);else if(tripRef.current?.id===r.trip.id)setTrip(r.trip);}
+                  else{setModal(null);showPlanner(r.trip,r.trip.startDate);}
+                }
               } catch (e: any) {
                 setMessage(e.message);
-              }finally{finish();}
+              }finally{pendingTripForms.current.delete(form);setTripSaving(false);finish();}
             }}
           >
             <div className="trip-details-column"><Input
@@ -1858,7 +1839,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,name:e.target.value})}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
             </div><button
               className="button primary full"
-              disabled={(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
+              disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </button>
@@ -2548,10 +2529,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{void saveLayout().then(()=>{setModal(null);setEdit(null);setHome(true);});}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
-    {ready&&historyBusy&&<LoadingScreen text="Loading your schedule…"/>}
+    {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}
     </>
   );
 }

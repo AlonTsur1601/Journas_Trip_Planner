@@ -56,7 +56,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             try {
                 const token = await adminAuth().verifyIdToken(authorization.slice(7), true);
                 uid = token.uid;
-                if (!token.email_verified && !['auth.email-verification','auth.verification-status'].includes(String(input.action)))
+                if (!token.email_verified && !['auth.email-verification','auth.verification-status','auth.session'].includes(String(input.action)))
                     throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email address to continue');
             }
             catch (error) {
@@ -71,7 +71,12 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             }
         }
         if(input.action==='auth.verification-status')return send(res,200,await verificationStatus(uid!));
-        if(input.action!=='auth.email-verification'&&!(await verificationStatus(uid!)).verified)throw new ApiError(403,'EMAIL_UNVERIFIED','Confirm your email again to continue.');
+        const startup=input.action==='auth.session';
+        if(input.action!=='auth.email-verification'){
+            const status=await verificationStatus(uid!);
+            if(!status.verified){if(startup)return send(res,200,{verified:false});throw new ApiError(403,'EMAIL_UNVERIFIED','Confirm your email again to continue.');}
+        }
+        if(startup)input.action='planner.restore';
         if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId));
         if(input.action==='places.search'||input.action==='places.reverse'||input.action==='places.landmarks')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
@@ -97,7 +102,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore(),version='practice-2026-10-17';return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion:version});return {seen:user.tourVersion===version};}));}
         if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
         const result=await new JournasService(firestoreStore()).execute(uid,input);
-        send(res,200,result);
+        send(res,200,startup?{...result,verified:true}:result);
     }
     catch (error) {
         errors(res, error);

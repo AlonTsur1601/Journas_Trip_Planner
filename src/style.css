@@ -2403,3 +2403,7 @@ body:has(.guided-tour) .bounded-popover:not([inert]){z-index:270!important;}
 @media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
 
 .settings-footer .settings-tour-button{min-height:30px;padding:5px 12px;font-size:12px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
+
+.background-status{position:fixed;right:16px;bottom:16px;z-index:400;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #0002;font-size:12px;pointer-events:none;}
+.background-status>span{width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#eab308;}
+@media(max-width:700px){.background-status{right:10px;bottom:10px;max-width:calc(100vw - 20px);}}

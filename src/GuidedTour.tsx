@@ -1,3 +1,4 @@
+import {observeTourTarget} from './tour-target';
 import {api} from './firebase';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
@@ -48,16 +49,16 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  useEffect(()=>{if(status==='running'&&!activity.length&&current.done?.(context))next();},[status,step,context,activity.length]);
  const selector=typeof current.target==='function'?current.target(context):current.target;
  useEffect(()=>{
-  if(status!=='running')return;let frame=0,scrolled:Element|null=null;
-  const place=()=>{frame=0;setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));const target=[...document.querySelectorAll(document.querySelector('.bounded-popover:not([inert])')?'.bounded-popover:not([inert])':selector)].find(element=>{const r=element.getBoundingClientRect();return r.width>0&&r.height>0&&!element.closest('[inert],[aria-hidden="true"]');});
+  if(status!=='running')return;let scrolled:Element|null=null;
+  const find=()=>[...document.querySelectorAll(document.querySelector('.bounded-popover:not([inert])')?'.bounded-popover:not([inert])':selector)].find(element=>{const r=element.getBoundingClientRect();return r.width>0&&r.height>0&&!element.closest('[inert],[aria-hidden="true"]');})??null;
+  const place=(target:Element|null)=>{setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));
    if(!target){setBox(previous=>previous===null?previous:null);return;}
    const rect=target.getBoundingClientRect();if(scrolled!==target&&(rect.bottom<80||rect.top>innerHeight-100)){scrolled=target;target.scrollIntoView({block:'center',behavior:'instant'});}
    const r=target.getBoundingClientRect(),next={x:Math.max(4,r.left-6),y:Math.max(4,r.top-6),width:Math.min(innerWidth-8,r.width+12),height:Math.min(innerHeight-8,r.height+12)};
    next.width=Math.min(next.width,innerWidth-4-next.x);next.height=Math.min(next.height,innerHeight-4-next.y);
-   setBox(previous=>previous&&Object.keys(next).every(key=>Math.abs(previous[key as keyof typeof next]-next[key as keyof typeof next])<1)?previous:next);
+   setBox(previous=>previous&&Object.keys(next).every(key=>Math.abs(previous[key as keyof typeof next]-next[key as keyof typeof next])<0.1)?previous:next);
   };
-  const update=()=>{if(!frame)frame=requestAnimationFrame(place);};place();const observer=new MutationObserver(update);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});window.addEventListener('resize',update);window.addEventListener('scroll',update,true);
-  return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};
+  return observeTourTarget(find,place);
  },[status,selector,step,activity.length,cardHeight,inModal]);
  if(status==='closed')return null;
  const welcome=status==='welcome',width=Math.min(inModal?700:340,innerWidth-24),height=cardHeight;

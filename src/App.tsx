@@ -373,6 +373,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
  const api:typeof profileApi=(action,data,signal,background)=>profileApi(action,data,signal,background,practiceData);
  const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
  const loadedAccount=useRef('');
+ const loadedDay=useRef('');
   const [user, setUser] = useState<User | null>(()=>practice?auth?.currentUser??null:null),
     [ready, setReady] = useState(practice||!configured),
     [trips, setTrips] = useState<Trip[]>([]),
@@ -540,6 +541,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(!ready||home||!user||shareTrip||!trip||date<trip.startDate||date>trip.endDate)return;const target={tripId:trip.id,date};setLastTarget(target);persistHome(recordVisit(homeRef.current,target));},[home,ready,user?.uid,trip?.id,date,trips.map(t=>t.id).join(',')]);
   async function openPlanner(target:HomeTarget){
     if(homeBusy)return;setHomeBusy(true);
+    const resumeTrip=target.tripId??(target.date?null:lastTarget?.tripId??trips[0]?.id??null);
+    const resumeDate=target.date??(resumeTrip===lastTarget?.tripId?lastTarget?.date:null)??trips.find(t=>t.id===resumeTrip)?.startDate??today();
+    if(resumeTrip&&loadedDay.current===`${resumeTrip}:${resumeDate}`&&tripRef.current?.id===resumeTrip&&dateRef.current===resumeDate){initialTripRequest.current={tripId:resumeTrip,date:resumeDate,promise:Promise.resolve({trip:tripRef.current,day,layout:layoutRef.current})};setShareTrip(false);setHome(false);setCalendar(false);setHomeBusy(false);return;}
     const finish=beginActivity('Opening your trip and schedule…');
     try{
       await saveLayout();
@@ -682,6 +686,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     (prepared?.tripId===trip.id&&prepared.date===date ? prepared.promise.then(result=>result??readDay()) : readDay())
       .then(async (r) => {
         if (cancelled) return;
+        loadedDay.current=`${trip.id}:${date}`;
         setDay(r.day);
         const local = localStorage.getItem(
           `journas-layout:${user.uid}:${trip.id}:${date}`,
@@ -1194,7 +1199,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&verified===null)return <LoadingScreen text="Checking your email confirmation…"/>;
+  if(user&&verified===null)return <LoadingScreen text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
@@ -2327,7 +2332,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 setSettings({ ...settings, displayName: e.target.value })
               }
             />
-            <button type="button" className="button account-methods-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Help and guided tour <ChevronRight size={16}/></button>
+
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
@@ -2434,6 +2439,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Save preferences
             </button>
             <div className="settings-footer">
+              <button type="button" className="text-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Guided tour</button>
               <small>
                 Journas · Version 1.0.0
               </small>

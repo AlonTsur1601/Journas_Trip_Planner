@@ -75,7 +75,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    <h2>{welcome?'Plan your first trip together':current.title}</h2>
    <p aria-live="polite">{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':current.text}</p>
    {!welcome&&!box&&<small>Open the relevant panel to continue, or skip this step.</small>}
-   <div className="tour-actions"><button className="text-button" onClick={welcome?close:next}>{welcome?'Not now':'Skip step'}</button>{(welcome||!current.done)&&<button className="button primary" onClick={()=>{if(welcome){remember(userId);setStep(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':step===tourSteps.length-1?'Finish':'Next'}<ArrowRight size={15}/></button>}</div>
+   <div className="tour-actions">{!welcome&&<button className="text-button" onClick={next}>Skip step</button>}{(welcome||!current.done)&&<button className="button primary" onClick={()=>{if(welcome){remember(userId);setStep(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':step===tourSteps.length-1?'Finish':'Next'}<ArrowRight size={15}/></button>}</div>
   </section>
  </div>,document.body);
 }

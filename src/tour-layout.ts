@@ -23,7 +23,7 @@ export function tourCardPosition(target:Rect|null,width:number,height:number,vw:
  return rect((vw-width)/2,vh-height-margin);
 }
 export function tourBannerPosition(width:number,height:number,vw:number,vh:number,obstacles:Rect[]){
- const candidates=[{x:(vw-width)/2,y:12},{x:(vw-width)/2,y:vh-height-12},{x:12,y:12},{x:vw-width-12,y:12},{x:12,y:vh-height-12}];
+ const candidates=[{x:(vw-width)/2,y:12},{x:(vw-width)/2,y:vh-height-12},{x:12,y:12},{x:vw-width-12,y:12},{x:12,y:vh-height-12},{x:vw-width-12,y:vh-height-12}];
  const free=candidates.find(point=>obstacles.every(item=>!overlaps({...point,width,height},item,8)));
  return free?{...free,embedded:false}:{...candidates[0],embedded:true};
 }

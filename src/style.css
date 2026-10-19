@@ -2459,3 +2459,5 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 :root{--neutral-accent:#292637;--neutral-accent-ink:#fff;}
 [data-theme="dark"]{--neutral-accent:#fff;--neutral-accent-ink:#17151f;}
 .color-swatches>button svg{filter:drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px #000c);}
+
+.color-swatches>.split-accent-swatch[aria-pressed="true"]{outline-offset:1px;}

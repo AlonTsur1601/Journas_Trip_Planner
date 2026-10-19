@@ -2058,7 +2058,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .all-trips-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:auto;min-height:0;padding:2px;}
 @media(max-width:1100px){.home-recents{grid-template-columns:1fr;gap:18px;}}
 @media(max-width:580px){.home-recents .home-list,.all-trips-list{grid-template-columns:1fr;}}
-.activity-screen{position:fixed;inset:0;z-index:300;display:grid;place-items:center;isolation:isolate;background:var(--bg);padding:24px;}
+.activity-screen{position:fixed;inset:0;z-index:300;display:grid;place-items:center;isolation:isolate;background-color:var(--bg);padding:24px;}
 .activity-screen .auth-map-background{position:absolute;inset:0;z-index:-1;}
 .activity-card{width:min(420px,100%);display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 16px 60px #0002;text-align:center;color:var(--ink);}
 .activity-card>svg{width:64px;height:64px;color:var(--accent);}

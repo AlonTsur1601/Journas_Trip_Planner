@@ -6,7 +6,7 @@ let workspaceOpened=false;
 export const hasOpenedWorkspace=()=>workspaceOpened;
 export const finishStartup=()=>{workspaceOpened=true;};
 export default function LoadingScreen({text='Getting your trips ready…',activity,startup=false}:{text?:string;activity?:Activity;startup?:boolean}){
-  if(startup&&!workspaceOpened)return <div className="activity-screen" role="status" aria-live="polite"><div className="activity-card"><Compass aria-hidden="true"/><strong>Journas</strong><h2>{text}</h2><span className="startup-progress" aria-hidden="true"/></div></div>;
+  if(startup&&!workspaceOpened)return <div className="home-page activity-screen" role="status" aria-live="polite"><div className="auth-map-background" aria-hidden="true"/><div className="activity-card"><Compass aria-hidden="true"/><strong>Journas</strong><h2>{text}</h2><span className="startup-progress" aria-hidden="true"/></div></div>;
   return <BackgroundStatus text={activity?.text??text}/>;
 }
 export function ActivityOverlay(){

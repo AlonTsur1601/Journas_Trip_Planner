@@ -2,7 +2,7 @@ import {it,expect} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import LoadingScreen,{BackgroundStatus,finishStartup} from '../src/LoadingScreen';
 it('uses the full screen only for the initial authentication gate',()=>{
- const startup=renderToStaticMarkup(<LoadingScreen startup/>);expect(startup).toContain('activity-screen');expect(startup).toContain('Journas');
+ const startup=renderToStaticMarkup(<LoadingScreen startup/>);expect(startup).toContain('activity-screen');expect(startup).toContain('Journas');expect(startup).toContain('home-page activity-screen');expect(startup).toContain('auth-map-background');
  const visibleWorkspace=renderToStaticMarkup(<LoadingScreen/>);expect(visibleWorkspace).toContain('background-status');expect(visibleWorkspace).not.toContain('activity-screen');
  finishStartup();const html=renderToStaticMarkup(<LoadingScreen startup text="Loading another account"/>);
  expect(html).toContain('background-status');expect(html).not.toContain('activity-screen');expect(html).not.toContain('tabindex');expect(html).not.toContain('inert');

@@ -355,7 +355,7 @@ export class JournasService {
             const trip = await this.member(tx, id, userId);
             const day = action === 'trip.members' ? trip.startDate : date(input.date);
             this.dayWithin(trip, day);
-            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,owner:uid===trip.ownerId,permission:uid===trip.ownerId?'Owner':trip.memberIds.includes(uid)?'Editor':'Owner (not participating)'};}));return {members};}
+            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,accent:prefs?.accent??defaultSettings.accent,owner:uid===trip.ownerId,permission:uid===trip.ownerId?'Owner':trip.memberIds.includes(uid)?'Editor':'Owner (not participating)'};}));return {members};}
             if (action === 'trip.get')
                 return { trip, day: await this.day(tx, id, day), layout: (await tx.get(layoutPath(userId, id, day)))?.layout ?? null };
             if (action === 'layout.save') {

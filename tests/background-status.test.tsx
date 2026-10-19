@@ -1,8 +1,8 @@
 import {it,expect} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import LoadingScreen,{BackgroundStatus,finishStartup} from '../src/LoadingScreen';
-it('uses a full loading screen only before the workspace has opened',()=>{
- const startup=renderToStaticMarkup(<LoadingScreen/>);expect(startup).toContain('activity-screen activity-translucent');
+it('never restores the old loading screen, including initial startup',()=>{
+ const startup=renderToStaticMarkup(<LoadingScreen/>);expect(startup).toContain('background-status');expect(startup).not.toContain('activity-screen');
  finishStartup();const html=renderToStaticMarkup(<LoadingScreen text="Loading another account"/>);
  expect(html).toContain('background-status');expect(html).not.toContain('activity-screen');expect(html).not.toContain('tabindex');expect(html).not.toContain('inert');
 });

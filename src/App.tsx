@@ -46,6 +46,7 @@ import type {HomeState,HomeTarget,TripAppearance} from "./types";
 import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {AccountName} from "./AccountName";
+import {lodgingName} from "./lodging-name";
 import {accountPhoto,accountName} from "./account-profile";
 import { api as profileApi, auth, configured } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
@@ -84,11 +85,10 @@ type Edit = {
   base?: Record<string, any>;
   locationSelected?: boolean;
 };
-function ProfileAvatar({src, fallback, name, id}: {src?:string;fallback?:string;name:string;id:string}) {
+function ProfileAvatar({src, fallback, name, id, accent="var(--accent)"}: {src?:string;fallback?:string;name:string;id:string;accent?:string}) {
   const [failed, setFailed] = useState<string[]>([]);
   const photo = [src, fallback].find(url => url && !failed.includes(url));
-  const hue=Array.from(id).reduce((hash,char)=>(hash*31+char.codePointAt(0)!)>>>0,0)%360;
-  return <span className="avatar profile-avatar" style={photo?undefined:{background:`hsl(${hue} 62% 30%)`,color:'#fff'}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
+  return <span className="avatar profile-avatar" style={photo?undefined:{background:accent,color:'#fff'}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
 }
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;
@@ -423,6 +423,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
   const placementSaves=useRef(Promise.resolve());
+  const lodgingNameEdited=useRef(false);
   const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
   const [lodgingView,setLodgingView]=useState(defaultLayout());
   const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
@@ -574,8 +575,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if(!selected&&!trips.length){setHome(true);createTrip();return;}
     showPlanner(selected,nextDate);
   }
-  function createTrip(){setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
-  function editTrip(selected:Trip){setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
+  function createTrip(){lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
+  function editTrip(selected:Trip){lodgingNameEdited.current=Boolean(selected.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(selected.lodging.name));setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
     if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
     try{await api('trip.remove',{tripId:selected.id});const remaining=await refresh();if(!remaining.length)setHome(true);const next=availableHome(homeRef.current,remaining);setHomeState(next);homeRef.current=next;await api('home.save',{home:next});setHistoryState({undo:null,redo:null});if(trip?.id===selected.id){setTrip(remaining[0]??null);setDate(remaining[0]?.startDate??today());setDay(emptyDay());}if(lastTarget?.tripId===selected.id)setLastTarget(remaining[0]?{tripId:remaining[0].id,date:remaining[0].startDate}:null);setModal(null);}catch(e:any){setMessage(e.message);}
@@ -1210,7 +1211,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
-      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1305,7 +1306,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             </button>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></button>
+            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></button>
             {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
           </div>
         </div>
@@ -1833,10 +1834,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><button type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</button><button type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</button></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><button type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</button></div>}</div></div></div>
             </div><div className="trip-location-column"><span className="lodging-label">Lodging location</span>
             <LocationPicker value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
-              setLodgingDraft(previous=>({...previous,lng:place.lng,lat:place.lat,name:source==='reverse'&&previous?.name&&previous.name!=='Unnamed location'?previous.name:place.name,timezone:tzlookup(place.lat,place.lng)}));
+              setLodgingDraft(previous=>({...previous,lng:place.lng,lat:place.lat,name:lodgingName(previous?.name,place.name,lodgingNameEdited.current),timezone:tzlookup(place.lat,place.lng)}));
             }}/>
 
-            {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,name:e.target.value})}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
+            {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=true;setLodgingDraft({...lodgingDraft!,name:e.target.value});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
             </div><button
               className="button primary full"
               disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
@@ -2187,8 +2188,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
-          {!shareTrip&&<button className="button" onClick={()=>{setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          {!shareTrip&&<button className="button" onClick={()=>{lodgingNameEdited.current=Boolean(trip.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(trip.lodging.name));setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
           {shareTrip ? (
             <>
               <p>
@@ -2317,7 +2318,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
-              <div className="settings-photo-preview"><ProfileAvatar id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
+              <div className="settings-photo-preview"><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
               <span>Profile photo</span>
               <input
                 aria-label="Choose profile photo"
@@ -2529,7 +2530,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour practice={practice} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}

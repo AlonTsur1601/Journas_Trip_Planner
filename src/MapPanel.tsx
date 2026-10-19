@@ -279,6 +279,7 @@ export default function MapPanel({
     const tooltip = new maplibregl.Popup({closeButton:false,closeOnClick:false,offset:38,maxWidth:'260px',className:'pin-tooltip'});
     markers.current = pins.map((pin) => {
       const el = document.createElement("button");
+      el.type="button";
       el.className = "map-pin";
       el.style.background = pin.color;
       const content=document.createElement('span');content.className='pin-symbol';const markup=symbolMarkup(pin.symbol);if(markup)content.innerHTML=markup;else content.textContent=pin.symbol;el.appendChild(content);
@@ -296,7 +297,7 @@ export default function MapPanel({
       el.addEventListener('blur',()=>tooltip.remove());
       el.addEventListener('pointerdown',()=>tooltip.remove());
       let ignoreClick=false;
-      el.onclick = (event) => {event.stopPropagation();if(ignoreClick){ignoreClick=false;return;}if(action.current.mode==='connect'){if(!action.current.source){setSource(pin.id);}else if(action.current.source!==pin.id){callbacks.current.onConnect?.(action.current.source,pin.id,action.current.arrow);setSource(null);setMode(null);}}else if(!movingPinId&&!placementMode)callbacks.current.onPin(pin);};
+      el.onclick = (event) => {event.preventDefault();event.stopPropagation();if(placementMode)return;if(ignoreClick){ignoreClick=false;return;}if(action.current.mode==='connect'){if(!action.current.source){setSource(pin.id);}else if(action.current.source!==pin.id){callbacks.current.onConnect?.(action.current.source,pin.id,action.current.arrow);setSource(null);setMode(null);}}else if(!movingPinId&&!placementMode)callbacks.current.onPin(pin);};
       const marker=new maplibregl.Marker({ element: el, draggable: false })
         .setLngLat([pin.lng, pin.lat])
         .addTo(m);

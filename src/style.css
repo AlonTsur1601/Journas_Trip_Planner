@@ -818,7 +818,7 @@ textarea {
   line-height: 1.5;
   border-radius: 6px;
   padding: 12px 15px;
-  z-index: 80;
+  z-index: 600;
   display: flex;
   align-items: center;
   gap: 15px;
@@ -2398,7 +2398,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 
 
 .tour-highlight{animation:tour-highlight-breathe 2.4s ease-in-out infinite;}
-@keyframes tour-highlight-breathe{0%,100%{opacity:.4;filter:drop-shadow(0 0 2px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 9px var(--accent));}}
+@keyframes tour-highlight-breathe{0%,100%{opacity:.85;filter:drop-shadow(0 0 9px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 16px var(--accent));}}
 @media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
 
 .settings-footer .settings-tour-button{min-height:30px;padding:5px 12px;font-size:12px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
@@ -2447,3 +2447,19 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .guided-tour[data-dock="side"] .tour-card{max-height:calc(100dvh - 24px);}
  .guided-tour[data-dock="side"] .tour-substeps{grid-template-columns:1fr;}
 }
+
+.tour-card{z-index:2;}
+.tour-banner{position:fixed;z-index:3;pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:9px 14px;background:var(--surface);color:var(--ink);border:1px solid var(--accent);border-radius:10px;box-shadow:0 4px 18px #0003;font-size:12px;}
+.tour-banner>svg{color:var(--accent);flex-shrink:0;}
+.tour-banner .text-button{white-space:nowrap;font-size:12px;}
+.tour-shade>rect[mask]{animation:tour-dim-in 240ms ease-out both;}
+@keyframes tour-dim-in{from{fill-opacity:.85;}to{fill-opacity:1;}}
+.tour-confetti{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden;}
+.tour-confetti>i{position:absolute;top:0;left:var(--x);width:9px;height:15px;border-radius:2px;animation:tour-confetti-fall 3.2s var(--delay) ease-in both;}
+@keyframes tour-confetti-fall{from{transform:translateY(0) rotate(0);opacity:1;}to{transform:translateY(110vh) rotate(var(--turn));opacity:0;}}
+@media(max-width:700px){.tour-banner{gap:7px;padding:8px 10px;font-size:11px;}}
+@media(prefers-reduced-motion:reduce){.tour-confetti{display:none;}.tour-shade>rect[mask]{animation:none;}}
+
+.tour-banner[data-embedded="true"]{gap:4px;padding:6px 8px;flex-wrap:wrap;font-size:11px;}
+.tour-banner[data-embedded="true"]>strong{flex:1;min-width:0;}
+.tour-banner[data-embedded="true"]>.text-button{flex-basis:100%;padding:0;}

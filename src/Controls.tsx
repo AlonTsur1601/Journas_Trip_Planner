@@ -1,3 +1,4 @@
+import {createPortal} from 'react-dom';
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import {Popover} from "./Popover";
@@ -71,7 +72,7 @@ export function Toast({ message }: { message: string; onDismiss: () => void }) {
     return () => clearTimeout(timer);
   }, [message]);
   if (!displayed) return null;
-  return <div className={`toast${leaving ? " leaving" : ""}`} role="status">
+  return createPortal(<div className={`toast${leaving ? " leaving" : ""}`} role="status">
     {displayed}
-  </div>;
+  </div>,document.body);
 }

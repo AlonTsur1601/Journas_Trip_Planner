@@ -2297,7 +2297,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => setModal(null)}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => {void saveSettings(settingsRef.current);setModal(null);}}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -2421,7 +2421,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Save preferences
             </button>
             <div className="settings-footer">
-              <button type="button" className="button settings-tour-button" onClick={()=>window.dispatchEvent(new Event('journas-start-tour'))}>Guided tour</button>
+              <button type="button" className="button settings-tour-button" onClick={()=>{void saveSettings(settingsRef.current);window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</button>
               <small>
                 Journas · Version 1.0.0
               </small>

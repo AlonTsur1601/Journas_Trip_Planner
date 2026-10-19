@@ -2455,8 +2455,8 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .tour-shade>rect[mask]{animation:tour-dim-in 240ms ease-out both;}
 @keyframes tour-dim-in{from{fill-opacity:.85;}to{fill-opacity:1;}}
 .tour-confetti{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden;}
-.tour-confetti>i{position:absolute;top:0;left:var(--x);width:9px;height:15px;border-radius:2px;animation:tour-confetti-fall 3.2s var(--delay) ease-in both;}
-@keyframes tour-confetti-fall{from{transform:translateY(0) rotate(0);opacity:1;}to{transform:translateY(110vh) rotate(var(--turn));opacity:0;}}
+.tour-confetti>i{position:absolute;bottom:0;left:50%;width:9px;height:15px;border-radius:2px;animation:tour-confetti-burst 3.2s var(--delay) linear both;}
+@keyframes tour-confetti-burst{0%{transform:translate(-50%,100%) rotate(0);opacity:1;animation-timing-function:cubic-bezier(.15,.65,.4,1);}50%{transform:translate(calc(var(--spread)*.55),var(--rise)) rotate(calc(var(--turn)*.5));opacity:1;animation-timing-function:cubic-bezier(.6,0,.85,.35);}100%{transform:translate(var(--spread),20vh) rotate(var(--turn));opacity:0;}}
 @media(max-width:700px){.tour-banner{gap:7px;padding:8px 10px;font-size:11px;}}
 @media(prefers-reduced-motion:reduce){.tour-confetti{display:none;}.tour-shade>rect[mask]{animation:none;}}
 

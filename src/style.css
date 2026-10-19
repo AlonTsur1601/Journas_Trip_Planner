@@ -2391,8 +2391,6 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .tour-actions .button{font-size:12px;padding:7px 10px;}
 @media(max-width:700px){.tour-card{padding:14px;}.tour-card h2{font-size:16px;}.tour-card p{font-size:12px;}.home-account{gap:6px;}}
 
-body:has(.guided-tour[data-modal="true"]) .modal-shade{padding-bottom:var(--tour-space,280px);}
-body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - var(--tour-space,280px) - 24px);}
 
 /* Picker portals stay below the guide mask, so only an explicit target is undimmed. */
 
@@ -2444,17 +2442,8 @@ body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - var(--
  .trip-details-column .trip-appearance-editor>.trip-badge svg{width:28px;height:28px;}
 }
 
-/* The guide reserves bottom space; trim form chrome before introducing a small scroll. */
-body:has(.guided-tour[data-modal="true"]) .item-modal{padding:14px;}
-body:has(.guided-tour[data-modal="true"]) .item-modal>header{margin-bottom:8px;}
-body:has(.guided-tour[data-modal="true"]) .item-modal .field{margin-bottom:8px;}
-body:has(.guided-tour[data-modal="true"]) .item-modal textarea{height:48px;}
-body:has(.guided-tour[data-modal="true"]) .item-modal .location-preview{height:140px;min-height:140px;}
-
-/* Wide screens can keep the entire form visible beside its instructions. */
+/* The guide floats over the page without changing the underlying layout. */
 @media(min-width:1100px){
- body:has(.guided-tour[data-modal="true"]) .modal-shade{padding:12px 376px 12px 12px;}
- body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - 24px);}
  .guided-tour[data-dock="side"] .tour-card{max-height:calc(100dvh - 24px);}
  .guided-tour[data-dock="side"] .tour-substeps{grid-template-columns:1fr;}
 }

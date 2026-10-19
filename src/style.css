@@ -2361,11 +2361,12 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 /* Saving an item keeps the surrounding planner visible, as dialogs do. */
 .activity-screen.activity-translucent{background:#19132780;}
 .activity-translucent>.auth-map-background{display:none;}
-.segmented-time>.time-picker-toggle{margin-left:auto;display:grid;place-items:center;width:28px;height:28px;min-width:28px;padding:0;border-radius:4px;background:var(--accent);color:#fff;}
-.segmented-time>.time-picker-toggle>svg{position:static;translate:none;margin:0;color:#fff;}
-.time-picker-popover{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #0003;}
+.segmented-time{padding-right:0;}
+.segmented-time>.time-picker-toggle{margin-left:auto;display:grid;place-items:center;flex:0 0 40px;width:40px;height:34px;min-width:40px;padding:0;border:0;border-left:1px solid var(--line);border-radius:0 4px 4px 0;background:var(--subtle);color:var(--ink);}
+.segmented-time>.time-picker-toggle>svg{position:static;translate:none;margin:0;color:currentColor;}
+.time-picker-popover{padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 8px 24px #0002;}
 .time-picker{display:grid;gap:14px;text-align:center;}
-.time-picker>strong{font-size:16px;}
+.time-picker>strong{font-size:13px;padding:6px 0;color:var(--ink);}
 .time-picker-wheels{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;}
 .time-wheel-column{width:76px;min-width:0;}
 .time-wheel-column>span{font-size:11px;color:var(--muted);}
@@ -2393,17 +2394,67 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 body:has(.guided-tour[data-modal="true"]) .modal-shade{padding-bottom:var(--tour-space,280px);}
 body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - var(--tour-space,280px) - 24px);}
 
-body:has(.guided-tour) .bounded-popover:not([inert]){z-index:270!important;}
+/* Picker portals stay below the guide mask, so only an explicit target is undimmed. */
 
 .time-wheel[aria-disabled="true"]{overflow:hidden;}
 
 
 .tour-highlight{animation:tour-highlight-breathe 2.4s ease-in-out infinite;}
-@keyframes tour-highlight-breathe{0%,100%{opacity:.6;filter:drop-shadow(0 0 2px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 4px var(--accent));}}
+@keyframes tour-highlight-breathe{0%,100%{opacity:.4;filter:drop-shadow(0 0 2px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 9px var(--accent));}}
 @media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
 
 .settings-footer .settings-tour-button{min-height:30px;padding:5px 12px;font-size:12px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
 
-.background-status{position:fixed;right:16px;bottom:16px;z-index:400;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #0002;font-size:12px;pointer-events:none;}
-.background-status>span{width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#eab308;}
-@media(max-width:700px){.background-status{right:10px;bottom:10px;max-width:calc(100vw - 20px);}}
+.background-status{position:fixed;right:16px;bottom:16px;z-index:400;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #0002;font-size:14px;pointer-events:none;}
+.background-status>span{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:#eab308;}
+@media(max-width:700px){.background-status{right:10px;bottom:10px;max-width:calc(100vw - 20px);padding:9px 13px;font-size:12px;}}
+
+/* Keep the instruction card compact while giving every substep its own state. */
+.tour-substeps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;list-style:none;padding:0;margin:0 0 12px;font-size:11px;line-height:1.4;}
+.tour-substeps li{display:flex;align-items:baseline;gap:6px;color:var(--muted);min-width:0;}
+.tour-substeps li>span{flex:0 0 14px;font-variant-numeric:tabular-nums;}
+.tour-substeps .complete{color:var(--muted);text-decoration:line-through;}
+.tour-substeps .complete>span{color:var(--accent);text-decoration:none;}
+.tour-substeps .current{color:var(--accent);font-weight:700;}
+.tour-card:has(.tour-substeps){max-height:min(42dvh,360px);}
+/* Use the visible viewport consistently; retain scrolling for genuinely long content. */
+.modal-shade{padding:12px;}
+.modal{max-height:calc(100dvh - 24px);overscroll-behavior:contain;scrollbar-gutter:stable;}
+@media(max-height:800px){
+ .modal{padding:16px;}
+ .modal>header{margin-bottom:10px;}
+ .item-modal .field{margin-bottom:8px;}
+ .item-modal textarea{height:56px;}
+ .trip-modal form{gap:12px 20px;}
+ .trip-details-column,.trip-location-column{gap:10px;}
+ .trip-details-column .trip-appearance-editor{gap:12px;}
+ .trip-details-column .trip-appearance-editor>.trip-badge{width:96px;height:96px;flex-basis:96px;}
+ .trip-details-column .trip-appearance-editor>.trip-badge svg{width:64px;height:64px;}
+ .trip-details-column .trip-logo-fields{gap:10px;}
+ .trip-modal .location-preview{height:150px;min-height:150px;}
+ .settings-location-map{height:180px;}
+ .settings-modal .settings-footer{margin:8px -16px -16px;padding:10px 16px;}
+}
+@media(max-width:700px){.modal-shade{padding:8px;}.modal{max-height:calc(100dvh - 16px);}.tour-substeps{gap:3px 8px;font-size:10px;}.tour-card:has(.tour-substeps){padding:12px;}.tour-card:has(.tour-substeps) p{line-height:1.45;margin-bottom:10px;}}
+
+.guided-tour[data-modal="false"] .tour-substeps{grid-template-columns:1fr;}
+
+@media(max-width:700px) and (max-height:800px){
+ .trip-details-column .trip-appearance-editor>.trip-badge{width:42px;height:42px;flex-basis:42px;}
+ .trip-details-column .trip-appearance-editor>.trip-badge svg{width:28px;height:28px;}
+}
+
+/* The guide reserves bottom space; trim form chrome before introducing a small scroll. */
+body:has(.guided-tour[data-modal="true"]) .item-modal{padding:14px;}
+body:has(.guided-tour[data-modal="true"]) .item-modal>header{margin-bottom:8px;}
+body:has(.guided-tour[data-modal="true"]) .item-modal .field{margin-bottom:8px;}
+body:has(.guided-tour[data-modal="true"]) .item-modal textarea{height:48px;}
+body:has(.guided-tour[data-modal="true"]) .item-modal .location-preview{height:140px;min-height:140px;}
+
+/* Wide screens can keep the entire form visible beside its instructions. */
+@media(min-width:1100px){
+ body:has(.guided-tour[data-modal="true"]) .modal-shade{padding:12px 376px 12px 12px;}
+ body:has(.guided-tour[data-modal="true"]) .modal{max-height:calc(100dvh - 24px);}
+ .guided-tour[data-dock="side"] .tour-card{max-height:calc(100dvh - 24px);}
+ .guided-tour[data-dock="side"] .tour-substeps{grid-template-columns:1fr;}
+}

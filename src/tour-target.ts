@@ -1,3 +1,7 @@
+/** Resolve only the requested target; unrelated nested portals never steal focus. */
+export function findTourTarget(selector:string,root:Pick<Document,'querySelectorAll'>=document){
+ return [...root.querySelectorAll(selector)].find(element=>{const rect=element.getBoundingClientRect();return rect.width>0&&rect.height>0&&!element.closest('[inert],[aria-hidden="true"]');})??null;
+}
 /** Track layout plus finite motion: transforms do not notify Mutation/ResizeObserver. */
 export function observeTourTarget(find:()=>Element|null,place:(target:Element|null)=>void){
  let frame=0,target:Element|null=null,stopped=false;

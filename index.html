@@ -8,7 +8,7 @@
       try {
         const theme = ['light', 'dark', 'system'].includes(saved?.theme) ? saved.theme : 'system';
         document.documentElement.dataset.theme = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-        if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(saved?.accent)) document.documentElement.style.setProperty('--accent', saved.accent);
+        if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(saved?.accent)) { const neutral = document.documentElement.dataset.theme === 'dark' && ['#292637','#000000','#000','#000000ff'].includes(saved.accent.toLowerCase()); document.documentElement.style.setProperty('--accent', neutral ? '#ffffff' : saved.accent); document.documentElement.style.setProperty('--accent-ink', neutral ? '#17151f' : '#ffffff'); }
       } catch { /* Storage can be disabled. */ }
     </script>
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />

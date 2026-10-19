@@ -1,4 +1,4 @@
-import {readAppearance,cacheAppearance} from "./appearance-cache";
+import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appearance-cache";
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
@@ -89,7 +89,7 @@ type Edit = {
 function ProfileAvatar({src, fallback, name, id, accent="var(--accent)"}: {src?:string;fallback?:string;name:string;id:string;accent?:string}) {
   const [failed, setFailed] = useState<string[]>([]);
   const photo = [src, fallback].find(url => url && !failed.includes(url));
-  return <span className="avatar profile-avatar" style={photo?undefined:{background:accent,color:'#fff'}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
+  return <span className="avatar profile-avatar" style={photo?undefined:{background:isBlackAccent(accent)?"var(--neutral-accent)":accent,color:isBlackAccent(accent)?"var(--neutral-accent-ink)":"#fff"}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
 }
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;
@@ -517,11 +517,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       (settings.theme === "system" &&
         matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    document.documentElement.style.setProperty("--accent", settings.accent);
+    applyAccent(settings.accent,dark);
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const fn = () => {
-      if (settings.theme === "system")
-        document.documentElement.dataset.theme = mq.matches ? "dark" : "light";
+      if (settings.theme === "system") {document.documentElement.dataset.theme = mq.matches ? "dark" : "light";applyAccent(settings.accent,mq.matches);}
     };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);

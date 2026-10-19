@@ -546,7 +546,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   async function restoreHistory(direction:'undo'|'redo'){
    if(!trip||shareTrip||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
    const version=navigationVersion.current;
-   try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();if(version!==navigationVersion.current)return;const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});if(version!==navigationVersion.current)return;setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));setMessage(direction==='undo'?'Action undone.':'Action redone.');}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
+   try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();if(version!==navigationVersion.current)return;const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});if(version!==navigationVersion.current)return;setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
   function persistHome(next:HomeState,availableTrips=trips){
     const clean=availableHome(next,availableTrips),signature=JSON.stringify(clean);if(signature===homeLastQueued.current)return;setHomeState(clean);homeRef.current=clean;homeLastQueued.current=signature;
@@ -1183,7 +1183,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
       const view=await startingLayout(next,lodgingForDate(trip,date));
       if(settingsRef.current===next&&tripRef.current?.id===savedTrip&&dateRef.current===savedDate&&layoutRef.current===savedView)changeLayout({center:view.center,zoom:view.zoom});
-      setMessage("Preferences saved.");
+
     } catch (e: any) {
       setMessage(e.message);
     }
@@ -1373,14 +1373,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 connections={day.connections}
                 layout={layout}
                 readonly={readonly}
-                onConnect={async(from,to,arrow)=>{if(await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow}))setMessage("Connection created.");}}
+                onConnect={async(from,to,arrow)=>{await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow});}}
                 arrowPreference={settings.connectionArrow??true}
                 onArrowPreferenceChange={value=>void savePlacementPreference("connectionArrow",value)}
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
                 onConnections={trip?()=>setModal("connections"):undefined}
                 onCancelMove={()=>setMovingPinId(null)}
-                onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);setMessage("Pin location saved.");}}}
+                onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
                 onView={(center, zoom) => changeLayout({ center, zoom })}
                 onPin={(pin) => setEdit({kind:"pins",item:pin})}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
@@ -2267,7 +2267,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       try {
                         await api("share.revoke", { tripId: trip.id });
                         setShareLink("");setShareLinks([]);
-                        setMessage("All sharing links revoked.");
+
                       } catch (e: any) {
                         setMessage(e.message);
                       }

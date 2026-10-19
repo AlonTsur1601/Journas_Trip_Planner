@@ -2,6 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem('journas-appearance') || '{}'); } catch { /* Storage can be disabled. */ }
+      try {
+        const theme = ['light', 'dark', 'system'].includes(saved?.theme) ? saved.theme : 'system';
+        document.documentElement.dataset.theme = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(saved?.accent)) document.documentElement.style.setProperty('--accent', saved.accent);
+      } catch { /* Storage can be disabled. */ }
+    </script>
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <meta name="theme-color" content="#7c5ce7" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

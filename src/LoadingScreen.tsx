@@ -1,10 +1,12 @@
+import {Compass} from 'lucide-react';
 import {useSyncExternalStore} from 'react';
 import {activitySnapshot,subscribeActivity,type Activity} from './activity';
 
 let workspaceOpened=false;
 export const hasOpenedWorkspace=()=>workspaceOpened;
 export const finishStartup=()=>{workspaceOpened=true;};
-export default function LoadingScreen({text='Getting your trips ready…',activity}:{text?:string;activity?:Activity}){
+export default function LoadingScreen({text='Getting your trips ready…',activity,startup=false}:{text?:string;activity?:Activity;startup?:boolean}){
+  if(startup&&!workspaceOpened)return <div className="activity-screen" role="status" aria-live="polite"><div className="activity-card"><Compass aria-hidden="true"/><strong>Journas</strong><h2>{text}</h2><span className="startup-progress" aria-hidden="true"/></div></div>;
   return <BackgroundStatus text={activity?.text??text}/>;
 }
 export function ActivityOverlay(){

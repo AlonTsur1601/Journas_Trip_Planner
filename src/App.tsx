@@ -1,3 +1,4 @@
+import {readAppearance,cacheAppearance} from "./appearance-cache";
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
@@ -385,7 +386,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [date, setDate] = useState(today()),
     [day, setDay] = useState<Day>(emptyDay),
     [layout, setLayout] = useState<Layout>(defaultLayout),
-    [settings, setSettings] = useState<Settings>(defaultSettings),
+    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...(!practice?readAppearance():{})})),
     [message, setMessage] = useState(""),
     [status, setStatus] = useState("All changes saved"),
     [modal, setModal] = useState<string | null>(null),
@@ -441,6 +442,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(user&&ready&&verified===true&&!practice)finishStartup();},[user?.uid,ready,verified]);
   const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
+  useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings);},[ready,user?.uid,practice,settings.theme,settings.accent]);
   const settingsRef=useRef(settings);settingsRef.current=settings;
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
@@ -1196,7 +1198,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
   if (!ready && !user && !hasOpenedWorkspace())
     return (
-      <LoadingScreen text="Getting Journas ready…"/>
+      <LoadingScreen startup text="Getting Journas ready…"/>
     );
   if (!user && !token)
     return (
@@ -1205,7 +1207,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&verified===null&&!hasOpenedWorkspace())return <LoadingScreen text="Getting Journas ready…"/>;
+  if(user&&verified===null&&!hasOpenedWorkspace())return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (

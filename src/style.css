@@ -2060,9 +2060,9 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @media(max-width:580px){.home-recents .home-list,.all-trips-list{grid-template-columns:1fr;}}
 .activity-screen{position:fixed;inset:0;z-index:300;display:grid;place-items:center;isolation:isolate;background-color:var(--bg);padding:24px;}
 .activity-screen .auth-map-background{position:absolute;inset:0;z-index:-1;}
-.activity-card{width:min(340px,100%);display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 16px 60px #0002;text-align:center;color:var(--ink);}
+.activity-card{width:min(374px,100%);display:flex;flex-direction:column;align-items:center;gap:16px;padding:22px;border:1px solid var(--line);border-radius:15px;background:var(--surface);box-shadow:0 16px 60px #0002;text-align:center;color:var(--ink);}
 .activity-card>.startup-brand{justify-content:center;width:100%;}
-.activity-card h2{font-size:clamp(15px,4.8vw,19px);line-height:1.5;margin:0;width:100%;white-space:nowrap;}
+.activity-card h2{font-size:clamp(16px,5vw,21px);line-height:1.5;margin:0;width:100%;white-space:nowrap;}
 .home-list-empty{font-size:13px;color:var(--muted);line-height:1.6;padding:20px 0;margin:0;}
 .home-tile .removal-warning{color:#c87612;font-weight:600;}
 .home-context-menu{position:fixed;width:226px;padding:5px;border:1px solid var(--line);background:var(--surface);box-shadow:0 8px 24px #0002;border-radius:7px;z-index:150;animation:panel-in 120ms ease-out;}
@@ -2465,6 +2465,9 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .tour-banner[data-embedded="true"]>.text-button{flex-basis:100%;padding:0;}
 
 .loading-spinner{display:block;flex-shrink:0;border:3px solid color-mix(in srgb,var(--accent) 20%,transparent);border-top-color:var(--accent);border-radius:50%;background:transparent;transform-origin:center;animation:startup-spin 800ms linear infinite;}
-.startup-progress{width:36px;height:36px;align-self:center;margin-inline:auto;}
+.startup-progress{width:40px;height:40px;align-self:center;margin-inline:auto;}
 @keyframes startup-spin{to{transform:rotate(360deg);}}
 @media(prefers-reduced-motion:reduce){.loading-spinner{animation:none;}}
+
+.activity-card>.startup-brand{gap:10px;}.startup-brand strong{font-size:44px;}.startup-brand svg{width:44px;height:44px;}
+@media(max-width:700px){.startup-brand strong{font-size:32px;}.startup-brand svg{width:33px;height:33px;}}

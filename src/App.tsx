@@ -386,7 +386,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [date, setDate] = useState(today()),
     [day, setDay] = useState<Day>(emptyDay),
     [layout, setLayout] = useState<Layout>(defaultLayout),
-    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...(!practice?readAppearance():{})})),
+    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings})),
     [message, setMessage] = useState(""),
     [status, setStatus] = useState("All changes saved"),
     [modal, setModal] = useState<string | null>(null),
@@ -442,7 +442,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(user&&ready&&verified===true&&!practice)finishStartup();},[user?.uid,ready,verified]);
   const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
-  useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings);},[ready,user?.uid,practice,settings.theme,settings.accent]);
+  useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings,user.uid);},[ready,user?.uid,practice,settings.theme,settings.accent]);
   const settingsRef=useRef(settings);settingsRef.current=settings;
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
@@ -504,6 +504,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       screenReady.current=false;
       setChooseName(false);
       if(u&&!token&&reloadVisit.current){try{const saved=JSON.parse(sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
+      setSettings({...defaultSettings,...(u?readAppearance(u.uid):{})});
       setUser(u);
       setReady(practice||!u);
     });

@@ -2,44 +2,31 @@ import {it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {readAppearance} from '../src/appearance-cache';
-it('only restores valid appearance preferences',()=>{
- expect(readAppearance({getItem:()=>'{"theme":"dark","accent":"#22c55e","displayName":"private"}'})).toEqual({theme:'dark',accent:'#22c55e'});
- expect(readAppearance({getItem:()=>'{"theme":"invalid","accent":"url(evil)"}'})).toEqual({});
- expect(readAppearance({getItem:()=>{throw Error('blocked');}})).toEqual({});
- expect(readAppearance({getItem:()=>'{bad'})).toEqual({});
+it('restores appearance only for the authenticated account',()=>{
+ const storage={getItem:()=>JSON.stringify({userId:'alice',theme:'dark',accent:'#22c55e'})};
+ expect(readAppearance('alice',storage)).toEqual({theme:'dark',accent:'#22c55e'});
+ expect(readAppearance('bob',storage)).toEqual({});
+ expect(readAppearance('',storage)).toEqual({});
+ expect(readAppearance('alice',{getItem:()=>'{"theme":"dark","accent":"#22c55e"}'})).toEqual({});
+ expect(readAppearance('alice',{getItem:()=>'{bad'})).toEqual({});
+ expect(readAppearance('alice',{getItem:()=>'{"userId":"alice","accent":"url(evil)","theme":"invalid"}'})).toEqual({});
 });
-const boot=readFileSync('index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)![1];
-function runBoot(saved:string,dark:boolean,blocked=false){
- const root={dataset:{} as Record<string,string>,style:{setProperty:(key:string,value:string)=>{root.dataset[key]=value;},getPropertyValue:(key:string)=>root.dataset[key]??''}};
- const icon={href:'/favicon.svg',getAttribute:()=>icon.href,setAttribute:(_key:string,value:string)=>{icon.href=value;}};
+it('uses a self-hosted bootstrap allowed by production CSP',()=>{
+ const html=readFileSync('index.html','utf8');
+ expect(html).toContain('<script src="/appearance.js"></script>');
+ expect(html).not.toMatch(/<script>/);
+ const config=JSON.parse(readFileSync('vercel.json','utf8'));
+ const csp=config.headers.flatMap((x:any)=>x.headers).find((x:any)=>x.key==='Content-Security-Policy').value;
+ expect(csp).toContain("script-src 'self'");
+});
+it('starts neutral before authentication and follows the active account accent',()=>{
+ const root={dataset:{} as Record<string,string>,style:{getPropertyValue:()=>root.dataset.accent??''}};
+ const icon={href:'',getAttribute:()=>icon.href,setAttribute:(_key:string,value:string)=>{icon.href=value;}};
  let refresh=()=>{};
- runInNewContext(boot,{localStorage:{getItem:()=>{if(blocked)throw Error('blocked');return saved;}},document:{documentElement:root,querySelector:()=>icon},matchMedia:()=>({matches:dark}),MutationObserver:class{constructor(callback:()=>void){refresh=callback;}observe(){}}});
- return {root,icon,refresh};
-}
-function bootAppearance(saved:string,dark:boolean,blocked=false){return runBoot(saved,dark,blocked).root.dataset;}
-it('applies saved theme and accent before the app module starts',()=>{
- expect(bootAppearance('{"theme":"dark","accent":"#22c55e"}',false)).toEqual({theme:'dark','--accent':'#22c55e','--accent-ink':'#ffffff'});
- expect(bootAppearance('{"theme":"light"}',true).theme).toBe('light');
- expect(bootAppearance('{"theme":"system"}',true).theme).toBe('dark');
- expect(bootAppearance('{}',true,true).theme).toBe('dark');
-});
-
-it('only inverts the black accent in dark mode, including early startup',()=>{
- for(const accent of ['#292637','#000000','#000']){
-  const saved=JSON.stringify({theme:'dark',accent});const result=bootAppearance(saved,false);expect(result['--accent']).toBe('#ffffff');expect(result['--accent-ink']).toBe('#17151f');
-  expect(bootAppearance(JSON.stringify({theme:'light',accent}),true)['--accent']).toBe(accent);
- }
- for(const accent of ['#8b5cf6','#64748b','#222222'])expect(bootAppearance(JSON.stringify({theme:'dark',accent}),false)['--accent']).toBe(accent);
- expect(bootAppearance('{"theme":"system","accent":"#292637"}',true)['--accent']).toBe('#ffffff');
-});
-
-it('colors the original favicon on startup and updates it when the active accent changes',()=>{
- const {root,icon,refresh}=runBoot('{"theme":"dark","accent":"#22c55e"}',false);
- const original=readFileSync('public/favicon.svg','utf8').trim();
- const svg=()=>decodeURIComponent(icon.href.slice('data:image/svg+xml,'.length));
- expect(svg()).toBe(original.replace('#7c5ce7','#22c55e'));
- root.style.setProperty('--accent','#ec4899');refresh();expect(svg()).toBe(original.replace('#7c5ce7','#ec4899'));
- expect(decodeURIComponent(runBoot('{"theme":"dark","accent":"#292637"}',false).icon.href)).toContain('stroke="#ffffff"');
- expect(decodeURIComponent(runBoot('{"theme":"light","accent":"#292637"}',true).icon.href)).toContain('stroke="#292637"');
- expect(decodeURIComponent(runBoot('{}',false,true).icon.href)).toContain('stroke="#7c5ce7"');
+ runInNewContext(readFileSync('public/appearance.js','utf8'),{document:{documentElement:root,querySelector:()=>icon},matchMedia:()=>({matches:true}),MutationObserver:class{constructor(callback:()=>void){refresh=callback;}observe(){}}});
+ const svg=()=>decodeURIComponent(icon.href);
+ expect(root.dataset.theme).toBe('dark');expect(svg()).toContain('stroke="#7c5ce7"');
+ root.dataset.accent='#22c55e';refresh();expect(svg()).toContain('stroke="#22c55e"');
+ root.dataset.accent='#ffffff';refresh();expect(svg()).toContain('stroke="#ffffff"');
+ root.dataset.accent='#7c5ce7';refresh();expect(svg()).toContain('stroke="#7c5ce7"');
 });

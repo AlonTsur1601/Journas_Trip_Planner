@@ -2,8 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <script src="/appearance.js"></script>
+    <link rel="icon" type="image/svg+xml"  />
+    <script>(() => {
+  let saved = {};
+  try {
+    const visit = JSON.parse(localStorage.getItem('journas-auth-visit') || 'null');
+    const appearance = JSON.parse(localStorage.getItem('journas-appearance') || 'null');
+    if (visit?.uid && appearance?.userId === visit.uid && Number.isFinite(visit.visited) && Date.now() - visit.visited < 7 * 24 * 60 * 60 * 1000) {
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith('firebase:authUser:') && JSON.parse(localStorage.getItem(key) || 'null')?.uid === visit.uid) {
+          saved = appearance;
+          document.documentElement.dataset.appearanceUser = visit.uid;
+          break;
+        }
+      }
+    }
+  } catch { /* Unavailable or invalid storage starts with the default appearance. */ }
+  const theme = ['light', 'dark', 'system'].includes(saved.theme) ? saved.theme : 'system';
+  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(saved.accent)) {
+    const neutral = dark && ['#292637', '#000000', '#000', '#000000ff'].includes(saved.accent.toLowerCase());
+    document.documentElement.style.setProperty('--accent', neutral ? '#ffffff' : saved.accent);
+    document.documentElement.style.setProperty('--accent-ink', neutral ? '#17151f' : '#ffffff');
+  }
+      const favicon = document.querySelector('link[rel="icon"]');
+      const faviconSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#7c5ce7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z\"/></svg>";
+      const updateFavicon = () => {
+        const accent = document.documentElement.style.getPropertyValue('--accent').trim() || '#7c5ce7';
+        const href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg.replace('#7c5ce7', accent));
+        if (favicon && favicon.getAttribute('href') !== href) favicon.setAttribute('href', href);
+      };
+      updateFavicon();
+      new MutationObserver(updateFavicon).observe(document.documentElement, {attributes:true,attributeFilter:['style']});
+    })();
+</script>
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <meta name="theme-color" content="#7c5ce7" />
     <meta

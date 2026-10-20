@@ -386,7 +386,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [date, setDate] = useState(today()),
     [day, setDay] = useState<Day>(emptyDay),
     [layout, setLayout] = useState<Layout>(defaultLayout),
-    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings})),
+    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...(!practice?readAppearance(document.documentElement.dataset.appearanceUser??""): {})})),
     [message, setMessage] = useState(""),
     [status, setStatus] = useState("All changes saved"),
     [modal, setModal] = useState<string | null>(null),

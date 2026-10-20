@@ -33,7 +33,7 @@ if (emulators && auth) {
 const sessionListeners=new Set<(user:User|null)=>void>();
 const deviceSession=new DeviceSession(window.localStorage);
 let sessionUser:User|null=null,sessionReady=false,expiryTimer:ReturnType<typeof setTimeout>|undefined;
-function publishSession(user:User|null){sessionUser=user;sessionReady=true;for(const listener of sessionListeners)listener(user);}
+function publishSession(user:User|null){if(user)document.documentElement.dataset.appearanceUser=user.uid;else delete document.documentElement.dataset.appearanceUser;sessionUser=user;sessionReady=true;for(const listener of sessionListeners)listener(user);}
 async function refreshDeviceSession(user:User|null){
  clearTimeout(expiryTimer);
  if(!user){deviceSession.clear();publishSession(null);return;}

@@ -1,9 +1,10 @@
+import {DeviceSession,sessionWeek} from './device-session';
 import {ConcurrentReads,isReadAction} from './request-cache';
 import {defaultSettings} from './types';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
-import { connectAuthEmulator, initializeAuth, browserSessionPersistence, browserPopupRedirectResolver } from "firebase/auth";
+import { connectAuthEmulator, initializeAuth, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, onIdTokenChanged, signOut, type User } from "firebase/auth";
 const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
 const config = emulators
@@ -23,10 +24,31 @@ export const configured = Boolean(
   config.apiKey && config.projectId && config.appId,
 );
 const app = configured ? initializeApp(config) : null;
-export const auth = app ? initializeAuth(app, { persistence: browserSessionPersistence, popupRedirectResolver: browserPopupRedirectResolver }) : null;
+export const auth = app ? initializeAuth(app, { persistence: [browserLocalPersistence,browserSessionPersistence], popupRedirectResolver: browserPopupRedirectResolver }) : null;
 
 if (emulators && auth) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+}
+// Publish only sessions that passed the device inactivity check, to every auth consumer.
+const sessionListeners=new Set<(user:User|null)=>void>();
+const deviceSession=new DeviceSession(window.localStorage);
+let sessionUser:User|null=null,sessionReady=false,expiryTimer:ReturnType<typeof setTimeout>|undefined;
+function publishSession(user:User|null){sessionUser=user;sessionReady=true;for(const listener of sessionListeners)listener(user);}
+async function refreshDeviceSession(user:User|null){
+ clearTimeout(expiryTimer);
+ if(!user){deviceSession.clear();publishSession(null);return;}
+ if(!deviceSession.visit(user)){await signOut(auth!);return;}
+ publishSession(user);
+ expiryTimer=setTimeout(()=>{void refreshDeviceSession(auth?.currentUser??null);},sessionWeek);
+}
+if(auth){
+ onIdTokenChanged(auth,user=>{void refreshDeviceSession(user);});
+ window.addEventListener('focus',()=>{if(sessionReady)void refreshDeviceSession(auth?.currentUser??null);});
+}
+export function observeAuthSession(listener:(user:User|null)=>void){
+ sessionListeners.add(listener);
+ if(sessionReady)queueMicrotask(()=>{if(sessionListeners.has(listener))listener(sessionUser);});
+ return ()=>{sessionListeners.delete(listener);};
 }
 async function request<T = unknown>(
   action: string,

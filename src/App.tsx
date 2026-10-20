@@ -4,7 +4,7 @@ import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
 import { Activity, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
-  onAuthStateChanged,
+
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -49,7 +49,7 @@ import {AccountCredentials} from "./AccountCredentials";
 import {AccountName} from "./AccountName";
 import {lodgingName} from "./lodging-name";
 import {accountPhoto,accountName} from "./account-profile";
-import { api as profileApi, auth, configured } from "./firebase";
+import { api as profileApi, auth, configured, observeAuthSession } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
 import {changeBlockPlace} from './block-link';
 import {blockRange} from './block-range';
@@ -498,7 +498,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
+    return observeAuthSession((u) => {
       if(u&&loadedAccount.current===u.uid){setUser(u);return;}
       loadedAccount.current="";
       screenReady.current=false;

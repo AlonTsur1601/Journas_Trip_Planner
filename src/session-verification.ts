@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
-import {onIdTokenChanged,type User} from 'firebase/auth';
-import {auth} from './firebase';
+import {type User} from 'firebase/auth';
+import {auth,observeAuthSession} from './firebase';
 import {startSession} from './startup';
 import {VerificationCache} from './verification-cache';
 const cache=new VerificationCache();
@@ -23,7 +23,7 @@ export function useSessionVerification(){
    }).then(verified=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified});})
    .catch(()=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified:false});});
   };
-  const stop=auth?onIdTokenChanged(auth,check):()=>{};
+  const stop=auth?observeAuthSession(check):()=>{};
   const refresh=()=>{const user=auth?.currentUser;if(user&&!cache.has(keyFor(user)))cache.invalidate(keyFor(user));check();};
   window.addEventListener('journas-email-confirmed',refresh);
   return()=>{live=false;stop();window.removeEventListener('journas-email-confirmed',refresh);};

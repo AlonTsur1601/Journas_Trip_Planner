@@ -1,4 +1,5 @@
 import {useLayoutEffect,useRef,type ReactNode} from 'react';
+import {registerSurfaceMotion} from './surface-motion';
 
 const duration=280;
 const easing='cubic-bezier(.2,.7,.2,1)';
@@ -25,6 +26,7 @@ export function MotionSurface({children}:{children:ReactNode}){
     const card=shaded?surface.querySelector<HTMLElement>('.modal'):null;
     const enter=surface.animate([{opacity:plannerPanel?1:0},{opacity:1}],{duration:fadeDuration,easing:shaded?'linear':easing});
     const lift=(card??surface).animate([{translate:plannerPanel?`${panelOffset}px 0`:'0 8px'},{translate:'0 0'}],{duration,easing});
+    registerSurfaceMotion(card??surface,lift);
     const dividerEnter=splitter?.animate([{translate:`${panelOffset}px 0`},{translate:'0 0'}],{duration,easing});
     let layoutMotion:Animation|undefined;
     let previousLeft=surface.offsetLeft,previousTop=surface.offsetTop;

@@ -2300,14 +2300,16 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @media(min-width:701px){.home-intro{align-items:start;}.home-intro h1{margin-top:0;}}
 
 /* Fixed pin grid beside the resume and create actions. */
-.home-intro{display:block;padding:16px 0 4px;}
-.home-featured{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch;padding-bottom:20px;}
+.home-intro{display:block;padding:0;}
+.home-intro h1{margin-bottom:0;}
+.home-featured{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch;padding-bottom:0;}
 .home-resume-column{display:flex;flex-direction:column;align-items:stretch;gap:12px;min-width:0;}
 .home-resume-column>.home-create{flex:none;min-height:60px;width:100%;min-width:0;padding:16px;font-size:17px;background:var(--surface);border:1px solid var(--line);border-radius:12px;gap:12px;}
 .home-resume-column>.home-create svg{width:24px;height:24px;}
 .home-pins-section{margin:0;min-height:calc(4 * var(--home-card-height) + 68px);}
 .home-pins-section .home-pins{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:var(--home-card-height);max-height:none;overflow:visible;scrollbar-gutter:auto;padding-right:0;}
-.home-recents{margin-top:18px;}
+.home-recents{margin-top:0;}
+@media(min-width:1101px) and (max-height:800px){.home-page{padding-top:12px;padding-bottom:12px;}}
 @media(max-width:700px){
  .home-featured{grid-template-columns:1fr;gap:16px;padding-bottom:16px;}
  .home-resume-column{gap:10px;}
@@ -2329,6 +2331,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 
 /* Keep the original icon-and-text cards, with menus clear of their dates. */
 @media(min-width:701px){.home-recents .home-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));}}
+@media(min-width:1280px){.home-recents .home-list{grid-template-columns:repeat(3,minmax(0,1fr));}}
 .home-pins .home-tile-main,.home-recents .home-tile-main{padding-right:10px;}
 .home-tile-main strong{padding-right:26px;}
 .home-tile .home-tile-menu,.home-pins .home-tile-menu,.home-recents .home-tile-menu{right:4px;top:4px;transform:none;height:28px;}
@@ -2385,9 +2388,11 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .time-wheel[aria-disabled="true"]{overflow:hidden;}
 
 
-.tour-highlight{animation:tour-highlight-breathe 2.4s ease-in-out infinite;}
-@keyframes tour-highlight-breathe{0%,100%{opacity:.85;filter:drop-shadow(0 0 9px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 16px var(--accent));}}
-@media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
+.tour-focus-clip{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.tour-highlight{position:absolute;border:2px solid var(--accent);border-radius:9px;pointer-events:none;will-change:translate;}
+.tour-highlight-glow{position:absolute;inset:-2px;border-radius:inherit;box-shadow:0 0 14px 2px color-mix(in srgb,var(--accent) 65%,transparent);opacity:.45;animation:tour-highlight-breathe 2.4s ease-in-out infinite;will-change:opacity;}
+@keyframes tour-highlight-breathe{0%,100%{opacity:.35;}50%{opacity:.85;}}
+@media(prefers-reduced-motion:reduce){.tour-highlight-glow{animation:none;}}
 
 .settings-footer .settings-tour-button,.tour-banner .settings-tour-button,.tour-actions .button{min-height:30px;padding:5px 12px;font-size:12px;}
 .settings-footer .settings-tour-button,.tour-banner .settings-tour-button,.tour-actions .button:not(.primary){color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
@@ -2474,7 +2479,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .guided-tour[data-mobile="true"] .tour-banner>.settings-tour-button{flex-basis:auto;}
 .guided-tour[data-mobile="true"]:has(.tour-banner) .tour-close{display:none;}
 .guided-tour[data-mobile="true"] .tour-substeps{grid-template-columns:repeat(2,minmax(0,1fr));}
-.guided-tour[data-mobile="true"] .tour-shade{height:var(--tour-site-height);overflow:hidden;}
+.guided-tour[data-mobile="true"] .tour-shade,.guided-tour[data-mobile="true"] .tour-focus-clip{height:var(--tour-site-height);overflow:hidden;}
 
 @media(min-width:701px){
  body:has(.guided-tour[data-mobile="false"]) :is(.trip-modal,.settings-modal,.item-modal){max-width:min(100%,calc(100vw - 2 * (clamp(200px,20vw,280px) + 32px)));}

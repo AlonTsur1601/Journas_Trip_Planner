@@ -1,10 +1,11 @@
 import {findTourTarget,observeTourTarget} from './tour-target';
 import {tourCardPosition,tourCardWidth} from './tour-layout';
-import {tourShieldPath,type TourRect} from './tour-progress';
+import {tourSpotlight} from './tour-spotlight';
+import {restingSurfaceRect} from './surface-motion';
 import {MotionSurface} from './MotionSurface';
 import {api} from './firebase';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {createPortal,flushSync} from 'react-dom';
+import {createPortal} from 'react-dom';
 import {ArrowRight,Compass,X} from 'lucide-react';
 export type TourContext={draft:Record<string,any>|null;lodgingChosen:boolean;mapStart:string;home:boolean;modal:string|null;editKind:string|null;editId:string|null;tripId:string|null;trips:number;pins:number;blocks:number;tasks:number;checkedTasks:number;connections:number;homePins:number;checklist:boolean;date:string};
 type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean};
@@ -107,7 +108,7 @@ function remember(uid:string){if(seen(uid))return;void api('tour.seen').catch(()
 function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));}catch{return false;}}
 export default function GuidedTour({userId,ready,context,onHome,practice}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>('closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
- const [surfaces,setSurfaces]=useState<TourRect[]>([]);
+ const outline=useRef<HTMLDivElement>(null),cutouts=useRef<SVGGElement>(null),shield=useRef<SVGPathElement>(null);
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
  const [viewport,setViewport]=useState(()=>({width:innerWidth,height:window.visualViewport?.height??innerHeight}));
  const mobile=viewport.width<=700,siteHeight=mobile?Math.round(viewport.height*2/3):viewport.height-banner.height-24;
@@ -150,30 +151,31 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  useLayoutEffect(()=>setBox(null),[step]);
  const target=current.target;const selector=typeof target==='function'?target(context):target;
  useEffect(()=>{
-  if(status!=='running')return;let scrolled:Element|null=null;
+  if(status!=='running'||!outline.current||!cutouts.current||!shield.current)return;let scrolled:Element|null=null;
+  const spotlight=tourSpotlight(outline.current,cutouts.current,shield.current);
   const find=()=>findTourTarget(selector);
-  const place=(target:Element|null)=>{const visible=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].filter(el=>!el.closest('[inert],[data-motion-exit]')).map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};}).filter(r=>r.width>0&&r.height>0);setSurfaces(previous=>JSON.stringify(previous)===JSON.stringify(visible)?previous:visible);setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));
+  const place=(target:Element|null)=>{spotlight.place(target,mobile?siteHeight:viewport.height);setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));
    if(!target)return;
    const availableHeight=mobile?siteHeight:viewport.height;
    const rect=target.getBoundingClientRect();if(scrolled!==target&&(rect.bottom<80||rect.top>availableHeight-60||(mobile&&rect.height<availableHeight&&rect.bottom>availableHeight))){scrolled=target;target.scrollIntoView({block:'center',behavior:'instant'});}
-   const r=target.getBoundingClientRect(),next={x:Math.max(4,r.left-6),y:Math.max(4,r.top-6),width:Math.min(innerWidth-8,r.width+12),height:Math.min(availableHeight-8,r.height+12)};
+   const r=restingSurfaceRect(target),next={x:Math.max(4,r.x-6),y:Math.max(4,r.y-6),width:Math.min(innerWidth-8,r.width+12),height:Math.min(availableHeight-8,r.height+12)};
    next.width=Math.min(next.width,innerWidth-4-next.x);next.height=Math.max(0,Math.min(next.height,availableHeight-4-next.y));
    setBox(previous=>previous&&Object.keys(next).every(key=>Math.abs(previous[key as keyof typeof next]-next[key as keyof typeof next])<0.1)?previous:next);
   };
-  // Commit the measured outline, cutout and shield before this frame is painted.
-  return observeTourTarget(find,target=>flushSync(()=>place(target)));
- },[status,selector,step,cardHeight,inModal,mobile,siteHeight,viewport.height]);
+  const stop=observeTourTarget(find,place);
+  return()=>{stop();spotlight.stop();};
+ },[status,selector,step,mobile,siteHeight,viewport.height]);
  if(status==='closed')return null;
  const welcome=status==='welcome',complete=status==='complete',intro=welcome||complete;
- const openings=intro?[]:[...(box?[box]:[]),...surfaces];
  const obstacles=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};});
  const parentModal=[...document.querySelectorAll('.modal')].filter(el=>!el.closest('[data-motion-exit]')).map(el=>el.getBoundingClientRect()).filter(rect=>rect.width>0).sort((a,b)=>b.width-a.width)[0];
  const placementTarget=parentModal?{x:parentModal.x,y:parentModal.y,width:parentModal.width,height:parentModal.height}:box;
  const preferredWidth=mobile?viewport.width:tourCardWidth(intro?null:placementTarget,viewport.width);
  const position=mobile?{x:0,y:siteHeight,width:viewport.width}:intro?{x:(viewport.width-preferredWidth)/2,y:Math.max(12,(siteHeight-cardHeight)/2),width:preferredWidth}:tourCardPosition(placementTarget,preferredWidth,cardHeight,viewport.width,siteHeight,obstacles,preferredWidth);
  return createPortal(<div className="guided-tour" data-mobile={mobile} data-step={step} data-substep={part} data-modal={inModal} data-dock={inModal&&innerWidth>=1100?'side':'bottom'}>
-  <svg className="tour-shade" width="100%" height="100%" aria-hidden="true"><defs><mask id="journas-tour-cutout"><rect width="100%" height="100%" fill="white"/>{openings.map((r,index)=><rect key={index} x={r.x} y={r.y} width={r.width} height={r.height} rx="9" fill="black"/>)}</mask></defs><rect width="100%" height="100%" fill="#15102099" mask="url(#journas-tour-cutout)"/>{!intro&&box&&<rect className="tour-highlight" x={box.x} y={box.y} width={box.width} height={box.height} rx="9" fill="none" stroke="var(--accent)" strokeWidth="2"/>}</svg>
-  <svg className="tour-interaction-shield" width="100%" height="100%" aria-hidden="true"><path d={tourShieldPath(innerWidth,innerHeight,openings)} fill="transparent" fillRule="evenodd"/></svg>
+  <svg className="tour-shade" width="100%" height="100%" aria-hidden="true"><defs><mask id="journas-tour-cutout"><rect width="100%" height="100%" fill="white"/><g ref={cutouts}/></mask></defs><rect width="100%" height="100%" fill="#15102099" mask="url(#journas-tour-cutout)"/></svg>
+  <div className="tour-focus-clip" aria-hidden="true"><div ref={outline} className="tour-highlight" hidden={intro||!box}><span className="tour-highlight-glow"/></div></div>
+  <svg className="tour-interaction-shield" width="100%" height="100%" aria-hidden="true"><path ref={shield} d={intro?`M0 0H${innerWidth}V${innerHeight}H0Z`:undefined} fill="transparent" fillRule="evenodd"/></svg>
   {!welcome&&<div className="tour-banner" role="status"><Compass size={17}/><strong>Guided tour</strong><button className="button settings-tour-button" onClick={close}>End tour</button></div>}
   {complete&&<div className="tour-confetti" aria-hidden="true">{Array.from({length:64},(_,i)=><i key={i} style={{'--spread':`${((i*37)%101-50)*.9}vw`,'--rise':`${-(58+(i*17)%33)}vh`,'--delay':`${(i%8)*.035}s`,'--turn':`${(i%2?1:-1)*(180+i*23)}deg`,background:['#8b5cf6','#22c55e','#eab308','#ec4899','#38bdf8'][i%5]} as React.CSSProperties}/>)}</div>}
   <MotionSurface key={`${status}:${step}`}><section ref={card} className="tour-card" role="dialog" aria-modal="false" aria-label="Journas guided tour" style={{left:position.x,top:position.y,width:position.width}}>

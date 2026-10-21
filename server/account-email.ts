@@ -18,6 +18,6 @@ export async function sendEmailChange(uid:string,value:unknown,authTime:number){
  const email=emailAddress(value),user=await adminAuth().getUser(uid);if(!user.email||user.disabled)throw new ApiError(400,'EMAIL_UNAVAILABLE','This account cannot change its email.');
  if(email.toLowerCase()===user.email.toLowerCase())throw new ApiError(400,'INVALID_EMAIL','Enter a different email address.');
  accountMailTransport();const release=await reserve([`change-uid:${uid}`,`change-email:${email.toLowerCase()}`]);
- try{const link=await adminAuth().generateVerifyAndChangeEmailLink(user.email,email);await deliverAccountMail(email,accountEmailSubject('emailChangeConfirmation'),accountEmailContent('emailChangeConfirmation',link,email),`Confirm your new email address for Journas:\n\n${link}\n\nYour sign-in email will stay the same until you confirm. If you did not request this, ignore this email.\n\nThe Journas team`);return {sent:true};}
+ try{const link=await adminAuth().generateVerifyAndChangeEmailLink(user.email,email);await deliverAccountMail(email,accountEmailSubject('emailChangeConfirmation'),accountEmailContent('emailChangeConfirmation',link,email),`Verify your new email address for Journas:\n\n${link}\n\nYour sign-in email will stay the same until you verify the new address. If you did not request this, ignore this email.\n\nThe Journas team`);return {sent:true};}
  catch{await release();throw new ApiError(503,'EMAIL_DELIVERY_FAILED','Unable to send the email. Please try again.');}
 }

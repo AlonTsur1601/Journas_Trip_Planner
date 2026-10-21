@@ -10,7 +10,7 @@ export function AccountCredentials({user,onMessage,onChanged}: {user:User;onMess
  const [mode,setMode]=useState<'link'|'email'|'password'|null>(null);
  const [busy,setBusy]=useState(false);
  const [disconnect,setDisconnect]=useState<'google.com'|'password'|null>(null);
- useEffect(()=>{if(!busy)return;return beginActivity(disconnect?'Disconnecting your sign-in method…':mode==='email'?'Sending confirmation to your new email…':mode==='password'?'Updating your password…':'Linking your sign-in method…');},[busy]);
+ useEffect(()=>{if(!busy)return;return beginActivity(disconnect?'Disconnecting your sign-in method…':mode==='email'?'Sending verification to your new email…':mode==='password'?'Updating your password…':'Linking your sign-in method…');},[busy]);
  const providers=user.providerData.map(p=>p.providerId);
  const password=providers.includes('password'),google=providers.includes('google.com');
  const canDisconnect=password&&google;
@@ -19,7 +19,7 @@ export function AccountCredentials({user,onMessage,onChanged}: {user:User;onMess
   e.preventDefault();if(busy)return;const form=new FormData(e.currentTarget);if(mode!=='email'&&String(form.get('newPassword')??'').length<6){onMessage('Use at least 6 characters for your password.');return;}if(mode!=='email'&&form.get('newPassword')!==form.get('confirmPassword')){onMessage('Passwords do not match.');return;}setBusy(true);
   try{
    if(mode==='link'){await linkPasswordAccount(user,String(form.get('email')),String(form.get('newPassword')));}
-   else{if(mode==='email'){await changeAccountEmail(user,String(form.get('email')),String(form.get('currentPassword')??''));onMessage('Check the new email address to confirm the change.');}else{await changeAccountPassword(user,String(form.get('newPassword')),String(form.get('currentPassword')??''));}}
+   else{if(mode==='email'){await changeAccountEmail(user,String(form.get('email')),String(form.get('currentPassword')??''));onMessage('Check your new email address to verify it and complete the change.');}else{await changeAccountPassword(user,String(form.get('newPassword')),String(form.get('currentPassword')??''));}}
    await user.reload();onChanged();setMode(null);
   }catch(e){error(e);}finally{setBusy(false);}
  }

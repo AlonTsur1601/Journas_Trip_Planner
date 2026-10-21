@@ -27,7 +27,7 @@ export async function sendVerificationEmail(uid:string,returnClientId?:unknown){
  let proof:string|undefined;
  try{
   proof=await createVerificationProof(uid,user.email);const target=new URL('/verify-email',siteUrl);target.searchParams.set('proof',proof);if(typeof returnClientId==='string'&&/^[a-zA-Z0-9-]{20,100}$/.test(returnClientId))target.searchParams.set('returnClientId',returnClientId);const link=target.toString();
-  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,verificationContent(link,attempt),`Confirm your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
+  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,verificationContent(link,attempt),`Verify your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
   return {sent:true};
  }catch{
   if(proof)await discardVerificationProof(proof);

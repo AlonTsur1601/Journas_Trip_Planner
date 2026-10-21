@@ -9,13 +9,16 @@
     const visit = JSON.parse(localStorage.getItem('journas-auth-visit') || 'null');
     const appearance = JSON.parse(localStorage.getItem('journas-appearance') || 'null');
     if (visit?.uid && appearance?.userId === visit.uid && Number.isFinite(visit.visited) && Date.now() - visit.visited < 7 * 24 * 60 * 60 * 1000) {
-      for (let index = 0; index < localStorage.length; index++) {
-        const key = localStorage.key(index);
-        if (key?.startsWith('firebase:authUser:') && JSON.parse(localStorage.getItem(key) || 'null')?.uid === visit.uid) {
+      for (const storage of [localStorage, sessionStorage]) {
+       for (let index = 0; index < storage.length; index++) {
+        const key = storage.key(index);
+        if (key?.startsWith('firebase:authUser:') && JSON.parse(storage.getItem(key) || 'null')?.uid === visit.uid) {
           saved = appearance;
           document.documentElement.dataset.appearanceUser = visit.uid;
           break;
         }
+       }
+       if (saved.userId) break;
       }
     }
   } catch { /* Unavailable or invalid storage starts with the default appearance. */ }

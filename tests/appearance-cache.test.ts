@@ -35,16 +35,17 @@ it('starts neutral before authentication and follows the active account accent',
  root.dataset.accent='#7c5ce7';refresh();expect(svg()).toContain('stroke="#7c5ce7"');
 });
 it('restores appearance before app startup only for a matching unexpired persisted sign-in',()=>{
- const run=(age:number,persistedUid:string|null,appearanceUid='alice')=>{
+ const run=(age:number,persistedUid:string|null,appearanceUid='alice',tabOnly=false)=>{
   const values:Record<string,string>={'journas-auth-visit':JSON.stringify({uid:'alice',visited:Date.now()-age}),'journas-appearance':JSON.stringify({userId:appearanceUid,theme:'dark',accent:'#22c55e'})};
   if(persistedUid)values['firebase:authUser:test:[DEFAULT]']=JSON.stringify({uid:persistedUid});
   const keys=Object.keys(values);
   const root={dataset:{} as Record<string,string>,style:{setProperty:(key:string,value:string)=>{root.dataset[key]=value;},getPropertyValue:(key:string)=>root.dataset[key]??''}};
   const icon={href:'',getAttribute:()=>icon.href,setAttribute:(_key:string,value:string)=>{icon.href=value;}};
-  runInNewContext(boot,{localStorage:{getItem:(key:string)=>values[key]??null,length:keys.length,key:(i:number)=>keys[i]},document:{documentElement:root,querySelector:()=>icon},matchMedia:()=>({matches:false}),MutationObserver:class{observe(){}}});
+  runInNewContext(boot,{localStorage:{getItem:(key:string)=>tabOnly&&key.startsWith('firebase:')?null:values[key]??null,length:tabOnly?0:keys.length,key:(i:number)=>keys[i]},sessionStorage:{getItem:(key:string)=>values[key]??null,length:tabOnly?keys.length:0,key:(i:number)=>keys[i]},document:{documentElement:root,querySelector:()=>icon},matchMedia:()=>({matches:false}),MutationObserver:class{observe(){}}});
   return {...root.dataset,icon:decodeURIComponent(icon.href)} as Record<string,string>;
  };
  expect(run(1000,'alice')).toMatchObject({appearanceUser:'alice',theme:'dark','--accent':'#22c55e'});
+ expect(run(1000,'alice','alice',true)).toMatchObject({appearanceUser:'alice',theme:'dark','--accent':'#22c55e'});
  expect(run(1000,'alice').icon).toContain('stroke="#22c55e"');
  for(const result of [run(7*86400000,'alice'),run(1000,null),run(1000,'bob'),run(1000,'alice','bob')]){
   expect(result.appearanceUser).toBeUndefined();expect(result['--accent']).toBeUndefined();expect(result.icon).toContain('stroke="#7c5ce7"');

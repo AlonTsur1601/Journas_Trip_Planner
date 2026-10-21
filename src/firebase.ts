@@ -4,7 +4,7 @@ import {defaultSettings} from './types';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
-import { connectAuthEmulator, initializeAuth, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, onIdTokenChanged, signOut, type User } from "firebase/auth";
+import { connectAuthEmulator, initializeAuth, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, onIdTokenChanged, signOut, setPersistence, type User } from "firebase/auth";
 const emulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
 const config = emulators
@@ -29,12 +29,16 @@ export const auth = app ? initializeAuth(app, { persistence: [browserLocalPersis
 if (emulators && auth) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 }
+// Migrate existing tab-only sign-ins as well as setting the default for new ones.
+const devicePersistenceReady=auth?setPersistence(auth,browserLocalPersistence).catch(()=>{/* Keep the SDK fallback if permanent storage is unavailable. */}):Promise.resolve();
 // Publish only sessions that passed the device inactivity check, to every auth consumer.
 const sessionListeners=new Set<(user:User|null)=>void>();
 const deviceSession=new DeviceSession(window.localStorage);
 let sessionUser:User|null=null,sessionReady=false,expiryTimer:ReturnType<typeof setTimeout>|undefined;
 function publishSession(user:User|null){if(user)document.documentElement.dataset.appearanceUser=user.uid;else delete document.documentElement.dataset.appearanceUser;sessionUser=user;sessionReady=true;for(const listener of sessionListeners)listener(user);}
 async function refreshDeviceSession(user:User|null){
+ await devicePersistenceReady;
+ if(user!==auth?.currentUser)return;
  clearTimeout(expiryTimer);
  if(!user){deviceSession.clear();publishSession(null);return;}
  if(!deviceSession.visit(user)){await signOut(auth!);return;}

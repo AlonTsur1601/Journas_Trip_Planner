@@ -4,7 +4,7 @@ import {tourShieldPath,type TourRect} from './tour-progress';
 import {MotionSurface} from './MotionSurface';
 import {api} from './firebase';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
+import {createPortal,flushSync} from 'react-dom';
 import {ArrowRight,Compass,X} from 'lucide-react';
 export type TourContext={draft:Record<string,any>|null;lodgingChosen:boolean;mapStart:string;home:boolean;modal:string|null;editKind:string|null;editId:string|null;tripId:string|null;trips:number;pins:number;blocks:number;tasks:number;checkedTasks:number;connections:number;homePins:number;checklist:boolean;date:string};
 type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean};
@@ -160,7 +160,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    next.width=Math.min(next.width,innerWidth-4-next.x);next.height=Math.max(0,Math.min(next.height,availableHeight-4-next.y));
    setBox(previous=>previous&&Object.keys(next).every(key=>Math.abs(previous[key as keyof typeof next]-next[key as keyof typeof next])<0.1)?previous:next);
   };
-  return observeTourTarget(find,place);
+  // Commit the measured outline, cutout and shield before this frame is painted.
+  return observeTourTarget(find,target=>flushSync(()=>place(target)));
  },[status,selector,step,cardHeight,inModal,mobile,siteHeight,viewport.height]);
  if(status==='closed')return null;
  const welcome=status==='welcome',complete=status==='complete',intro=welcome||complete;

@@ -1,3 +1,4 @@
+import {sendPasswordReset,sendEmailChange} from './account-email.js';
 import {hasAcknowledgedTour,tourVersion} from '../src/tour-state.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -48,15 +49,17 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json'))
             throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json');
         const input = await body(req);
+        if(input.action==='auth.password-reset'){const address=process.env.VERCEL?String(req.headers['x-forwarded-for']??'').split(',')[0]:req.socket.remoteAddress??'unknown';return send(res,200,await sendPasswordReset(input.email,address));}
         if(input.action==='auth.confirm-verification')return send(res,200,await confirmVerification(input.proof));
         let uid: string | null = null;
+        let authTime=NaN;
         if (input.action !== 'share.read') {
             const authorization = req.headers.authorization ?? '';
             if (!authorization.startsWith('Bearer '))
                 throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in to continue');
             try {
                 const token = await adminAuth().verifyIdToken(authorization.slice(7), true);
-                uid = token.uid;
+                uid = token.uid;authTime=Number(token.auth_time);
                 if (!token.email_verified && !['auth.email-verification','auth.verification-status','auth.session'].includes(String(input.action)))
                     throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email address to continue');
             }
@@ -77,6 +80,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             const status=await verificationStatus(uid!);
             if(!status.verified){if(startup)return send(res,200,{verified:false});throw new ApiError(403,'EMAIL_UNVERIFIED','Confirm your email again to continue.');}
         }
+        if(input.action==='auth.email-change')return send(res,200,await sendEmailChange(uid!,input.email,authTime));
         if(startup)input.action='planner.restore';
         if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId));
         if(input.action==='places.search'||input.action==='places.reverse'||input.action==='places.landmarks')return send(res,200,await places(input,uid!));

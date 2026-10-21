@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
+
   signOut,
   type User,
 } from "firebase/auth";
@@ -339,7 +339,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                   return;
                 }
                 run(async () => {
-                  await sendPasswordResetEmail(auth!, email);
+                  await api('auth.password-reset',{email});
                   onError("Password reset email sent.");
                 },'Sending your password reset email…');
               }}

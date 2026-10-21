@@ -1,4 +1,5 @@
-import {EmailAuthProvider,GoogleAuthProvider,linkWithCredential,linkWithPopup,reauthenticateWithCredential,reauthenticateWithPopup,updatePassword,verifyBeforeUpdateEmail,unlink,type User} from 'firebase/auth';
+import {api} from './firebase';
+import {EmailAuthProvider,GoogleAuthProvider,linkWithCredential,linkWithPopup,reauthenticateWithCredential,reauthenticateWithPopup,updatePassword,unlink,type User} from 'firebase/auth';
 export const linkGoogleAccount=(user:User)=>linkWithPopup(user,new GoogleAuthProvider());
 export async function linkPasswordAccount(user:User,email:string,password:string){
  try{return await linkWithCredential(user,EmailAuthProvider.credential(email,password));}
@@ -13,7 +14,7 @@ export async function confirmAccountIdentity(user:User,currentPassword:string){
  if(user.providerData.some(p=>p.providerId==='password'))return reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email!,currentPassword));
  return reauthenticateWithPopup(user,new GoogleAuthProvider());
 }
-export async function changeAccountEmail(user:User,email:string,currentPassword:string){await confirmAccountIdentity(user,currentPassword);await verifyBeforeUpdateEmail(user,email);}
+export async function changeAccountEmail(user:User,email:string,currentPassword:string){await confirmAccountIdentity(user,currentPassword);await user.getIdToken(true);await api('auth.email-change',{email});}
 export async function changeAccountPassword(user:User,password:string,currentPassword:string){await confirmAccountIdentity(user,currentPassword);await updatePassword(user,password);}
 
 export async function unlinkAccountProvider(user:User,providerId:'google.com'|'password'){

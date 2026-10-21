@@ -1936,14 +1936,17 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .modal-shade:has(.account-credentials){z-index:130;}
 .account-credentials{gap:16px;}
 .credential-email{color:var(--muted);font-size:13px;overflow-wrap:anywhere;}
-.credential-methods{padding:12px;border:1px solid var(--line);border-radius:6px;gap:14px;flex-wrap:wrap;}
+.credential-methods{display:grid;grid-template-columns:minmax(0,1fr) auto auto;padding:12px;border:1px solid var(--line);border-radius:6px;gap:14px;}
 .credential-provider{display:flex;align-items:center;gap:12px;min-width:0;}
 .credential-provider>svg{color:var(--accent);}
+.credential-provider>svg,.credential-provider>img{flex-shrink:0;}
 .credential-provider>span{display:grid;gap:4px;}
 .credential-provider strong{font-size:14px;}
 .credential-provider small{font-size:12px;color:var(--muted);}
-.credential-linked{color:var(--accent);margin-left:auto;}
-.credential-methods>.button{font-size:12px;margin-left:auto;}
+.credential-linked{color:var(--accent);grid-column:3;margin-left:0;}
+.credential-methods>.button{font-size:12px;margin-left:0;white-space:nowrap;}
+.credential-methods>.credential-actions{grid-column:1/-1;}
+@media(max-width:400px){.credential-methods{gap:8px;}.credential-provider{gap:8px;}}
 .credential-actions{gap:12px;flex-wrap:wrap;}
 .credential-actions>.button{border-radius:5px!important;border-width:1px!important;}
 .credential-form{border-top:1px solid var(--line);padding-top:16px;gap:14px;}

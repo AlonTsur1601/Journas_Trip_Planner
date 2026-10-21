@@ -1,12 +1,12 @@
 import {findTourTarget,observeTourTarget} from './tour-target';
-import {tourCardPosition} from './tour-layout';
+import {tourCardPosition,tourCardWidth} from './tour-layout';
 import {MotionSurface} from './MotionSurface';
 import {api} from './firebase';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Compass,X} from 'lucide-react';
 export type TourContext={draft:Record<string,any>|null;lodgingChosen:boolean;mapStart:string;home:boolean;modal:string|null;editKind:string|null;editId:string|null;tripId:string|null;trips:number;pins:number;blocks:number;tasks:number;checkedTasks:number;connections:number;homePins:number;checklist:boolean;date:string};
-type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;blurOn?:string;ready?:(context:TourContext)=>boolean};
+type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;blurOn?:string;ready?:(context:TourContext)=>boolean};
 type Step={title:string;text:string;target:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;instructions?:Instruction[]};
 const tourSteps:Step[]=[
  {title:'Start a simple trip',text:'Choose Create new trip. We will build a short itinerary together, using your own places and dates.',target:'.home-create',done:c=>c.modal==='new-trip'},
@@ -63,7 +63,7 @@ const instructions:Record<string,Instruction[]>={
  ],
  'Explore the map':[
   {title:'Move and zoom',text:'Drag the map to move it. Use + and − to zoom, or the compass to face north. On a phone, pinch to zoom and drag with one finger.'},
-  {title:'Edit places and routes',text:'Click a marker to edit its place or use Delete to remove it. Connections lets you edit or delete routes. Close any editor before continuing; hiding and reopening the map keeps its view.'},
+  {title:'Edit places and routes',closeOnNext:'.modal:not([inert]) > header [aria-label="Close"]',text:'Click a marker to edit its place or use Delete to remove it. Connections lets you edit or delete routes. Next closes any open editor before continuing; hiding and reopening the map keeps its view.'},
  ],
  'Navigate the trip dates':[
   {title:'Open the calendar',text:'Press the date in the top bar to open its calendar. Select a day, or close it and use the arrows beside the date. Dots mark dates belonging to trips; the legend scrolls if it has many trips.'},
@@ -79,7 +79,7 @@ const instructions:Record<string,Instruction[]>={
  ],
  'Share and collaborate':[
   {title:'Trip settings',text:'In Trip details, use Edit trip dates and lodging to change its name, dates, appearance or lodging. Return to Trip details after reviewing the editor.'},
-  {title:'Sharing and travelers',text:'The sharing controls create view-only or editor links; the travelers list manages who has access. Links and account changes are disabled in this practice trip. Close Trip details with its X to continue.'},
+  {title:'Sharing and travelers',closeOnNext:'.share-modal > header [aria-label="Close"]',text:'The sharing controls create view-only or editor links; the travelers list manages who has access. Links and account changes are disabled in this practice trip. Press Next to close Trip details and continue.'},
  ],
  'Pin a shortcut':[
   {title:'Open Create pin',text:'Under Pins on the home page, press Create pin. These shortcuts open a trip, a specific trip day, or a standalone date.',done:()=>Boolean(document.querySelector('.home-pin-modal:not([inert])'))},
@@ -88,7 +88,7 @@ const instructions:Record<string,Instruction[]>={
  'Find your plans again':[
   {title:'Resume and recent plans',text:'The large Continue card opens your last planner view. Below, Recent dates opens a particular day and Recent trips opens a trip. Their three-dot menus let you manage those entries.'},
   {title:'Open all trips',text:'Press All trips beside the large Continue card to see every trip saved in this practice workspace.',target:'.home-browse-trips',completeOn:'.home-browse-trips'},
-  {title:'Browse your trips',text:'Each card opens a trip. The three dots provide its edit and delete actions. Close All trips using its X to continue.',target:'.all-trips-modal',completeOn:'.all-trips-modal [aria-label="Close all trips"]'},
+  {title:'Browse your trips',text:'Each card opens a trip. The three dots provide its edit and delete actions. Press Next to close All trips and continue.',target:'.all-trips-modal',closeOnNext:'.all-trips-modal [aria-label="Close all trips"]'},
  ],
  'Choose your preferences':[
   {title:'Appearance',target:()=>document.querySelector('.dropdown-menu[aria-label="Appearance"]')?'.dropdown-menu[aria-label="Appearance"]':'.settings-modal [aria-label="Appearance"]',text:'Open Appearance and select Light, Dark or Automatic. Automatic follows your device. Choosing an option updates the preview immediately.',completeOn:'.dropdown-menu[aria-label="Appearance"] [role="option"]'},
@@ -109,9 +109,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
  const [viewport,setViewport]=useState(()=>({width:innerWidth,height:window.visualViewport?.height??innerHeight}));
  const mobile=viewport.width<=700,siteHeight=mobile?Math.round(viewport.height*2/3):viewport.height-banner.height-24;
- const guideWidth=Math.min(280,Math.max(200,viewport.width*.2));
  useLayoutEffect(()=>{const resize=()=>setViewport({width:innerWidth,height:window.visualViewport?.height??innerHeight});window.addEventListener('resize',resize);window.visualViewport?.addEventListener('resize',resize);return()=>{window.removeEventListener('resize',resize);window.visualViewport?.removeEventListener('resize',resize);};},[]);
- useLayoutEffect(()=>{if(status==='closed'||!mobile)return;document.body.dataset.tourMobile='true';document.body.style.setProperty('--tour-site-height',`${siteHeight}px`);document.body.style.setProperty('--tour-panel-height',`${viewport.height-siteHeight}px`);return()=>{delete document.body.dataset.tourMobile;document.body.style.removeProperty('--tour-site-height');document.body.style.removeProperty('--tour-panel-height');};},[status,mobile,siteHeight,viewport.height,guideWidth,viewport.width]);
+ useLayoutEffect(()=>{if(status==='closed'||!mobile)return;document.body.dataset.tourMobile='true';document.body.style.setProperty('--tour-site-height',`${siteHeight}px`);document.body.style.setProperty('--tour-panel-height',`${viewport.height-siteHeight}px`);return()=>{delete document.body.dataset.tourMobile;document.body.style.removeProperty('--tour-site-height');document.body.style.removeProperty('--tour-panel-height');};},[status,mobile,siteHeight,viewport.height,viewport.width]);
 
  const progress=useRef({step,part,context});progress.current={step,part,context};
  const inModal=status==='running'&&Boolean(context.modal||context.editKind||domModal);
@@ -122,6 +121,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}if(seen(userId)){initialized.current=userId;return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(!live)return;initialized.current=userId;if(result.seen){try{localStorage.setItem(keyFor(userId),'seen');}catch{}}if(!result.seen){remember(userId);onHome();setStatus('welcome');}}).catch(()=>{if(live&&!seen(userId)){initialized.current=userId;onHome();setStatus('welcome');}});return()=>{live=false;};},[ready,userId,practice]);
  useEffect(()=>{const start=()=>{onHome();setStep(0);setPart(0);setSkipped([]);setStatus('welcome');};window.addEventListener('journas-start-tour',start);return()=>window.removeEventListener('journas-start-tour',start);},[onHome]);
  const close=()=>{remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));};
+ useEffect(()=>{if(status!=='running')return;const blockBackdrop=(event:MouseEvent)=>{if(event.target instanceof Element&&event.target.matches('.modal-shade')){event.preventDefault();event.stopPropagation();}};document.addEventListener('mousedown',blockBackdrop,true);return()=>document.removeEventListener('mousedown',blockBackdrop,true);},[status]);
  useEffect(()=>{if(status!=='closed'){const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));}};window.addEventListener('keydown',escape,true);return()=>window.removeEventListener('keydown',escape,true);}},[status,userId,practice]);
  const advanceStage=()=>{setPart(0);setSkipped([]);if(step===tourSteps.length-1)setStatus('complete');else setStep(value=>value+1);};
  const next=()=>{if(current.instructions&&part<current.instructions.length-1)setPart(value=>value+1);else advanceStage();};
@@ -153,10 +153,10 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  if(status==='closed')return null;
  const welcome=status==='welcome',complete=status==='complete',intro=welcome||complete;
  const opening=!intro&&box?`M${box.x+9} ${box.y}H${box.x+box.width-9}a9 9 0 0 1 9 9V${box.y+box.height-9}a9 9 0 0 1-9 9H${box.x+9}a9 9 0 0 1-9-9V${box.y+9}a9 9 0 0 1 9-9Z`:'';
- const preferredWidth=mobile?viewport.width:guideWidth;
  const obstacles=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};});
- const parentModal=document.querySelector('.modal:not([inert])')?.getBoundingClientRect();
+ const parentModal=[...document.querySelectorAll('.modal')].filter(el=>!el.closest('[data-motion-exit]')).map(el=>el.getBoundingClientRect()).filter(rect=>rect.width>0).sort((a,b)=>b.width-a.width)[0];
  const placementTarget=parentModal?{x:parentModal.x,y:parentModal.y,width:parentModal.width,height:parentModal.height}:box;
+ const preferredWidth=mobile?viewport.width:tourCardWidth(intro?null:placementTarget,viewport.width);
  const position=mobile?{x:0,y:siteHeight,width:viewport.width}:intro?{x:(viewport.width-preferredWidth)/2,y:Math.max(12,(siteHeight-cardHeight)/2),width:preferredWidth}:tourCardPosition(placementTarget,preferredWidth,cardHeight,viewport.width,siteHeight,obstacles,preferredWidth);
  return createPortal(<div className="guided-tour" data-mobile={mobile} data-step={step} data-substep={part} data-modal={inModal} data-dock={inModal&&innerWidth>=1100?'side':'bottom'}>
   <svg className="tour-shade" width="100%" height="100%" aria-hidden="true"><defs><mask id="journas-tour-cutout"><rect width="100%" height="100%" fill="white"/>{!intro&&box&&<rect x={box.x} y={box.y} width={box.width} height={box.height} rx="9" fill="black"/>}</mask></defs><rect width="100%" height="100%" fill="#15102099" mask="url(#journas-tour-cutout)"/>{!intro&&box&&<rect className="tour-highlight" x={box.x} y={box.y} width={box.width} height={box.height} rx="9" fill="none" stroke="var(--accent)" strokeWidth="2"/>}</svg>
@@ -171,7 +171,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    <div className="tour-variants">{(intro?[undefined]:current.instructions??[undefined]).map((item,index)=>{const active=intro||!current.instructions||index===part;return <div key={index} className="tour-variant" data-active={active} aria-hidden={!active} inert={!active}>
     <p aria-live={active?'polite':undefined}>{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':complete?'You can now plan with trips, places, schedules, tasks, sharing, home shortcuts and settings. Your practice workspace will be discarded when you finish.':item?.text??current.text}</p>
     {!intro&&!box&&<small>Open the highlighted panel to continue.</small>}
-    <div className="tour-actions">{(intro||(!item?.done&&!item?.completeOn&&(!current.done||Boolean(current.instructions&&index<current.instructions.length-1))))&&<button className="button" disabled={!intro&&Boolean(active&&item?.ready&&!item.ready(context))} onClick={()=>{if(complete){close();return;}if(welcome){remember(userId);setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish':'Next'}<ArrowRight size={15}/></button>}</div>
+    <div className="tour-actions">{(intro||item?.closeOnNext||(!item?.done&&!item?.completeOn&&(!current.done||Boolean(current.instructions&&index<current.instructions.length-1))))&&<button className="button" disabled={!intro&&Boolean(active&&item?.ready&&!item.ready(context))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){remember(userId);setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish':'Next'}<ArrowRight size={15}/></button>}</div>
    </div>;})}</div>
   </section></MotionSurface>
  </div>,document.body);

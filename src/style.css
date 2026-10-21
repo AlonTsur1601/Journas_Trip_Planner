@@ -2441,6 +2441,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 }
 
 .tour-card{z-index:252;}
+body:has(.guided-tour) .modal>header button[aria-label^="Close"]{display:none;}
 .tour-banner{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:9px 14px;background:var(--surface);color:var(--ink);border:1px solid var(--accent);border-radius:10px;box-shadow:0 4px 18px #0003;font-size:12px;}
 .tour-banner>svg{color:var(--accent);flex-shrink:0;}
 .tour-banner .settings-tour-button{white-space:nowrap;font-size:12px;}

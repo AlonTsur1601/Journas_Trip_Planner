@@ -1,5 +1,11 @@
 export type Rect={x:number;y:number;width:number;height:number};
 export const overlaps=(a:Rect,b:Rect,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;
+/** Use the free side space without moving the page or its dialogs. */
+export function tourCardWidth(target:Rect|null,vw:number){
+ if(!target)return Math.min(420,vw-24);
+ const side=Math.floor(Math.max(target.x-32,vw-target.x-target.width-32));
+ return Math.min(480,side>=200?side:Math.min(360,vw-24));
+}
 /** Prefer free space around the target, preserving a real gap without moving the site. */
 export function tourCardPosition(target:Rect|null,width:number,height:number,vw:number,vh:number,obstacles:Rect[]=[],minWidth=180){
  const margin=12,gap=20;

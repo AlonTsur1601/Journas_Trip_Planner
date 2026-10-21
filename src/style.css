@@ -2389,7 +2389,8 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @keyframes tour-highlight-breathe{0%,100%{opacity:.85;filter:drop-shadow(0 0 9px var(--accent));}50%{opacity:1;filter:drop-shadow(0 0 16px var(--accent));}}
 @media(prefers-reduced-motion:reduce){.tour-highlight{animation:none;}}
 
-.settings-footer .settings-tour-button,.tour-banner .settings-tour-button,.tour-actions .button{min-height:30px;padding:5px 12px;font-size:12px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
+.settings-footer .settings-tour-button,.tour-banner .settings-tour-button,.tour-actions .button{min-height:30px;padding:5px 12px;font-size:12px;}
+.settings-footer .settings-tour-button,.tour-banner .settings-tour-button,.tour-actions .button:not(.primary){color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}
 
 .toast,.background-status{position:fixed;right:16px;bottom:16px;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #0002;font-size:14px;line-height:1.5;}
 .background-status{z-index:400;pointer-events:none;}

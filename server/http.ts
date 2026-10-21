@@ -1,3 +1,4 @@
+import {hasAcknowledgedTour,tourVersion} from '../src/tour-state.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { ApiError, type Data } from './types.js';
@@ -99,7 +100,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
             if(!account.emailVerified||account.disabled)throw new ApiError(403,'EMAIL_UNVERIFIED','Verify your email address to continue');
             return send(res,200,{sessionToken:await adminAuth().createCustomToken(uid!)});
         }
-        if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore(),version='practice-2026-10-17';return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion:version});return {seen:user.tourVersion===version};}));}
+        if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore();return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion,tourAcknowledged:true});return {seen:input.action==='tour.seen'||hasAcknowledgedTour(user)};}));}
         if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
         const result=await new JournasService(firestoreStore()).execute(uid,input);
         send(res,200,startup?{...result,verified:true}:result);

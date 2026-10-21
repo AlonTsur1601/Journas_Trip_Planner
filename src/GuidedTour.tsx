@@ -2,6 +2,7 @@ import {findTourTarget,observeTourTarget} from './tour-target';
 import {tourCardPosition,tourCardWidth} from './tour-layout';
 import {tourSpotlight} from './tour-spotlight';
 import {restingSurfaceRect} from './surface-motion';
+import {tourStorageKey} from './tour-state';
 import {MotionSurface} from './MotionSurface';
 import {api} from './firebase';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
@@ -103,11 +104,11 @@ const instructions:Record<string,Instruction[]>={
  ],
 };
 for(const stage of tourSteps)stage.instructions=instructions[stage.title];
-const keyFor=(uid:string)=>`journas-guided-tour:practice-2026-10-17:${uid}`;
-function remember(uid:string){if(seen(uid))return;void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
+const keyFor=tourStorageKey;
+function remember(uid:string){void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
 function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));}catch{return false;}}
-export default function GuidedTour({userId,ready,context,onHome,practice}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void}){
- const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>('closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
+export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
+ const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>(()=>practice?'running':ready&&seenBefore===false&&!seen(userId)?'welcome':'closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
  const outline=useRef<HTMLDivElement>(null),cutouts=useRef<SVGGElement>(null),shield=useRef<SVGPathElement>(null);
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
  const [viewport,setViewport]=useState(()=>({width:innerWidth,height:window.visualViewport?.height??innerHeight}));
@@ -121,12 +122,12 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
  useLayoutEffect(()=>{if(card.current)setCardHeight(card.current.getBoundingClientRect().height);},[status,step,part,inModal,viewport.width,banner.embedded]);
  useEffect(()=>{if(!card.current)return;const observer=new ResizeObserver(()=>setCardHeight(card.current?.getBoundingClientRect().height??250));observer.observe(card.current,{box:'border-box'});return()=>observer.disconnect();},[status,step,inModal]);
  const initialized=useRef('');const current=tourSteps[step];const instruction=current.instructions?.[part];
- useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}if(seen(userId)){initialized.current=userId;return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(!live)return;initialized.current=userId;if(result.seen){try{localStorage.setItem(keyFor(userId),'seen');}catch{}}if(!result.seen){remember(userId);onHome();setStatus('welcome');}}).catch(()=>{if(live&&!seen(userId)){initialized.current=userId;onHome();setStatus('welcome');}});return()=>{live=false;};},[ready,userId,practice]);
+ useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}if(seen(userId)){initialized.current=userId;if(seenBefore===false)remember(userId);return;}const apply=(acknowledged:boolean)=>{initialized.current=userId;if(acknowledged){try{localStorage.setItem(keyFor(userId),'seen');}catch{}setStatus('closed');}else{onHome();setStatus('welcome');}};if(seenBefore!==undefined){apply(seenBefore);return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(live)apply(result.seen);}).catch(()=>{if(live)apply(false);});return()=>{live=false;};},[ready,userId,practice,seenBefore]);
  useEffect(()=>{const start=()=>{onHome();setStep(0);setPart(0);setSkipped([]);setStatus('welcome');};window.addEventListener('journas-start-tour',start);return()=>window.removeEventListener('journas-start-tour',start);},[onHome]);
  const close=()=>{remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));};
  useEffect(()=>{if(status!=='running')return;const blockBackdrop=(event:MouseEvent)=>{if(event.target instanceof Element&&event.target.matches('.modal-shade')){event.preventDefault();event.stopPropagation();}};document.addEventListener('mousedown',blockBackdrop,true);return()=>document.removeEventListener('mousedown',blockBackdrop,true);},[status]);
  useEffect(()=>{if(status!=='closed'){const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));}};window.addEventListener('keydown',escape,true);return()=>window.removeEventListener('keydown',escape,true);}},[status,userId,practice]);
- const advanceStage=()=>{setPart(0);setSkipped([]);if(step===tourSteps.length-1)setStatus('complete');else setStep(value=>value+1);};
+ const advanceStage=()=>{setPart(0);setSkipped([]);if(step===tourSteps.length-1){remember(userId);setStatus('complete');}else setStep(value=>value+1);};
  const next=()=>{if(current.instructions&&part<current.instructions.length-1)setPart(value=>value+1);else advanceStage();};
  // DOM state is used only for explicitly named picker steps, never to choose an arbitrary popup.
  useEffect(()=>{if(status!=='running')return;let frame=0;const changed=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh(value=>value+1);});};const observer=new MutationObserver(changed);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["inert","aria-hidden"]});document.addEventListener('input',changed);document.addEventListener('change',changed);return()=>{observer.disconnect();document.removeEventListener('input',changed);document.removeEventListener('change',changed);cancelAnimationFrame(frame);};},[status]);
@@ -186,7 +187,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice}:{pract
    <div className="tour-variants">{(intro?[undefined]:current.instructions??[undefined]).map((item,index)=>{const active=intro||!current.instructions||index===part;return <div key={index} className="tour-variant" data-active={active} aria-hidden={!active} inert={!active}>
     <p aria-live={active?'polite':undefined}>{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':complete?'You can now plan with trips, places, schedules, tasks, sharing, home shortcuts and settings. Your practice workspace will be discarded when you finish.':item?.text??current.text}</p>
     {!intro&&!box&&<small>Open the highlighted panel to continue.</small>}
-    <div className="tour-actions">{(intro||item?.closeOnNext||(!item?.done&&!item?.completeOn&&(!current.done||Boolean(current.instructions&&index<current.instructions.length-1))))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&item?.ready&&!item.ready(context))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){remember(userId);setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
+    <div className="tour-actions">{(intro||item?.closeOnNext||(!item?.done&&!item?.completeOn&&(!current.done||Boolean(current.instructions&&index<current.instructions.length-1))))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&item?.ready&&!item.ready(context))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
    </div>;})}</div>
   </section></MotionSurface>
  </div>,document.body);

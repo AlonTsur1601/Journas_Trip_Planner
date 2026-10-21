@@ -1,3 +1,4 @@
+import {hasAcknowledgedTour} from '../src/tour-state.js';
 import {historyTransaction} from './history.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store, type Transaction, type Trip } from './types.js';
@@ -226,7 +227,7 @@ export class JournasService {
                     const [day,view]=await Promise.all([this.day(tx,selected.id,requestedDate),tx.get(layoutPath(userId,selected.id,requestedDate))]);
                     restore={trip:selected,day,layout:view?.layout??null};
                 }
-                return {trips,settings:{...defaultSettings,...object(user?.settings??{})},home:user?.home??{recentTrips:[],recentDays:[],pins:[]},restore};
+                return {trips,settings:{...defaultSettings,...object(user?.settings??{})},home:user?.home??{recentTrips:[],recentDays:[],pins:[]},restore,tourSeen:hasAcknowledgedTour(user)};
             }
             if(action==='home.save'){const home=await homeState(tx,userId,input.home);const user=await tx.get(userPath(userId))??{id:userId,tripCount:0};tx.set(userPath(userId),{...user,home});return {home};}
             if (action === 'settings.get') {

@@ -1,7 +1,7 @@
 import {api} from './firebase';
 import {type Trip,type Day,type Layout,type Settings,type HomeState} from './types';
 const today=()=>new Date().toLocaleDateString('en-CA');
-export type ProfileStartup={trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null};
+export type ProfileStartup={tourSeen?:boolean;trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null};
 const profiles=new Map<string,ProfileStartup>();
 export function initialScreen(uid:string){
  let saved:any=null;

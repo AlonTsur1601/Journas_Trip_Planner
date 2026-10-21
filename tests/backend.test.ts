@@ -597,3 +597,9 @@ describe("Shared time blocks across calendar days",()=>{
   });
 });
 it('changing only the Journas display name preserves the uploaded profile photo',async()=>{const {service}=await setup();const photo='data:image/png;base64,aGVsbG8=';await service.execute('alice',{action:'settings.save',settings:{displayName:'Alice',photoURL:photo}});await service.execute('alice',{action:'settings.save',settings:{displayName:'Bob'}});expect((await service.execute('alice',{action:'settings.get'})).settings).toMatchObject({displayName:'Bob',photoURL:photo});});
+
+describe('tour eligibility in profile startup',()=>{
+ it('offers the guide to a new user in the initial restore response',async()=>{const store=new MemoryStore();const result=await new JournasService(store).execute('fresh-user',{action:'planner.restore',date:'2026-10-21'});expect(result.tourSeen).toBe(false);expect(store.docs.has('users/fresh-user')).toBe(false);});
+ it('does not treat the old automatic seen flag as a user decision',async()=>{const store=new MemoryStore();store.docs.set('users/fresh-user',{tourVersion:'practice-2026-10-17'});const result=await new JournasService(store).execute('fresh-user',{action:'planner.restore',date:'2026-10-21'});expect(result.tourSeen).toBe(false);});
+ it('preserves an explicit guide decision across sessions',async()=>{const store=new MemoryStore();store.docs.set('users/fresh-user',{tourVersion:'practice-2026-10-17',tourAcknowledged:true});const result=await new JournasService(store).execute('fresh-user',{action:'planner.restore',date:'2026-10-21'});expect(result.tourSeen).toBe(true);});
+});

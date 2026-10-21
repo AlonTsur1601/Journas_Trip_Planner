@@ -1,7 +1,7 @@
 export type Rect={x:number;y:number;width:number;height:number};
 export const overlaps=(a:Rect,b:Rect,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;
 /** Prefer free space around the target, preserving a real gap without moving the site. */
-export function tourCardPosition(target:Rect|null,width:number,height:number,vw:number,vh:number,obstacles:Rect[]=[]){
+export function tourCardPosition(target:Rect|null,width:number,height:number,vw:number,vh:number,obstacles:Rect[]=[],minWidth=180){
  const margin=12,gap=20;
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(Math.max(min,max),n));
  const rect=(x:number,y:number,w=width)=>({x:clamp(x,margin,vw-w-margin),y:clamp(y,64,vh-height-margin),width:w,height});
@@ -11,7 +11,7 @@ export function tourCardPosition(target:Rect|null,width:number,height:number,vw:
   const candidates=[rect(target.x+target.width+gap,target.y),rect(target.x-width-gap,target.y),rect(target.x,target.y+target.height+gap),rect(target.x,target.y-height-gap)];
   const free=candidates.find(candidate=>!overlaps(candidate,target,gap)&&blocking.every(item=>!overlaps(candidate,item,gap)));
   if(free)return free;
-  if(Math.max(right,left)>=180){const w=Math.min(width,Math.max(right,left));return rect(right>=left?target.x+target.width+gap:target.x-gap-w,(vh-height)/2,w);}
+  if(Math.max(right,left)>=minWidth){const w=Math.min(width,Math.max(right,left));return rect(right>=left?target.x+target.width+gap:target.x-gap-w,(vh-height)/2,w);}
  }
  if(target){
   const secondary=obstacles.filter(item=>item.width<target.width-16||item.height<target.height-16);

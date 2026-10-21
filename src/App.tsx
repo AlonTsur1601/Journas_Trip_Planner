@@ -367,7 +367,7 @@ export default function App(){
  const verification=useSessionVerification();
  const cachedIdentity=useRef(verification.accountId);
  useEffect(()=>{if(cachedIdentity.current!==verification.accountId){cachedIdentity.current=verification.accountId;if(practice){setPractice(false);setPracticeMode(false);}}},[verification.accountId,practice]);
- useEffect(()=>{const change=(event:Event)=>{const value=Boolean((event as CustomEvent).detail);setPractice(value);setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
+ useEffect(()=>{const change=(event:Event)=>{const value=Boolean((event as CustomEvent).detail);setPractice(value,auth?.currentUser?.uid,readAppearance(auth?.currentUser?.uid??"" ).accent);setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
  return <><Activity mode={practice?'hidden':'visible'}><PlannerApp key={verification.accountId??"signed-out"} practice={false} verified={verification.verified} onVerified={verification.confirm}/></Activity>{practice&&<PlannerApp practice verified={verification.verified} onVerified={verification.confirm}/>}</>;
 }
 function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:boolean|null;onVerified:()=>void}) {
@@ -386,7 +386,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [date, setDate] = useState(today()),
     [day, setDay] = useState<Day>(emptyDay),
     [layout, setLayout] = useState<Layout>(defaultLayout),
-    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...(!practice?readAppearance(document.documentElement.dataset.appearanceUser??""): {})})),
+    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...readAppearance(document.documentElement.dataset.appearanceUser??"")})),
     [message, setMessage] = useState(""),
     [status, setStatus] = useState("All changes saved"),
     [modal, setModal] = useState<string | null>(null),

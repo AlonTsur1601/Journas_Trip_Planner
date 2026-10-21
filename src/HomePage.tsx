@@ -53,7 +53,7 @@ export default function HomePage({trips,state,preferences,name,avatar,resume,bus
  useLayoutEffect(()=>{
   const page=home.current,content=page?.querySelector<HTMLElement>('.home-content');if(!page||!content)return;
   const fit=()=>{
-   if(innerWidth<=700){page.style.removeProperty('--home-spacing');return;}
+   if(innerWidth<=700){page.style.removeProperty('--home-spacing');page.style.removeProperty('--home-extra-gap');return;}
    const style=getComputedStyle(page),number=(value:string)=>parseFloat(value)||0;
    const recents=page.querySelector<HTMLElement>('.home-recents')!;
    const maximumRecentHeight=Math.max(...[...recents.querySelectorAll<HTMLElement>('.home-section')].map(section=>{
@@ -62,9 +62,9 @@ export default function HomePage({trips,state,preferences,name,avatar,resume,bus
     return heading.getBoundingClientRect().height+number(getComputedStyle(heading).marginBottom)+rows*number(getComputedStyle(content).getPropertyValue('--home-card-height'))+(rows-1)*number(getComputedStyle(list).rowGap);
    }));
    const fullHeight=content.getBoundingClientRect().height+number(style.paddingTop)+number(style.paddingBottom)+maximumRecentHeight-recents.getBoundingClientRect().height;
-   const current=number(style.getPropertyValue('--home-spacing'))*76;
+   const current=number(style.getPropertyValue('--home-spacing'))*76+number(style.getPropertyValue('--home-extra-gap'));
    const budget=homeSpacingBudget(page.closest('.home-app')?.clientHeight??innerHeight,fullHeight,current);
-   if(Math.abs(budget-current)>.2)page.style.setProperty('--home-spacing',String(budget/76));
+   if(Math.abs(budget-current)>.2){page.style.setProperty('--home-spacing',String(Math.min(1,budget/76)));page.style.setProperty('--home-extra-gap',`${Math.max(0,budget-76)}px`);}
   };
   let frame=0;const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;fit();});};
   const observer=new ResizeObserver(schedule);observer.observe(content);window.addEventListener('resize',schedule);fit();

@@ -1,5 +1,6 @@
 import {MotionSurface} from "./MotionSurface";
-import {useEffect,useRef,useState,type ReactNode,type CSSProperties,type SyntheticEvent} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type ReactNode,type CSSProperties,type SyntheticEvent} from 'react';
+import {homeSpacingBudget} from './home-spacing';
 
 import {CalendarDays,Compass,Settings,Pin,Plus,MoreHorizontal,Trash2,X,LogOut,ChevronDown} from 'lucide-react';
 
@@ -48,6 +49,27 @@ function TripListDialog({children,onClose}:{children:ReactNode;onClose:()=>void}
 export default function HomePage({trips,state,preferences,name,avatar,resume,busy,onOpen,onUpdate,onCreate,onEdit,onDelete,onSettings,onLogout,onMessage}:{trips:Trip[];state:HomeState;preferences:Preferences;name:string;avatar:ReactNode;resume:HomeTarget|null;busy:boolean;onOpen:(target:HomeTarget)=>void;onUpdate:(state:HomeState)=>void;onCreate:()=>void;onEdit:(trip:Trip)=>void;onDelete:(trip:Trip)=>void;onSettings:()=>void;onLogout:()=>void;onMessage:(message:string)=>void}){
 
  const [showAll,setShowAll]=useState(false),[creator,setCreator]=useState(false),[kind,setKind]=useState('trip'),[selected,setSelected]=useState(''),[selectedDate,setSelectedDate]=useState(new Date().toLocaleDateString('en-CA'));
+ const home=useRef<HTMLElement>(null);
+ useLayoutEffect(()=>{
+  const page=home.current,content=page?.querySelector<HTMLElement>('.home-content');if(!page||!content)return;
+  const fit=()=>{
+   if(innerWidth<=700){page.style.removeProperty('--home-spacing');return;}
+   const style=getComputedStyle(page),number=(value:string)=>parseFloat(value)||0;
+   const recents=page.querySelector<HTMLElement>('.home-recents')!;
+   const maximumRecentHeight=Math.max(...[...recents.querySelectorAll<HTMLElement>('.home-section')].map(section=>{
+    const heading=section.querySelector<HTMLElement>('.home-section-heading')!,list=section.querySelector<HTMLElement>('.home-list')!;
+    const columns=getComputedStyle(list).gridTemplateColumns.split(' ').length,rows=Math.ceil(6/columns);
+    return heading.getBoundingClientRect().height+number(getComputedStyle(heading).marginBottom)+rows*number(getComputedStyle(content).getPropertyValue('--home-card-height'))+(rows-1)*number(getComputedStyle(list).rowGap);
+   }));
+   const fullHeight=content.getBoundingClientRect().height+number(style.paddingTop)+number(style.paddingBottom)+maximumRecentHeight-recents.getBoundingClientRect().height;
+   const current=number(style.getPropertyValue('--home-spacing'))*76;
+   const budget=homeSpacingBudget(page.closest('.home-app')?.clientHeight??innerHeight,fullHeight,current);
+   if(Math.abs(budget-current)>.2)page.style.setProperty('--home-spacing',String(budget/76));
+  };
+  let frame=0;const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;fit();});};
+  const observer=new ResizeObserver(schedule);observer.observe(content);window.addEventListener('resize',schedule);fit();
+  return()=>{observer.disconnect();window.removeEventListener('resize',schedule);cancelAnimationFrame(frame);};
+ },[]);
 
  const [menu,setMenu]=useState<{target:HomeTarget;source:'trip'|'all'|'day'|'pin'|'resume';x:number;y:number}|null>(null);const menuRef=useRef<HTMLDivElement>(null);
 
@@ -70,7 +92,7 @@ export default function HomePage({trips,state,preferences,name,avatar,resume,bus
 
  const tile=(target:HomeTarget,source:'trip'|'all'|'day'|'pin',key:string)=>{const trip=find(target.tripId),label=target.date?dateLabel(target.date):trip?.name??'Date';return <div className={`home-tile ${source==='pin'?'pinned-tile':''}`} style={{"--trip-tint":trip?tripAppearance(trip).color:preferences.accent} as CSSProperties} key={key} onContextMenu={event=>context(event,target,source)}><button className="home-tile-main" disabled={busy} onClick={()=>{setShowAll(false);onOpen(target);}}>{trip?<TripBadge trip={trip}/>:<span className="trip-badge date-badge"><CalendarDays size={22}/></span>}<span><strong title={label}>{label}</strong>{target.date&&trip&&<small>{trip.name}</small>}{!target.date&&trip&&<small className="home-trip-dates" title={`${dateLabel(trip.startDate)} — ${dateLabel(trip.endDate)}`}>{dateRangeLabel(trip.startDate,trip.endDate)}</small>}{(source==='trip'||source==='all')&&trip&&warning(trip)&&<small className="removal-warning">{warning(trip)}</small>}</span></button><button className="home-tile-menu icon" aria-label={`Options for ${label}${target.date&&trip?' in '+trip.name:''}`} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();setMenu({target,source,x:Math.max(8,Math.min(box.right-226,innerWidth-238)),y:Math.max(8,Math.min(box.bottom,innerHeight-238))});}}><MoreHorizontal size={17}/></button></div>;};
 
- return <main className="home-page"><div className="auth-map-background" aria-hidden="true"/><div className="home-content">
+ return <main ref={home} className="home-page"><div className="auth-map-background" aria-hidden="true"/><div className="home-content">
 
   <div className="home-masthead"><div className="brand home-brand"><Compass/><strong>Journas</strong></div><div className="home-account">{avatar}<span><strong>{name}</strong></span><button className="icon" aria-label="Settings" title="Settings" onClick={onSettings}><Settings size={21}/></button><button className="icon" aria-label="Sign out" title="Sign out" onClick={onLogout}><LogOut size={20}/></button></div></div>
 

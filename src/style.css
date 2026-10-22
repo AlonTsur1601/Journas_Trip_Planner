@@ -2545,3 +2545,13 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .emoji-loading .loading-spinner{width:14px;height:14px;border-width:2px;}
 
 .dropdown-scroll-options{max-height:240px;overflow-y:auto;overscroll-behavior:contain;}
+
+/* Mobile home can scroll, so keep generous space between its sections. */
+@media(max-width:700px){
+ .home-intro{padding:24px 0 20px;}
+ .home-featured{gap:28px;padding-bottom:12px;}
+ .home-resume-column{gap:14px;}
+ .home-recents{margin-top:20px;gap:24px;}
+ .home-section-heading{margin-bottom:14px;}
+ .home-pins-section .home-pins,.home-recents .home-list{gap:12px;}
+}

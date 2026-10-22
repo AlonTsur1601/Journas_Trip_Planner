@@ -23,7 +23,13 @@ export async function sendVerificationEmail(uid:string,returnClientId?:unknown){
  if(!user.email||user.disabled)throw new ApiError(400,'EMAIL_UNAVAILABLE','This account cannot receive a verification email.');
  accountMailTransport();
  const attempt=randomUUID(),path=`rateLimits/verification_${uid}`,store=firestoreStore();
- await store.transaction(async tx=>{const last=await tx.get(path);const remaining=Number(last?.nextAttemptAt??0)-Date.now();if(remaining>0)throw new ApiError(429,'EMAIL_RATE_LIMIT','Please wait before resending.',{retryAfter:Math.ceil(remaining/1000)});tx.set(path,{attempt,nextAttemptAt:Date.now()+30000,expiresAt:Date.now()+86400000});});
+ await store.transaction(async tx=>{
+  const last=await tx.get(path),now=Date.now(),remaining=Number(last?.nextAttemptAt??0)-now;
+  if(remaining>0)throw new ApiError(429,'EMAIL_RATE_LIMIT','Please wait before resending.',{retryAfter:Math.ceil(remaining/1000)});
+  const sameWindow=Number(last?.windowStart??0)>now-3600000;
+  if(sameWindow&&Number(last?.count??0)>=10)throw new ApiError(429,'EMAIL_RATE_LIMIT','Too many verification emails. Please try again later.',{retryAfter:Math.ceil((Number(last!.windowStart)+3600000-now)/1000)});
+  tx.set(path,{attempt,nextAttemptAt:now+30000,windowStart:sameWindow?last!.windowStart:now,count:sameWindow?Number(last?.count??0)+1:1,expiresAt:now+86400000});
+ });
  let proof:string|undefined;
  try{
   proof=await createVerificationProof(uid,user.email);const target=new URL('/verify-email',siteUrl);target.searchParams.set('proof',proof);if(typeof returnClientId==='string'&&/^[a-zA-Z0-9-]{20,100}$/.test(returnClientId))target.searchParams.set('returnClientId',returnClientId);const link=target.toString();
@@ -31,7 +37,7 @@ export async function sendVerificationEmail(uid:string,returnClientId?:unknown){
   return {sent:true};
  }catch{
   if(proof)await discardVerificationProof(proof);
-  await store.transaction(async tx=>{const current=await tx.get(path);if(current?.attempt===attempt)tx.delete(path);});
+  await store.transaction(async tx=>{const current=await tx.get(path);if(current?.attempt===attempt)tx.set(path,{...current,nextAttemptAt:0});});
   throw new ApiError(503,'EMAIL_DELIVERY_FAILED','Unable to send the email. Please try again.');
  }
 }

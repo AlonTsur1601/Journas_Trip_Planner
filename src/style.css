@@ -1047,6 +1047,29 @@ textarea {
   text-align: center;
   margin-top: 16px;
 }
+.auth-form .auth-signup-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.auth-signup-prompt .button {
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink,#fff);
+  font-size: 14px;
+  font-weight: 700;
+}
 .auth-form footer {
   text-align: center;
   font-size: 10px;

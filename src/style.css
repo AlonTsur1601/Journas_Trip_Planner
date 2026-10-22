@@ -2546,12 +2546,12 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 .dropdown-scroll-options{max-height:240px;overflow-y:auto;overscroll-behavior:contain;}
 
-/* Mobile home can scroll, so keep generous space between its sections. */
+/* Keep mobile spacing close to the compact desktop rhythm. */
 @media(max-width:700px){
- .home-intro{padding:24px 0 20px;}
- .home-featured{gap:28px;padding-bottom:12px;}
- .home-resume-column{gap:14px;}
- .home-recents{margin-top:20px;gap:24px;}
- .home-section-heading{margin-bottom:14px;}
- .home-pins-section .home-pins,.home-recents .home-list{gap:12px;}
+ .home-intro{padding:16px 0 14px;}
+ .home-featured{gap:24px;padding-bottom:0;}
+ .home-resume-column{gap:12px;}
+ .home-recents{margin-top:24px;gap:20px;}
+ .home-section-heading{margin-bottom:10px;}
+ .home-pins-section .home-pins,.home-recents .home-list{gap:10px;}
 }

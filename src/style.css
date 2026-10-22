@@ -1052,9 +1052,13 @@ textarea {
   font-size: 13px;
   font-weight: 500;
 }
-.auth-signup-prompt .text-button {
-  font-size: 13px;
-  font-weight: 700;
+.auth-signup-prompt .button {
+  min-height: 0;
+  padding: 6px 10px;
+  margin-left: 6px;
+  border: 0;
+  font-size: 12px;
+  font-weight: 600;
 }
 .auth-form footer {
   text-align: center;

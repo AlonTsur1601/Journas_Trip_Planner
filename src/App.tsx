@@ -349,7 +349,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
             <p className={`auth-switch${register ? "" : " auth-signup-prompt"}`}>
               {register ? "Already have an account?" : "New to Journas?"}{" "}
               <button
-                className="text-button"
+                className={register ? "text-button" : "button primary"}
                 onClick={() => setRegister(!register)}
               >
                 {register ? "Sign in" : "Create an account"}

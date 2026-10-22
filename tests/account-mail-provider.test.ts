@@ -1,0 +1,9 @@
+import{beforeEach,it,expect,vi}from'vitest';
+const transport=vi.hoisted(()=>vi.fn(()=>({sendMail:vi.fn()})));
+vi.mock('nodemailer',()=>({default:{createTransport:transport}}));
+import{accountMailTransport}from'../server/account-mail';
+beforeEach(()=>{vi.unstubAllEnvs();transport.mockClear();vi.stubEnv('SMTP_HOST','smtp.gmail.com');vi.stubEnv('SMTP_USER','journas.app@gmail.com');vi.stubEnv('SMTP_PASSWORD','test-only');vi.stubEnv('ACCOUNT_MAIL_PROVIDER',undefined);vi.stubEnv('BREVO_SMTP_USER',undefined);vi.stubEnv('BREVO_SMTP_KEY',undefined);});
+it('keeps existing Gmail delivery until explicitly switched',()=>{vi.stubEnv('BREVO_SMTP_USER','local-test-login');vi.stubEnv('BREVO_SMTP_KEY','local-test-credential');expect(accountMailTransport().sender).toBe('journas.app@gmail.com');expect(transport).toHaveBeenCalledWith(expect.objectContaining({host:'smtp.gmail.com',auth:{user:'journas.app@gmail.com',pass:'test-only'}}));});
+it('supports the Brevo-specific login through encrypted SMTP without changing reply identity',()=>{vi.stubEnv('ACCOUNT_MAIL_PROVIDER','brevo');vi.stubEnv('BREVO_SMTP_USER','local-test-login');vi.stubEnv('BREVO_SMTP_KEY','local-test-credential');expect(accountMailTransport().sender).toBe('journas.app@gmail.com');expect(transport).toHaveBeenCalledWith(expect.objectContaining({host:'smtp-relay.brevo.com',port:465,secure:true,auth:{user:'local-test-login',pass:'local-test-credential'}}));});
+it('never falls back to another provider when the chosen configuration is missing',()=>{vi.stubEnv('ACCOUNT_MAIL_PROVIDER','brevo');expect(()=>accountMailTransport()).toThrow('Email delivery is not configured.');expect(transport).not.toHaveBeenCalled();});
+it('rejects unknown providers',()=>{vi.stubEnv('ACCOUNT_MAIL_PROVIDER','unknown');expect(()=>accountMailTransport()).toThrow('Email delivery is not configured.');expect(transport).not.toHaveBeenCalled();});

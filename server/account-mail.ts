@@ -3,9 +3,11 @@ import {ApiError} from './types.js';
 import {accountEmailSenderName} from './account-email-templates.js';
 export const accountEmailSenderAddress='journas.app@gmail.com';
 export function accountMailTransport(){
- const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,password=process.env.SMTP_PASSWORD;
- if(!host||!user||!password||user.trim().toLowerCase()!==accountEmailSenderAddress)throw new ApiError(503,'EMAIL_NOT_CONFIGURED','Email delivery is not configured.');
- return {sender:accountEmailSenderAddress,transport:nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT??465),secure:process.env.SMTP_SECURE!=='false',auth:{user,pass:password.replace(/\s/g,'')},connectionTimeout:10000,greetingTimeout:10000,socketTimeout:20000})};
+ const provider=process.env.ACCOUNT_MAIL_PROVIDER??'gmail';
+ const brevo=provider==='brevo';
+ const host=brevo?'smtp-relay.brevo.com':process.env.SMTP_HOST,user=brevo?process.env.BREVO_SMTP_USER:process.env.SMTP_USER,password=brevo?process.env.BREVO_SMTP_KEY:process.env.SMTP_PASSWORD;
+ if(!['gmail','brevo'].includes(provider)||!host||!user||!password||(!brevo&&user.trim().toLowerCase()!==accountEmailSenderAddress))throw new ApiError(503,'EMAIL_NOT_CONFIGURED','Email delivery is not configured.');
+ return {sender:accountEmailSenderAddress,transport:nodemailer.createTransport({host,port:brevo?465:Number(process.env.SMTP_PORT??465),secure:brevo||process.env.SMTP_SECURE!=='false',auth:{user,pass:brevo?password.trim():password.replace(/\s/g,'')},connectionTimeout:10000,greetingTimeout:10000,socketTimeout:20000})};
 }
 export async function deliverAccountMail(to:string,subject:string,html:string,text:string){
  const{sender,transport}=accountMailTransport();

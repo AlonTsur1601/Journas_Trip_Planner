@@ -38,7 +38,7 @@ export function firestoreStore(): Store {
                 const tx: Transaction = {
                     async get(path) { if (writes.has(path))
                         return writes.get(path) ?? undefined; return (await firebaseTx.get(db.doc(path))).data(); },
-                    async list(path) { const snapshot = await firebaseTx.get(db.collection(path)); const found = new Map(snapshot.docs.map(doc => [doc.ref.path, doc.data()])); for (const [key, value] of writes) {
+                    async list(path) { const snapshot = await firebaseTx.get(db.collection(path)); const found = new Map(snapshot.docs.map(doc => [doc.ref.path, path==='users'?{...doc.data(),id:doc.id}:doc.data()])); for (const [key, value] of writes) {
                         if (key.slice(0, key.lastIndexOf('/')) === path) {
                             if (value)
                                 found.set(key, value);

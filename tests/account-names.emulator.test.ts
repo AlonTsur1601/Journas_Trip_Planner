@@ -1,0 +1,20 @@
+import {it,expect} from 'vitest';
+import {getFirestore} from 'firebase-admin/firestore';
+import {adminApp,firestoreStore} from '../server/store.js';
+import {JournasService} from '../server/service.js';
+it.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('reserves normalized names under concurrent Firestore transactions and migrates legacy users without stored ids',async()=>{
+ process.env.FIREBASE_PROJECT_ID='demo-journas';
+ const db=getFirestore(adminApp());
+ await db.recursiveDelete(db.collection('users'));await db.recursiveDelete(db.collection('accountNames'));await db.doc('accountNameRegistry/state').delete();
+ const service=new JournasService(firestoreStore());
+ await db.doc('users/legacy').set({settings:{displayName:'Legacy Name'}});
+ expect(await service.execute('candidate',{action:'profile.name-availability',name:'legacy name'})).toEqual({available:false});
+ const result=await Promise.allSettled(['first','second'].map(uid=>service.execute(uid,{action:'settings.save',settings:{displayName:'Shared Name'}})));
+ expect(result.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(result.filter(r=>r.status==='rejected')).toHaveLength(1);
+ const winner=result[0].status==='fulfilled'?'first':'second',loser=winner==='first'?'second':'first';
+ expect(await service.execute(loser,{action:'profile.name-availability',name:'ＳＨＡＲＥＤ NAME'})).toEqual({available:false});
+ await service.execute(winner,{action:'settings.save',settings:{displayName:'Renamed'}});
+ expect(await service.execute(loser,{action:'profile.name-availability',name:'Shared Name'})).toEqual({available:true});
+ await service.execute(loser,{action:'settings.save',settings:{displayName:'Shared Name'}});
+ expect((await db.doc(`users/${loser}`).get()).data()?.settings.displayName).toBe('Shared Name');
+},30000);

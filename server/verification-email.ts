@@ -1,3 +1,4 @@
+import {accountEmailAccent,applyEmailAccent} from './email-appearance.js';
 import {createVerificationProof,verificationStatus,discardVerificationProof} from './verification-campaign.js';
 import {accountMailTransport,deliverAccountMail} from './account-mail.js';
 import {randomUUID} from 'node:crypto';
@@ -6,9 +7,9 @@ import {ApiError} from './types.js';
 import {verificationTemplate} from './verification-template.js';
 
 export const siteUrl='https://journas-trip-planner.vercel.app';
-export function verificationContent(link:string,requestId:string){
+export function verificationContent(link:string,requestId:string,accent?:unknown){
  const safe=link.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
- return verificationTemplate.replaceAll('%LINK%',safe).replaceAll('%REQUEST_ID%',requestId);
+ return applyEmailAccent(verificationTemplate,accent).replaceAll('%LINK%',safe).replaceAll('%REQUEST_ID%',requestId);
 }
 export function verificationActionLink(firebaseLink:string,returnClientId?:unknown){
  const code=new URL(firebaseLink).searchParams.get('oobCode');
@@ -33,7 +34,7 @@ export async function sendVerificationEmail(uid:string,returnClientId?:unknown,p
  let proof:string|undefined;
  try{
   proof=await createVerificationProof(uid,user.email);const target=new URL('/verify-email',siteUrl);target.searchParams.set('proof',proof);if(typeof returnClientId==='string'&&/^[a-zA-Z0-9-]{20,100}$/.test(returnClientId))target.searchParams.set('returnClientId',returnClientId);const link=target.toString();
-  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,plainText?undefined:verificationContent(link,attempt),`Verify your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
+  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,plainText?undefined:verificationContent(link,attempt,await accountEmailAccent(uid)),`Verify your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
   return {sent:true};
  }catch{
   if(proof)await discardVerificationProof(proof);

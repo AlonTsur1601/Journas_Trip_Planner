@@ -1,3 +1,4 @@
+import {AccountNameField} from "./AccountNameField";
 import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appearance-cache";
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
@@ -1178,7 +1179,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     setSettings(current=>({...current,[key]:value}));
     try{const pending=placementSaves.current.then(()=>api('settings.save',{settings:{[key]:value}}));placementSaves.current=pending.then(()=>{},()=>{});await pending;}catch(e:any){setSettings(current=>({...current,[key]:previous}));setMessage(e.message);}
   }
+  const [accountNameValid,setAccountNameValid]=useState(true);
   async function saveSettings(next: Settings) {
+    if(!practice&&!accountNameValid){setMessage("Choose an available account name before saving.");return false;}
     try {
       const savedTrip=tripRef.current?.id,savedDate=dateRef.current,savedView=layoutRef.current;
       await api("settings.save", { settings: next });
@@ -1186,8 +1189,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       const view=await startingLayout(next,lodgingForDate(trip,date));
       if(settingsRef.current===next&&tripRef.current?.id===savedTrip&&dateRef.current===savedDate&&layoutRef.current===savedView)changeLayout({center:view.center,zoom:view.zoom});
 
+      return true;
     } catch (e: any) {
-      setMessage(e.message);
+      setMessage(e.message);return false;
     }
   }
   const taskIsCurrent=(task:Day['tasks'][number])=>{
@@ -2301,7 +2305,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => {void saveSettings(settingsRef.current);setModal(null);}}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={async () => {if(await saveSettings(settingsRef.current))setModal(null);}}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -2310,14 +2314,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           >
             <div className="settings-account">
             <div className="settings-identity">
-            <Input
-              label="Display name"
-              value={settings.displayName ?? ""}
-              maxLength={80}
-              onChange={(e: any) =>
-                setSettings({ ...settings, displayName: e.target.value })
-              }
-            />
+            <AccountNameField value={settings.displayName??""} onChange={displayName=>setSettings({...settings,displayName})} onValidity={setAccountNameValid} check={!practice} disabled={practice}/>
 
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
@@ -2421,7 +2418,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Automatic removal affects your account only. Other travelers keep
               their copy of the shared trip.
             </p>
-            <button className="button primary full" disabled={!user}>
+            <button className="button primary full" disabled={!user||(!practice&&!accountNameValid)}>
               Save preferences
             </button>
             <div className="settings-footer">

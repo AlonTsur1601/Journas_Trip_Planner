@@ -38,7 +38,8 @@ export const tourSteps:Step[]=[
 ];
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
-  {title:'Name and dates',ready:()=>{const form=document.querySelector('.trip-modal form');const name=form?.querySelector<HTMLInputElement>('[name=name]')?.value.trim();const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(name&&start&&end&&end>=start);},text:'Enter a Trip name and choose two or three days under First day and Last day. Type MM/DD/YYYY or use the calendars. Press Next step once the name and both dates are ready.'},
+  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page, then press Next step.'},
+  {title:'Trip dates',ready:()=>{const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars, then press Next step.'},
   {title:'Choose the trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol to open the icon and emoji grid, where you will choose the logo for this trip.',target:'.trip-appearance-options [aria-label="Choose symbol"]',done:()=>Boolean(document.querySelector('.symbol-menu:not([inert])'))},
   {title:'Pick a symbol',text:'Select an icon from the grid, use the search above it, or switch to Emoji. Your selection becomes the trip logo and closes the picker.',target:'.symbol-menu',completeOn:'.symbol-menu .symbol-grid button'},
   {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
@@ -52,8 +53,8 @@ const instructions:Record<string,Instruction[]>={
  ],
  'Link your schedule to a place':[
   {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place"] [role="option"]',ready:c=>Boolean(c.draft?.pinId),text:'Open Linked place below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
-  {title:'Choose dates',text:'Under Start date and End date, type a date or use each calendar button. Keep the same day for one activity, or choose a later End date to span days.'},
-  {title:'Set the time',text:'Type hours and minutes in Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
+  {title:'Choose dates',ready:c=>{const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Under Start date and End date, type a date or use each calendar button. Keep the same day for one activity, or choose a later End date to span days.'},
+  {title:'Set the time',ready:c=>{const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Type hours and minutes in Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
   {title:'Details and save',text:'Edit Title, Details, Color or Symbol if needed, then press Create time block at the bottom. The same block appears on each included day, clipped to that day; editing any part updates the shared block.'},
  ],
  'Connect a task to the plan':[
@@ -109,6 +110,7 @@ function remember(uid:string){void api('tour.seen').catch(()=>{});try{localStora
 function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));}catch{return false;}}
 export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>(()=>practice?'running':ready&&seenBefore===false&&!seen(userId)?'welcome':'closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
+ const occluders=useRef<SVGGElement>(null);
  const outline=useRef<HTMLDivElement>(null),cutouts=useRef<SVGGElement>(null),shield=useRef<SVGPathElement>(null);
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
  const [viewport,setViewport]=useState(()=>({width:innerWidth,height:window.visualViewport?.height??innerHeight}));
@@ -152,8 +154,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  useLayoutEffect(()=>setBox(null),[step]);
  const target=current.target;const selector=typeof target==='function'?target(context):target;
  useEffect(()=>{
-  if(status!=='running'||!outline.current||!cutouts.current||!shield.current)return;let scrolled:Element|null=null;
-  const spotlight=tourSpotlight(outline.current,cutouts.current,shield.current);
+  if(status!=='running'||!outline.current||!cutouts.current||!shield.current||!occluders.current)return;let scrolled:Element|null=null;
+  const spotlight=tourSpotlight(outline.current,cutouts.current,shield.current,occluders.current);
   const find=()=>findTourTarget(selector);
   const place=(target:Element|null)=>{spotlight.place(target,mobile?siteHeight:viewport.height);setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));
    if(!target)return;
@@ -174,8 +176,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  const preferredWidth=mobile?viewport.width:tourCardWidth(intro?null:placementTarget,viewport.width);
  const position=mobile?{x:0,y:siteHeight,width:viewport.width}:intro?{x:(viewport.width-preferredWidth)/2,y:Math.max(12,(siteHeight-cardHeight)/2),width:preferredWidth}:tourCardPosition(placementTarget,preferredWidth,cardHeight,viewport.width,siteHeight,obstacles,preferredWidth);
  return createPortal(<div className="guided-tour" data-mobile={mobile} data-step={step} data-substep={part} data-modal={inModal} data-dock={inModal&&innerWidth>=1100?'side':'bottom'}>
-  <svg className="tour-shade" width="100%" height="100%" aria-hidden="true"><defs><mask id="journas-tour-cutout"><rect width="100%" height="100%" fill="white"/><g ref={cutouts}/></mask></defs><rect width="100%" height="100%" fill="#15102099" mask="url(#journas-tour-cutout)"/></svg>
-  <div className="tour-focus-clip" aria-hidden="true"><div ref={outline} className="tour-highlight" hidden={intro||!box}><span className="tour-highlight-glow"/></div></div>
+  <svg className="tour-shade" width="100%" height="100%" aria-hidden="true"><defs><mask id="journas-tour-cutout"><rect width="100%" height="100%" fill="white"/><g ref={cutouts}/></mask><mask id="journas-tour-focus-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={viewport.width} height={viewport.height}><rect width="100%" height="100%" fill="white"/><g ref={occluders}/></mask></defs><rect width="100%" height="100%" fill="#15102099" mask="url(#journas-tour-cutout)"/></svg>
+  <div className="tour-focus-clip" style={{mask:"url(#journas-tour-focus-mask)"}} aria-hidden="true"><div ref={outline} className="tour-highlight" hidden={intro||!box}><span className="tour-highlight-glow"/></div></div>
   <svg className="tour-interaction-shield" width="100%" height="100%" aria-hidden="true"><path ref={shield} d={intro?`M0 0H${innerWidth}V${innerHeight}H0Z`:undefined} fill="transparent" fillRule="evenodd"/></svg>
   {!welcome&&<div className="tour-banner" role="status"><Compass size={17}/><strong>Guided tour</strong><button className="button settings-tour-button" onClick={close}>End tour</button></div>}
   {complete&&<div className="tour-confetti" aria-hidden="true">{Array.from({length:64},(_,i)=><i key={i} style={{'--spread':`${((i*37)%101-50)*.9}vw`,'--rise':`${-(58+(i*17)%33)}vh`,'--delay':`${(i%8)*.035}s`,'--turn':`${(i%2?1:-1)*(180+i*23)}deg`,background:['#8b5cf6','#22c55e','#eab308','#ec4899','#38bdf8'][i%5]} as React.CSSProperties}/>)}</div>}
@@ -183,7 +185,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
    <button className="icon tour-close" aria-label="Close guide" onClick={close}><X size={18}/></button>
    <div className="tour-eyebrow"><Compass size={17}/>{welcome?'Welcome to Journas':complete?'Tour complete':`Step ${step+1} of ${tourSteps.length}`}</div>
    <h2>{welcome?'Plan your first trip together':complete?'You’re ready to plan your next trip!':current.title}</h2>
-   {!intro&&current.instructions&&<ol className="tour-substeps" aria-label="Steps in this window">{current.instructions.map((item,index)=><li key={item.title} className={index===part?'current':index<part?skipped.includes(index)?'skipped':'complete':''} aria-current={index===part?'step':undefined}>{index<part?<span aria-label={skipped.includes(index)?'Skipped':'Completed'}>{skipped.includes(index)?'–':'✓'}</span>:<span>{index+1}</span>}<span className="tour-substep-label" data-label={item.title}><span>{item.title}</span></span></li>)}</ol>}
+   {!intro&&current.instructions&&<ol className="tour-substeps" aria-label="Steps in this window">{current.instructions.map((item,index)=>{const complete=!skipped.includes(index)&&(item.ready?Boolean(item.ready(context)):index<part);return <li key={item.title} className={[index===part?'current':'',skipped.includes(index)?'skipped':complete?'complete':''].filter(Boolean).join(' ')} aria-current={index===part?'step':undefined}>{complete||skipped.includes(index)?<span aria-label={skipped.includes(index)?'Skipped':'Completed'}>{skipped.includes(index)?'–':'✓'}</span>:<span>{index+1}</span>}<span className="tour-substep-label" data-label={item.title}><span>{item.title}</span></span></li>;})}</ol>}
    <div className="tour-variants">{(intro?[undefined]:current.instructions??[undefined]).map((item,index)=>{const active=intro||!current.instructions||index===part;return <div key={index} className="tour-variant" data-active={active} aria-hidden={!active} inert={!active}>
     <p aria-live={active?'polite':undefined}>{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':complete?'You can now plan with trips, places, schedules, tasks, sharing, home shortcuts and settings. Your practice workspace will be discarded when you finish.':item?.text??current.text}</p>
     {!intro&&!box&&<small>Open the highlighted panel to continue.</small>}

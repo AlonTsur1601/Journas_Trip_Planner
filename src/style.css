@@ -2522,3 +2522,10 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .color-swatches>button svg{filter:drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px #000c);}
 
 .color-swatches>.split-accent-swatch[aria-pressed="true"]{outline-offset:1px;}
+
+.account-name-status{min-height:22px;margin-top:5px;font-size:12px;display:flex;align-items:center;gap:6px;}
+.account-name-status .loading-spinner{width:14px;height:14px;border-width:2px;}
+.name-available{color:var(--accent);}
+.name-unavailable{color:var(--danger,#dc2626);}
+
+.account-name-status .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}

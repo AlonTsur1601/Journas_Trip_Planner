@@ -1,3 +1,4 @@
+import {accountNameAvailable,claimAccountName} from './account-names.js';
 import {hasAcknowledgedTour} from '../src/tour-state.js';
 import {historyTransaction} from './history.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -234,10 +235,12 @@ export class JournasService {
                 const user = await tx.get(userPath(userId));
                 return { settings: { ...defaultSettings, ...object(user?.settings ?? {}) } };
             }
+            if(action==='profile.name-availability'){const user=await tx.get(userPath(userId));const current=(user?.settings as any)?.displayName;const available=await accountNameAvailable(tx,userId,input.name);return {available:available||(typeof current==='string'&&current.normalize('NFKC').trim().replace(/\s+/gu,' ').toLowerCase()===String(input.name).normalize('NFKC').trim().replace(/\s+/gu,' ').toLowerCase())};}
             if (action === 'settings.save' || action === 'profile.save') {
                 const patch = object(input.settings ?? input.profile);
                 validateSettings(patch);
                 const user = await tx.get(userPath(userId)) ?? { id: userId, tripCount: 0 };
+                if('displayName' in patch){await claimAccountName(tx,userId,patch.displayName,(user.settings as any)?.displayName);patch.displayName=String(patch.displayName).trim().replace(/\s+/gu,' ');}
                 const settings = { ...defaultSettings, ...object(user.settings ?? {}), ...patch };
                 if ('autoDelete' in patch || 'retentionDays' in patch)
                     for (const ref of await tx.list(`users/${userId}/trips`))

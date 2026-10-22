@@ -82,7 +82,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         }
         if(input.action==='auth.email-change')return send(res,200,await sendEmailChange(uid!,input.email,authTime));
         if(startup)input.action='planner.restore';
-        if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId));
+        if(input.action==='auth.email-verification')return send(res,200,await sendVerificationEmail(uid!,input.returnClientId,input.format==='text'));
         if(input.action==='places.search'||input.action==='places.reverse'||input.action==='places.landmarks')return send(res,200,await places(input,uid!));
         // Public previews are limited by a hashed network address; authenticated operations by account.
         // Only the platform's network header is used in production; no raw IP or token is persisted.

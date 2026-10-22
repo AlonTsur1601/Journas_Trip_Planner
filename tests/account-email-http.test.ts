@@ -1,11 +1,14 @@
 import{it,expect,vi,beforeEach}from'vitest';
-const state=vi.hoisted(()=>({reset:vi.fn(),change:vi.fn(),verified:true}));
+const state=vi.hoisted(()=>({reset:vi.fn(),change:vi.fn(),verification:vi.fn(),verified:true}));
+vi.mock('../server/verification-email.js',()=>({sendVerificationEmail:state.verification}));
 vi.mock('../server/account-email.js',()=>({sendPasswordReset:state.reset,sendEmailChange:state.change}));
 vi.mock('../server/store.js',()=>({adminAuth:()=>({verifyIdToken:async(token:string)=>{if(token!=='valid')throw Object.assign(new Error(),{code:'auth/invalid-id-token'});return {uid:'trusted-user',email_verified:true,auth_time:12345};}}),firestoreStore:vi.fn()}));
 vi.mock('../server/verification-campaign.js',()=>({verificationStatus:async()=>({verified:state.verified}),confirmVerification:vi.fn()}));
 import{journasHandler}from'../server/http';
-beforeEach(()=>{vi.clearAllMocks();state.verified=true;state.reset.mockResolvedValue({sent:true});state.change.mockResolvedValue({sent:true});});
+beforeEach(()=>{vi.clearAllMocks();state.verified=true;state.verification.mockResolvedValue({sent:true});state.reset.mockResolvedValue({sent:true});state.change.mockResolvedValue({sent:true});});
 async function call(body:Record<string,unknown>,token?:string){const response={setHeader:vi.fn(),end:vi.fn(),statusCode:0};await journasHandler({method:'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},body,socket:{remoteAddress:'local-ip'}}as any,response as any);return{status:response.statusCode,body:JSON.parse(response.end.mock.calls[0][0])};}
 it('allows signed-out password recovery and passes its network bucket',async()=>{expect(await call({action:'auth.password-reset',email:'recipient@example.test'})).toEqual({status:200,body:{sent:true}});expect(state.reset).toHaveBeenCalledWith('recipient@example.test','local-ip');});
 it('uses verified token identity and auth time for email changes, ignoring client claims',async()=>{expect((await call({action:'auth.email-change',email:'new@example.test',uid:'forged',authTime:999999999},'valid')).status).toBe(200);expect(state.change).toHaveBeenCalledWith('trusted-user','new@example.test',12345);});
 it('rejects missing authentication and unconfirmed accounts before email changes',async()=>{expect((await call({action:'auth.email-change',email:'new@example.test'})).status).toBe(401);state.verified=false;expect((await call({action:'auth.email-change',email:'new@example.test'},'valid')).status).toBe(403);expect(state.change).not.toHaveBeenCalled();});
+
+it('limits text-only verification to the authenticated account and retains HTML by default',async()=>{state.verified=false;expect((await call({action:'auth.email-verification',format:'text',uid:'forged',email:'other@example.test'},'valid')).status).toBe(200);expect(state.verification).toHaveBeenLastCalledWith('trusted-user',undefined,true);await call({action:'auth.email-verification'},'valid');expect(state.verification).toHaveBeenLastCalledWith('trusted-user',undefined,false);state.verification.mockClear();expect((await call({action:'auth.email-verification',format:'text'})).status).toBe(401);expect(state.verification).not.toHaveBeenCalled();});

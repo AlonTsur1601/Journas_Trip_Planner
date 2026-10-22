@@ -17,7 +17,7 @@ export function verificationActionLink(firebaseLink:string,returnClientId?:unkno
  if(typeof returnClientId==='string'&&/^[a-zA-Z0-9-]{20,100}$/.test(returnClientId))link.searchParams.set('returnClientId',returnClientId);
  return link.toString();
 }
-export async function sendVerificationEmail(uid:string,returnClientId?:unknown){
+export async function sendVerificationEmail(uid:string,returnClientId?:unknown,plainText=false){
  const user=await adminAuth().getUser(uid);
  if((await verificationStatus(uid)).verified)return {alreadyVerified:true};
  if(!user.email||user.disabled)throw new ApiError(400,'EMAIL_UNAVAILABLE','This account cannot receive a verification email.');
@@ -33,7 +33,7 @@ export async function sendVerificationEmail(uid:string,returnClientId?:unknown){
  let proof:string|undefined;
  try{
   proof=await createVerificationProof(uid,user.email);const target=new URL('/verify-email',siteUrl);target.searchParams.set('proof',proof);if(typeof returnClientId==='string'&&/^[a-zA-Z0-9-]{20,100}$/.test(returnClientId))target.searchParams.set('returnClientId',returnClientId);const link=target.toString();
-  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,verificationContent(link,attempt),`Verify your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
+  await deliverAccountMail(user.email,`Verify your email for Journas \u2014 ${attempt.slice(0,8)}`,plainText?undefined:verificationContent(link,attempt),`Verify your email address for Journas:\n\n${link}\n\nIf you did not request this email, you can ignore it.\n\nThe Journas team\nRequest: ${attempt}`);
   return {sent:true};
  }catch{
   if(proof)await discardVerificationProof(proof);

@@ -4,7 +4,7 @@ import { Children, isValidElement, useEffect, useId, useRef, useState } from "re
 import { ChevronDown, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import {Popover} from "./Popover";
 
-export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, ...props }: any) {
+export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, scrollable=false, ...props }: any) {
   const [open, setOpen] = useState(false);
   const [search,setSearch]=useState("");const [page,setPage]=useState(0);
   const root = useRef<HTMLDivElement>(null);
@@ -17,6 +17,9 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
   const filtered=options.filter(option=>String(option.label).toLowerCase().includes(search.toLowerCase()));
   const pages=Math.max(1,Math.ceil(filtered.length/6));const current=Math.min(page,pages-1);
   const toggle=()=>{setOpen(!open);setSearch('');setPage(0);};
+  const optionButtons=(scrollable?filtered:filtered.slice(current*6,current*6+6)).map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
+        onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
+      }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button>);
   return <div ref={root} className="dropdown" onKeyDown={(event) => {
     if (event.key === "Escape") { event.stopPropagation(); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
@@ -34,10 +37,8 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
     </button>
     {open && <Popover anchor={root} width={Math.max(220,root.current?.getBoundingClientRect().width??220)} height={searchable?294:256} onClose={()=>setOpen(false)} id={id} role="listbox" aria-label={props["aria-label"]} className="dropdown-menu">
       {searchable&&<input aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/>}
-      {filtered.slice(current*6,current*6+6).map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
-        onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
-      }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button>)}
-      {pages>1&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous options page" disabled={!current} onClick={()=>setPage(current-1)}><ChevronLeft size={15}/></button><span>{current+1} / {pages}</span><button type="button" className="icon" aria-label="Next options page" disabled={current===pages-1} onClick={()=>setPage(current+1)}><ChevronRight size={15}/></button></div>}
+      {scrollable?<div className="dropdown-scroll-options">{optionButtons}</div>:optionButtons}
+      {!scrollable&&pages>1&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous options page" disabled={!current} onClick={()=>setPage(current-1)}><ChevronLeft size={15}/></button><span>{current+1} / {pages}</span><button type="button" className="icon" aria-label="Next options page" disabled={current===pages-1} onClick={()=>setPage(current+1)}><ChevronRight size={15}/></button></div>}
       {!filtered.length&&<p>No matching options</p>}
     </Popover>}
   </div>;

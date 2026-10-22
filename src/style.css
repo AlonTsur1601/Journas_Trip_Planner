@@ -2529,3 +2529,19 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .name-unavailable{color:var(--danger,#dc2626);}
 
 .account-name-status .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+
+.connection-symbol-field{display:flex;align-items:flex-end;gap:10px;}
+.connection-symbol-field>.field{flex:1;}
+.connection-list-title{display:flex;align-items:center;gap:8px;min-width:0;}
+.connection-list-title small{display:block;font-size:12px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;}
+.map-connection-symbol{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);box-shadow:0 2px 8px #0003;cursor:pointer;padding:4px;}
+.map-connection-symbol svg{width:20px;height:20px;}
+
+.bounded-popover.symbol-menu{height:420px;max-height:calc(100dvh - 24px);overflow:hidden;}
+.symbol-scroll{flex:1;min-height:68px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;}
+.symbol-menu .symbol-scroll>.symbol-grid{padding:0;overflow:visible;min-height:0;}
+.symbol-menu .symbol-scroll .symbol-grid>button{min-height:34px;}
+.emoji-loading{display:flex;align-items:center;gap:6px;font-size:12px;}
+.emoji-loading .loading-spinner{width:14px;height:14px;border-width:2px;}
+
+.dropdown-scroll-options{max-height:240px;overflow-y:auto;overscroll-behavior:contain;}

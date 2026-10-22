@@ -19,6 +19,7 @@ export type Block = {
   color: string;
   symbol: string;
   pinId: string | null;
+  connectionId?: string | null;
   timezone?: string;
   disambiguation?: "earlier" | "later" | null;
   startEpoch?: number;
@@ -31,6 +32,7 @@ export type Task = {
   title: string;
   checked: boolean;
   pinId: string | null;
+  connectionId?: string | null;
   blockId: string | null;
   versions: Record<string, number>;
 };
@@ -39,6 +41,9 @@ export type Connection = {
   from: string;
   to: string;
   arrow: boolean;
+  title?: string;
+  detail?: string;
+  symbol?: string;
   versions: Record<string, number>;
 };
 export type Day = {

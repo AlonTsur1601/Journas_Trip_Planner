@@ -1,3 +1,7 @@
+import type {Connection} from "./types";
+import {ConnectionDetails} from "./ConnectionDetails";
+import {PlanLinkField} from "./PlanLinkField";
+import {connectionTitle} from "./connection-label";
 import {AccountNameField} from "./AccountNameField";
 import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appearance-cache";
 import WorkspaceMotion from "./WorkspaceMotion";
@@ -52,7 +56,7 @@ import {lodgingName} from "./lodging-name";
 import {accountPhoto,accountName} from "./account-profile";
 import { api as profileApi, auth, configured, observeAuthSession } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
-import {changeBlockPlace} from './block-link';
+import {changeBlockPlace,changeBlockConnection} from './block-link';
 import {blockRange} from './block-range';
 import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout, lodgingForDate } from "./map-start";
@@ -487,7 +491,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const timeout = setTimeout(() => setMessage(""), 5000);
     return () => clearTimeout(timeout);
   }, [message]);
-  function setEdit(value: Edit | null) {
+  const [blockLinkSources,setBlockLinkSources]=useState<{date:string;pins:Pin[];connections:Connection[]}|null>(null);
+  const linkDay=edit?.kind==='blocks'?(edit.item.startDate??date):date;
+  useEffect(()=>{setBlockLinkSources(null);if(edit?.kind!=='blocks'||linkDay===date||!trip?.id||!/^\d{4}-\d{2}-\d{2}$/.test(linkDay))return;const controller=new AbortController();void api<{day:Day}>('trip.get',{tripId:trip.id,date:linkDay},controller.signal,true).then(result=>{if(!controller.signal.aborted)setBlockLinkSources({date:linkDay,pins:result.day.pins,connections:result.day.connections});}).catch(error=>{if(!controller.signal.aborted)setMessage(error.message);});return()=>controller.abort();},[edit?.kind,linkDay,date,trip?.id]);
+  const blockLinkPins=linkDay===date?day.pins:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.pins:[];
+  const blockLinkConnections=linkDay===date?day.connections:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.connections:[];
+  function setEdit(value: Edit | null) {
+    if(value?.kind==="connections")value={...value,item:{...value.item,title:value.item.title??connectionTitle(value.item as any,mapPins),detail:value.item.detail??"",symbol:value.item.symbol??""}};
     if (value && !value.base)
       value = {
         ...value,
@@ -1384,6 +1394,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onArrowPreferenceChange={value=>void savePlacementPreference("connectionArrow",value)}
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
+                onConnection={connection=>setEdit({kind:"connections",item:connection})}
                 onConnections={trip?()=>setModal("connections"):undefined}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
@@ -1475,15 +1486,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 ))}
                 {day.blocks.map((b) => {
                   const segment=blockRange(b,date);
-                  const pin = day.pins.find((p) => p.id === b.pinId);
-                  const field = (key: string) =>
-                    pin && !b.overrides.includes(key)
-                      ? key === "title"
-                        ? pin.title
-                        : key === "detail"
-                          ? pin.note
-                          : (pin as any)[key]
-                      : (b as any)[key];
+                  const pin = day.pins.find((p) => p.id === b.pinId);
+                  const connection=day.connections.find(connection=>connection.id===b.connectionId);
+                  const inherited=pin?{title:pin.title,detail:pin.note,color:pin.color,symbol:pin.symbol}:connection?{title:connectionTitle(connection,mapPins),detail:connection.detail??'',symbol:connection.symbol??''}:null;
+                  const field=(key:string)=>inherited&&key in inherited&&!b.overrides.includes(key)?(inherited as any)[key]:(b as any)[key];
                   const minutes = (value: string) => {
                     const [h, m] = value.split(":").map(Number);
                     return h * 60 + m;
@@ -1626,7 +1632,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     {taskIsCurrent(t)&&<span className="task-now">Now</span>}
                     <small>
                       {[
-                        day.pins.find((p) => p.id === t.pinId)?.title,
+                        day.pins.find((p) => p.id === t.pinId)?.title,
+                        day.connections.filter(connection=>connection.id===t.connectionId).map(connection=>connectionTitle(connection,mapPins))[0],
                         day.blocks.find((b) => b.id === t.blockId)?.title,
                       ]
                         .filter(Boolean)
@@ -1962,18 +1969,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     <option value="earlier">Earlier occurrence</option>
                     <option value="later">Later occurrence</option>
                   </Select>}
-                  <Select
-                    label="Linked place"
-                    value={edit.item.pinId ?? ""}
-                    onChange={(e:any)=>setEdit({...edit,item:changeBlockPlace(edit.item as any,day.pins.find(p=>p.id===e.target.value))})}
-                  >
-                    <option value="">Independent time block</option>
-                    {day.pins.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </Select>
+                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={blockLinkPins} connections={blockLinkConnections} disabled={linkDay!==date&&blockLinkSources?.date!==linkDay} emptyLabel="Independent time block" onChange={(kind,id)=>setEdit({...edit,item:kind==='connections'?changeBlockConnection(edit.item as any,blockLinkConnections.find(connection=>connection.id===id),blockLinkPins):changeBlockPlace(edit.item as any,blockLinkPins.find(pin=>pin.id===id))})}/>
                 </>
               )}
               {(edit.kind === "pins" || edit.kind === "blocks") && (
@@ -2079,23 +2075,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               )}
               {edit.kind === "tasks" && (
                 <>
-                  <Select
-                    label="Linked place"
-                    value={edit.item.pinId ?? ""}
-                    onChange={(e: any) =>
-                      setEdit({
-                        ...edit,
-                        item: { ...edit.item, pinId: e.target.value || null },
-                      })
-                    }
-                  >
-                    <option value="">No place</option>
-                    {day.pins.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </Select>
+                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={day.pins} connections={day.connections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
                   <Select
                     label="Linked time"
                     value={edit.item.blockId ?? ""}
@@ -2116,7 +2096,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 </>
               )}
               {edit.kind === "connections" && (
-                <>
+                <>
+                  <ConnectionDetails value={edit.item} onChange={patch=>setEdit({...edit,item:{...edit.item,...patch}})}/>
                   <Select
                     label="From"
                     value={edit.item.from}
@@ -2127,7 +2108,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       })
                     }
                   >
-                    {day.pins.map((p) => (
+                    {mapPins.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title}
                       </option>
@@ -2143,7 +2124,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       })
                     }
                   >
-                    {day.pins.map((p) => (
+                    {mapPins.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title}
                       </option>
@@ -2188,7 +2169,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       )}
       {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
         <div className="connections-list">{day.connections.length?day.connections.map(connection=><div className="connection-row" key={connection.id}>
-          <span>{mapPins.find(pin=>pin.id===connection.from)?.title??"Place"} {connection.arrow?"→":"—"} {mapPins.find(pin=>pin.id===connection.to)?.title??"Place"}</span>
+          <span className="connection-list-title">{connection.symbol&&<SymbolIcon value={connection.symbol}/>}<span>{connectionTitle(connection,mapPins)}{connection.detail&&<small>{connection.detail}</small>}</span></span>
           {!readonly&&<button className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</button>}
         </div>):<p>No connections for this day.</p>}</div>
       </Modal>}
@@ -2457,7 +2438,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   end: "Ends at",
                   lng: "Longitude",
                   lat: "Latitude",
-                  pinId: "Linked place",
+                  pinId: "Linked place",
+                  connectionId: "Linked connection",
                   blockId: "Linked time",
                   overrides: "Custom properties",
                   timezone: "Time zone",

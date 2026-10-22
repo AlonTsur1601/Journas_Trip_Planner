@@ -17,7 +17,7 @@ export const tourSteps:Step[]=[
  {title:'Add your first place',text:'Choose Add pin on map, then click an empty spot on the map to open the place editor. Places on the map are separate from the shortcuts pinned to your home page.',target:'.map-panel',done:c=>c.editKind==='pins'&&c.editId!=='trip-lodging'},
  {title:'Find and customize a place',text:'Search for a place, or choose its position on the map. Give it a name, note, color and symbol, then choose Create pin.',target:'.item-modal',done:c=>c.pins>=1&&!c.editKind},
  {title:'Plan a time block',text:'Choose Add time block to put an activity on your schedule.',target:'[aria-label="Add time block"]',done:c=>c.editKind==='blocks'},
- {title:'Link your schedule to a place',text:'Choose your saved place under Linked place. Its details are inherited until you customize a field yourself. Set start and end dates and times; use the white clock button for the time wheels. A block can continue across days. Choose Create time block.',target:'.item-modal',done:c=>c.blocks>=1&&!c.editKind},
+ {title:'Link your schedule to a place',text:'Choose your saved place under Linked place or connection. Its details are inherited until you customize a field yourself. Set start and end dates and times; use the white clock button for the time wheels. A block can continue across days. Choose Create time block.',target:'.item-modal',done:c=>c.blocks>=1&&!c.editKind},
  {title:'Open your checklist',text:'Turn on Tasks to keep a checklist alongside the map and schedule.',target:'[aria-label="Tasks"]',done:c=>c.checklist},
  {title:'Add a task',text:'Choose Add a task in your checklist.',target:'.todo-add',done:c=>c.editKind==='tasks'},
  {title:'Connect a task to the plan',text:'Write a task, such as Buy tickets. Link it to your place and time block, then choose Create task. The task can then follow the activity in your itinerary.',target:'.task-modal',done:c=>c.tasks>=1&&!c.editKind},
@@ -52,14 +52,14 @@ const instructions:Record<string,Instruction[]>={
   {title:'Save the place',text:'Press Create pin at the bottom. This saves a place on the map, rather than a home-page shortcut.'},
  ],
  'Link your schedule to a place':[
-  {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place"] [role="option"]',ready:c=>Boolean(c.draft?.pinId),text:'Open Linked place below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
+  {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place or connection"] [role="option"]',ready:c=>Boolean(c.draft?.pinId||c.draft?.connectionId),text:'Open Linked place or connection below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
   {title:'Choose dates',ready:c=>{const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Under Start date and End date, type a date or use each calendar button. Keep the same day for one activity, or choose a later End date to span days.'},
   {title:'Set the time',ready:c=>{const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Type hours and minutes in Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
   {title:'Details and save',text:'Edit Title, Details, Color or Symbol if needed, then press Create time block at the bottom. The same block appears on each included day, clipped to that day; editing any part updates the shared block.'},
  ],
  'Connect a task to the plan':[
   {title:'Write the task',ready:c=>Boolean(c.draft?.title?.trim()),text:'In Task at the top, enter a short action such as Buy tickets. You will choose its place and activity links in the next step.'},
-  {title:'Link and save',text:'Open Linked place and choose your saved place. In Linked time, choose the activity you created. Press Create task at the bottom; both links are optional in everyday use.'},
+  {title:'Link and save',text:'Open Linked place or connection and choose your saved place. In Linked time, choose the activity you created. Press Create task at the bottom; both links are optional in everyday use.'},
  ],
  'Add another place':[
   {title:'Choose another position',text:'If the checklist covers the map, press Close tasks first. In the map toolbar, choose Add pin on map, then click a second empty position. If its editor is already open, continue below.',done:c=>c.editKind==='pins'},

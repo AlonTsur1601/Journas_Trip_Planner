@@ -1,3 +1,4 @@
+import {connectionTitle} from './connection-label';
 import { useEffect, useRef, useState } from "react";
 import { MapPinPlus, Route, Waypoints, X } from "lucide-react";
 import { symbolMarkup } from "./PlannerControls";
@@ -12,6 +13,7 @@ export default function MapPanel({
   layout,
   onView,
   onPin,
+  onConnection,
   onAdd,
   readonly,
   onConnect,
@@ -29,6 +31,7 @@ export default function MapPanel({
   layout: Layout;
   onView: (center: [number, number], zoom: number) => void;
   onPin: (pin: Pin) => void;
+  onConnection?: (connection:Connection) => void;
   onAdd: (lng: number, lat: number) => void;
   readonly: boolean;
   onConnect?: (from: string, to: string, arrow: boolean) => void;
@@ -49,9 +52,9 @@ export default function MapPanel({
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
-  const callbacks = useRef({ onView, onPin, onAdd, readonly, onConnect, onMovePin });
+  const callbacks = useRef({ onView, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId });
   const restoringView = useRef(false);
-  callbacks.current = { onView, onPin, onAdd, readonly, onConnect, onMovePin };
+  callbacks.current = { onView, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId };
   useEffect(() => {
     if (!container.current || !viewport.current) return;
     const visible = viewport.current;
@@ -208,7 +211,9 @@ export default function MapPanel({
     m.on('touchstart',()=>{gestureDragged=false;});
     m.on('dragstart',()=>{gestureDragged=true;container.current?.classList.add('map-dragging');});
     m.on('dragend',()=>container.current?.classList.remove('map-dragging'));
-    m.on('click',e=>{if(!callbacks.current.readonly&&!gestureDragged&&(action.current.mode==='add'||action.current.placementMode)&&!(e.originalEvent.target as HTMLElement)?.closest('button')){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}});
+    const connectionAt=(point:maplibregl.Point)=>{const layers=(m.getStyle()?.layers??[]).filter(layer=>layer.id.startsWith('route-')&&layer.id.endsWith(':hit')).map(layer=>layer.id);if(!layers.length)return;const id=m.queryRenderedFeatures(point,{layers})[0]?.properties?.connectionId;return callbacks.current.connections.find(connection=>connection.id===id);};
+    m.on('click',e=>{if(gestureDragged||(e.originalEvent.target as HTMLElement)?.closest('button'))return;if(!callbacks.current.readonly&&(action.current.mode==='add'||action.current.placementMode)){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}else if(!action.current.mode&&!action.current.placementMode&&!callbacks.current.movingPinId){const connection=connectionAt(e.point);if(connection)callbacks.current.onConnection?.(connection);}});
+    m.on('mousemove',e=>{m.getCanvas().style.cursor=!action.current.mode&&!action.current.placementMode&&!callbacks.current.movingPinId&&callbacks.current.onConnection&&connectionAt(e.point)?'pointer':'';});
     m.doubleClickZoom.disable();
     let resizeFrame=0;
     const retainedFrame=document.createElement('canvas');
@@ -319,15 +324,15 @@ export default function MapPanel({
           b = pins.find((x) => x.id === connection.to);
         if (!a || !b) return;
         const id = `route-${connection.id}`;
+        if (m.getLayer(`${id}:hit`))m.removeLayer(`${id}:hit`);
         if (m.getLayer(id)) m.removeLayer(id);
-        if (m.getLayer(`${id}-arrow`)) m.removeLayer(`${id}-arrow`);
         if (m.getSource(id)) m.removeSource(id);
         m.addSource(id, {
           type: "geojson",
           lineMetrics: true,
           data: {
             type: "Feature",
-            properties: {},
+            properties: {connectionId:connection.id},
             geometry: {
               type: "LineString",
               coordinates: [
@@ -354,6 +359,14 @@ export default function MapPanel({
             ],
           },
         });
+        m.addLayer({id:`${id}:hit`,type:'line',source:id,paint:{'line-width':18,'line-color':'rgba(0,0,0,0)'}});
+        if(connection.symbol){
+          const el=document.createElement('button');el.type='button';el.className='map-connection-symbol';el.setAttribute('aria-label',`Connection: ${connectionTitle(connection,pins)}`);el.title=connectionTitle(connection,pins);
+          const markup=symbolMarkup(connection.symbol);if(markup)el.innerHTML=markup;else el.textContent=connection.symbol;
+          el.onclick=event=>{event.preventDefault();event.stopPropagation();if(!action.current.mode&&!action.current.placementMode&&!movingPinId)callbacks.current.onConnection?.(connection);};
+          const marker=new maplibregl.Marker({element:el}).setLngLat([(a.lng+b.lng)/2,(a.lat+b.lat)/2]).addTo(m);
+          const place=()=>{const from=m.project([a.lng,a.lat]),to=m.project([b.lng,b.lat]);marker.setLngLat(m.unproject([(from.x+to.x)/2,(from.y+to.y)/2]));};place();arrowUpdates.push(place);markers.current.push(marker);
+        }
         if (connection.arrow) {
           const el = document.createElement("span");
           el.className = "route-arrow";
@@ -390,7 +403,7 @@ export default function MapPanel({
             const baseX = tipX - ux * 13, baseY = tipY - uy * 13;
             // End inside the arrowhead, so the round line cap cannot protrude past its tip.
             const end=m.unproject([target.x-ux*29,target.y-uy*29]);
-            (m.getSource(id) as maplibregl.GeoJSONSource)?.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[a.lng,a.lat],[end.lng,end.lat]]}});
+            (m.getSource(id) as maplibregl.GeoJSONSource)?.setData({type:'Feature',properties:{connectionId:connection.id},geometry:{type:'LineString',coordinates:[[a.lng,a.lat],[end.lng,end.lat]]}});
             head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
             gradient.setAttribute("x1", String(40 - dx));
             gradient.setAttribute("y1", String(40 - dy));
@@ -410,13 +423,14 @@ export default function MapPanel({
           );
         }
       });
-      const wanted = new Set(connections.map((x) => `route-${x.id}`));
+      const wanted = new Set(connections.flatMap((x) => [`route-${x.id}`,`route-${x.id}:hit`]));
       for (const layer of m.getStyle().layers ?? []) {
         if (layer.id.startsWith("route-") && !wanted.has(layer.id)) {
           m.removeLayer(layer.id);
-          if (m.getSource(layer.id)) m.removeSource(layer.id);
+
         }
       }
+      for(const id of Object.keys(m.getStyle().sources??{}))if(id.startsWith('route-')&&!wanted.has(id))m.removeSource(id);
     };
     // Tile loading can make isStyleLoaded false after the one-time load event.
     // Route layers only need the parsed style, not every visible tile.

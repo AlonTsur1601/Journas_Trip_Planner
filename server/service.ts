@@ -1,3 +1,4 @@
+import {connectionTitle} from '../src/connection-label.js';
 import {accountNameAvailable,claimAccountName} from './account-names.js';
 import {hasAcknowledgedTour} from '../src/tour-state.js';
 import {historyTransaction} from './history.js';
@@ -6,7 +7,7 @@ import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store,
 import { resolveWallTime } from './time.js';
 import tzlookup from 'tz-lookup';
 const kinds: Kind[] = ['pins', 'blocks', 'tasks', 'connections'];
-const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'startDate', 'endDate', 'title', 'detail', 'color', 'symbol', 'pinId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId'], connections: ['from', 'to', 'arrow'] };
+const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'startDate', 'endDate', 'title', 'detail', 'color', 'symbol', 'pinId', 'connectionId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId', 'connectionId'], connections: ['from', 'to', 'arrow', 'title', 'detail', 'symbol'] };
 function fail(status: number, code: string, message: string, details?: unknown): never { throw new ApiError(status, code, message, details); }
 const identifier = (value: unknown): string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value) ? value : fail(400, 'INVALID_ID', 'Invalid identifier');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.length <= max ? value : fail(400, 'INVALID_TEXT', `Text must contain at most ${max} characters`);
@@ -111,7 +112,7 @@ function validateSettings(value: Data) {
 }
 function validateItem(kind: Kind, item: Data) {
     for (const key of fields[kind])
-        if (!(key in item))
+        if (!(key in item)&&key!=='connectionId'&&!(kind==='connections'&&['title','detail','symbol'].includes(key)))
             fail(400, 'MISSING_FIELD', `Missing ${key}`);
     if ('title' in item && !text(item.title, 200).trim())
         fail(400, 'INVALID_ITEM', 'A title is required');
@@ -136,7 +137,8 @@ function validateItem(kind: Kind, item: Data) {
         if (!Array.isArray(item.overrides) || item.overrides.length > 4 || item.overrides.some(x => !['title', 'detail', 'color', 'symbol'].includes(String(x))))
             fail(400, 'INVALID_ITEM', 'Invalid overrides');
     }
-    for (const key of ['pinId', 'blockId'])
+    if(item.pinId&&item.connectionId)fail(400,'INVALID_LINK','Choose either a place or a connection.');
+    for (const key of ['pinId', 'blockId', 'connectionId'])
         if (key in item && item[key] !== null)
             identifier(item[key]);
     if (kind === 'tasks' && typeof item.checked !== 'boolean')
@@ -422,6 +424,18 @@ export class JournasService {
                     if (!overrides.includes(key) && item[key] !== defaults[key])
                         item = bump(item, { [key]: defaults[key] });
             }
+            if(kind==='connections'){
+                if(!('title' in item))item=bump(item,{title:connectionTitle(item as any,all as any)});
+                if(!('detail' in item))item=bump(item,{detail:''});
+                if(!('symbol' in item))item=bump(item,{symbol:''});
+            }
+            if(kind==='blocks'&&item.connectionId){
+                const sources=item.startDate===day?all:await tx.list(itemsPath(id,String(item.startDate))) as Item[];
+                const connection=sources.find(source=>source.kind==='connections'&&source.id===item.connectionId);
+                if(!connection)fail(400,'INVALID_LINK','Linked connection does not exist');
+                const defaults:Data={title:connectionTitle(connection as any,sources as any),detail:connection.detail??'',symbol:connection.symbol??''};
+                for(const key of Object.keys(defaults))if(!(item.overrides as string[]??[]).includes(key)&&item[key]!==defaults[key])item=bump(item,{[key]:defaults[key]});
+            }
             validateItem(kind, item);
             if (kind === 'blocks') {
                 const startEpoch = resolveWallTime(String(item.startDate), String(item.start), String(item.timezone), item.disambiguation);
@@ -443,6 +457,7 @@ export class JournasService {
             if (kind === 'tasks') {
                 linked('pinId', 'pins');
                 linked('blockId', 'blocks');
+                linked('connectionId','connections');
             }
             if (kind === 'connections') {
                 linked('from', 'pins');
@@ -461,6 +476,11 @@ export class JournasService {
                     if (Object.keys(inherited).length)
                         await this.syncBlock(tx,id,bump(block, inherited),block,day);
                 }
+            if(kind==='connections')for(const block of all.filter(source=>source.kind==='blocks'&&source.connectionId===itemId)){
+                const values:Data={title:connectionTitle(item as any,all as any),detail:item.detail??'',symbol:item.symbol??''},inherited:Data={};
+                for(const[key,value]of Object.entries(values))if(!(block.overrides as string[]).includes(key)&&block[key]!==value)inherited[key]=value;
+                if(Object.keys(inherited).length)await this.syncBlock(tx,id,bump(block,inherited),block,day);
+            }
             return { item };
         });
     }
@@ -491,6 +511,7 @@ export class JournasService {
     private async readShare(input: Data) { return this.store.transaction(async (tx) => { const share = await this.share(tx, input.token); const trip = await tx.get(tripPath(identifier(share.tripId))) as Trip; const day = input.date ? date(input.date) : trip.startDate; this.dayWithin(trip, day); return { trip: { ...trip, memberIds: [], ownerId: '' }, day: await this.day(tx, trip.id, day), mode: share.mode }; }); }
     private async deleteItem(tx: Transaction, id: string, day: string, item: Item, all: Item[]) {
         tx.delete(`${itemsPath(id, day)}/${item.id}`);
+        const removedConnections=new Set(item.kind==='connections'?[item.id]:item.kind==='pins'?all.filter(related=>related.kind==='connections'&&(related.from===item.id||related.to===item.id)).map(related=>related.id):[]);
         for (const related of all) {
             const patch: Data = {};
             if (item.kind === 'pins') {
@@ -501,6 +522,7 @@ export class JournasService {
                 if (related.pinId === item.id)
                     patch.pinId = null;
             }
+            if(related.connectionId&&removedConnections.has(String(related.connectionId)))patch.connectionId=null;
             if (item.kind === 'blocks' && related.blockId === item.id)
                 patch.blockId = null;
             if (Object.keys(patch).length){

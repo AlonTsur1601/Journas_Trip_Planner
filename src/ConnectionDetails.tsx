@@ -1,0 +1,4 @@
+import {SymbolPicker} from './PlannerControls';
+export function ConnectionDetails({value,onChange}:{value:{title?:string;detail?:string;symbol?:string};onChange:(patch:{title?:string;detail?:string;symbol?:string})=>void}){
+ return <><label className="field"><span>Connection name</span><input required maxLength={200} value={value.title??''} onChange={e=>onChange({title:e.target.value})}/></label><label className="field"><span>Description</span><textarea rows={3} maxLength={4000} value={value.detail??''} onChange={e=>onChange({detail:e.target.value})}/></label><div className="connection-symbol-field"><SymbolPicker value={value.symbol??''} onChange={(e:any)=>onChange({symbol:e.target.value})}/><button type="button" className="button" disabled={!value.symbol} onClick={()=>onChange({symbol:''})}>No symbol</button></div></>;
+}

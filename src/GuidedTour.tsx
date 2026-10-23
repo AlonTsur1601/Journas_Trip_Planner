@@ -11,7 +11,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Compass,X} from 'lucide-react';
 export type TourContext={draft:Record<string,any>|null;lodgingChosen:boolean;mapStart:string;home:boolean;modal:string|null;editKind:string|null;editId:string|null;tripId:string|null;trips:number;pins:number;blocks:number;tasks:number;checkedTasks:number;connections:number;homePins:number;checklist:boolean;date:string};
-type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean;action?:string;completeWhenReady?:boolean};
+type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean;action?:string;actionEvents?:string[]};
 type Step={title:string;text:string;target:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;instructions?:Instruction[]};
 export const tourSteps:Step[]=[
  {title:'Start a simple trip',text:'Choose Create new trip. We will build a short itinerary together, using your own places and dates.',target:'.home-create',done:c=>c.modal==='new-trip'},
@@ -41,68 +41,65 @@ export const tourSteps:Step[]=[
 function editingTourFields(selector:string){return Boolean(document.activeElement?.closest(selector)||selector.includes('.date-field')&&document.querySelector('.field-calendar:not([inert]):not([data-motion-exit])')||selector.includes('.time-field')&&document.querySelector('.time-picker-popover:not([inert]):not([data-motion-exit])'));}
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
-  {title:'Trip name',ready:()=>!editingTourFields('.trip-modal [name=name]')&&Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. Finish entering the name, then leave the field to continue.'},
+  {title:'Trip name',action:'.trip-modal [name=name]',ready:()=>!editingTourFields('.trip-modal [name=name]')&&Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. Finish entering the name, then leave the field to continue.'},
   {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{if(editingTourFields('.trip-modal .date-field'))return false;const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars. Finish both dates, then leave the date fields to continue.'},
   {title:'Choose a trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol, then select an icon or emoji from the grid. You can search above the grid. The selected symbol becomes your trip logo.',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
-  {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
-  {title:'Choose lodging',ready:c=>c.lodgingChosen,completeWhenReady:true,text:'Select a lodging location from search results or click the map. That completes this step. The suggested name, color and symbol can stay as they are; changing them is optional.'},
+  {title:'Choose a color',action:'.advanced-color-fields',actionEvents:['input','change','pointerup','keydown'],ready:()=>!document.querySelector('.advanced-color-fields:not([inert]):not([data-motion-exit])'),completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
+  {title:'Choose lodging',action:'.trip-modal .location-picker',actionEvents:['click','change','journas-field-edit'],ready:c=>c.lodgingChosen,text:'Select a lodging location from search results or click the map. That completes this step. The suggested name, color and symbol can stay as they are; changing them is optional.'},
   {title:'Create the trip',text:'Press Create trip at the bottom of this window. If it is disabled, check that you chose a lodging location (and uploaded an image if you selected Image).'},
  ],
  'Find and customize a place':[
-  {title:'Position and name',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'Keep the suggested Place name, or change it if you want. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
-  {title:'Note and appearance',text:'Place note, Color and Symbol are optional. Keep the suggested appearance, or customize it. The guide continues after a short pause; editing gives you more time.'},
+  {title:'Position and name',action:'.item-modal input:not([type=hidden])',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'Review Place name, then leave the field. You can keep the suggested name; your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
+  {title:'Note and appearance',action:'.item-modal textarea, .item-modal .color-picker, .item-modal .symbol-picker, .advanced-color-fields',actionEvents:['input','change','focusout','click','pointerup','keydown'],ready:()=>!editingTourFields('.item-modal textarea, .item-modal .color-picker input')&&!document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])'),text:'Review Place note, Color or Symbol. Click a swatch or open the symbol picker, or focus the note and leave it when finished. Changes are optional; you can keep the suggested details.'},
   {title:'Save the place',text:'Press Create pin at the bottom. This saves a place on the map, rather than a home-page shortcut.'},
  ],
  'Link your schedule to a place':[
   {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place or connection"] [role="option"]',ready:c=>Boolean(c.draft?.pinId||c.draft?.connectionId),text:'Open Linked place or connection below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
-  {title:'Choose dates',ready:c=>{if(editingTourFields('.item-modal .date-field'))return false;const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Keep the suggested Start date and End date, or choose dates with the fields or calendars. Keep the same day for one activity, or choose a later End date to span days.'},
-  {title:'Set the time',ready:c=>{if(editingTourFields('.item-modal .time-field'))return false;const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Keep the suggested times, or edit Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
+  {title:'Choose dates',action:'.item-modal .date-field',ready:c=>{if(editingTourFields('.item-modal .date-field'))return false;const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Review Start date and End date, then leave the date fields. You can keep their values or use the calendars. Keep the same day for one activity, or choose a later End date to span days.'},
+  {title:'Set the time',action:'.item-modal .field:has(.time-field)',ready:c=>{if(editingTourFields('.item-modal .time-field'))return false;const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Review Starts at and Ends at, then leave the time fields. You can keep their values. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
   {title:'Details and save',text:'Edit Title, Details, Color or Symbol if needed, then press Create time block at the bottom. The same block appears on each included day, clipped to that day; editing any part updates the shared block.'},
  ],
  'Connect a task to the plan':[
-  {title:'Write the task',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'In Task at the top, enter a short action such as Buy tickets. You will choose its place and activity links in the next step.'},
+  {title:'Write the task',action:'.task-modal input:not([type=hidden])',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'In Task at the top, enter a short action such as Buy tickets. You will choose its place and activity links in the next step.'},
   {title:'Link and save',text:'Open Linked place or connection and choose your saved place. In Linked time, choose the activity you created. Press Create task at the bottom; both links are optional in everyday use.'},
  ],
  'Add another place':[
-  {title:'Choose another position',text:'If the checklist covers the map, press Close tasks first. In the map toolbar, choose Add pin on map, then click a second empty position. If its editor is already open, continue below.',done:c=>c.editKind==='pins'},
+  {title:'Choose another position',text:'If the checklist covers the map, press Close tasks first. In the map toolbar, choose Add pin on map, then click a second empty position. If its editor is already open, continue below.',completeOn:'.map-panel .maplibregl-canvas, .map-panel [aria-label="Add pin on map"]',ready:c=>c.editKind==='pins'},
   {title:'Save the second place',text:'Give the second place a name in Place name, adjust its note or appearance if you want, and press Create pin.'},
  ],
  'Explore the map':[
-  {title:'Move and zoom',text:'Drag the map to move it. Use + and − to zoom, or the compass to face north. On a phone, pinch to zoom and drag with one finger.'},
-  {title:'Edit places and routes',closeOnNext:'.modal:not([inert]) > header [aria-label="Close"]',text:'Click a marker to edit its place or use Delete to remove it. Connections lets you edit or delete routes. Next step closes any open editor before continuing; hiding and reopening the map keeps its view.'},
+  {title:'Move and zoom',completeOn:'.map-panel .maplibregl-ctrl-zoom-in, .map-panel .maplibregl-ctrl-zoom-out, .map-panel .maplibregl-ctrl-compass',text:'Press + or − to try zooming, or press the compass to face north. You can also drag the map. On a phone, pinch to zoom and drag with one finger.'},
+  {title:'Edit places and routes',action:'.map-panel .map-pin, .map-panel [aria-label="Connections"]',actionEvents:['click'],closeOnNext:'.modal:not([inert]) > header [aria-label="Close"]',text:'Click a marker to edit its place or use Delete to remove it. Connections lets you edit or delete routes. Next step closes any open editor before continuing; hiding and reopening the map keeps its view.'},
  ],
  'Navigate the trip dates':[
-  {title:'Open the calendar',done:()=>Boolean(document.querySelector('.calendar-popover:not([inert])')),text:'Press the date in the top bar to open its calendar. Select a day, or close it and use the arrows beside the date. Dots mark dates belonging to trips; the legend scrolls if it has many trips.'},
-  {title:'Check an overnight activity',text:'Move to another day covered by your block. The schedule runs from midnight to midnight and shows only that day’s portion. Click a block to edit it, or drag it to adjust its time; linked parts stay synchronized.'},
+  {title:'Open the calendar',completeOn:'.date-picker .date-button',ready:()=>Boolean(document.querySelector('.calendar-popover:not([inert])')),text:'Press the date in the top bar to open its calendar. Select a day, or close it and use the arrows beside the date. Dots mark dates belonging to trips; the legend scrolls if it has many trips.'},
+  {title:'Check an overnight activity',completeOn:'.calendar-popover .calendar-grid button:not(:disabled), .date-picker button:not(.date-button)',text:'Select a date in the calendar, or use the arrows beside the date to review another day. The schedule runs from midnight to midnight and shows only that day’s portion. Click a block to edit it, or drag it to adjust its time; linked parts stay synchronized.'},
  ],
  'Arrange your workspace':[
-  {title:'Show the panels you need',text:'Use Map, Schedule and Tasks in the top bar to show or hide each panel. If a control is in the overflow menu on your screen, open that menu to find it.'},
-  {title:'Adjust the layout',text:'On a computer, drag the divider between Map and Schedule. Move the checklist by its header or resize its corner. On a phone, panels adapt to the available screen width.'},
+  {title:'Show the panels you need',completeOn:'.view-controls button',text:'Toggle Map, Schedule or Tasks in the top bar to try the panel controls. On a computer, you can also drag the divider or move and resize the checklist. On a phone, panels adapt to the available screen width.'},
  ],
  'Undo, redo and save':[
-  {title:'Undo and redo',text:'Use Undo and Redo in the top bar to reverse or restore recent edits. Keyboard shortcuts are Ctrl+Z and Ctrl+Shift+Z.'},
+  {title:'Undo and redo',completeOn:'[aria-label="Undo"]:not(:disabled), [aria-label="Redo"]:not(:disabled)',text:'Press an available Undo or Redo button to try reversing or restoring a recent edit. Outside this guide, Ctrl+Z and Ctrl+Shift+Z do the same.'},
   {title:'Save without waiting',completeOn:'[aria-label="Save planning"]',text:'Press Save planning in the top bar to continue. Outside the guide, Ctrl+S does the same. Its dot turns amber during saving, and the small status at the bottom shows background work. You can keep planning while it saves.'},
  ],
  'Share and collaborate':[
-  {title:'Trip settings',text:'In Trip details, use Edit trip dates and lodging to change its name, dates, appearance or lodging. Return to Trip details after reviewing the editor.'},
-  {title:'Sharing and travelers',closeOnNext:'.share-modal > header [aria-label="Close"]',text:'The sharing controls create view-only or editor links; the travelers list manages who has access. Links and account changes are disabled in this practice trip. Press Next step to close Trip details and continue.'},
+  {title:'Sharing and travelers',closeOnNext:'.share-modal > header [aria-label="Close"]',text:'Edit trip dates and lodging opens the trip editor. Sharing controls create view-only or editor links, and the travelers list manages access. Sharing is disabled in this practice trip. Press Next step to close Trip details and continue.'},
  ],
  'Pin a shortcut':[
-  {title:'Open Create pin',text:'Under Pins on the home page, press Create pin. These shortcuts open a trip, a specific trip day, or a standalone date.',done:()=>Boolean(document.querySelector('.home-pin-modal:not([inert])'))},
+  {title:'Open Create pin',text:'Under Pins on the home page, press Create pin. These shortcuts open a trip, a specific trip day, or a standalone date.',completeOn:'.home-pin-create',ready:()=>Boolean(document.querySelector('.home-pin-modal:not([inert])'))},
   {title:'Choose what to pin',text:'Choose the shortcut type, select its trip or date, and press Create pin in this window. Use the three dots (or right-click) on a home card later to manage it.',target:'.home-pin-modal'},
  ],
  'Find your plans again':[
-  {title:'Resume and recent plans',text:'The large Continue card opens your last planner view. Below, Recent dates opens a particular day and Recent trips opens a trip. Their three-dot menus let you manage those entries.'},
-  {title:'Open all trips',text:'Press All trips beside the large Continue card to see every trip saved in this practice workspace.',target:'.home-browse-trips',completeOn:'.home-browse-trips'},
+  {title:'Open all trips',text:'Continue opens your last planner view; Recent dates and Recent trips reopen past plans. Press All trips beside Continue to see every trip saved in this practice workspace.',target:'.home-browse-trips',completeOn:'.home-browse-trips'},
   {title:'Browse your trips',text:'Each card opens a trip. The three dots provide its edit and delete actions. Press Next step to close All trips and continue.',target:'.all-trips-modal',closeOnNext:'.all-trips-modal [aria-label="Close all trips"]'},
  ],
  'Choose your preferences':[
   {title:'Appearance',target:()=>document.querySelector('.dropdown-menu[aria-label="Appearance"]')?'.dropdown-menu[aria-label="Appearance"]':'.settings-modal [aria-label="Appearance"]',text:'Open Appearance and select Light, Dark or Automatic. Automatic follows your device. Choosing an option updates the preview immediately.',completeOn:'.dropdown-menu[aria-label="Appearance"] [role="option"]'},
-  {title:'Accent color',target:'.settings-modal .color-picker',text:'Click an Accent color swatch. It colors site controls and your initial avatar; an uploaded profile photo stays unchanged. Advanced color selection offers a custom color.'},
+  {title:'Accent color',action:'.advanced-color-fields',actionEvents:['input','change','pointerup','keydown'],ready:()=>!document.querySelector('.advanced-color-fields:not([inert]):not([data-motion-exit])'),completeOn:'.settings-modal .color-picker .color-swatches button',target:'.settings-modal .color-picker',text:'Click an Accent color swatch. It colors site controls and your initial avatar; an uploaded profile photo stays unchanged. Advanced color selection offers a custom color.'},
   {title:'Map starting view',target:()=>document.querySelector('.dropdown-menu[aria-label="Starting map view"]')?'.dropdown-menu[aria-label="Starting map view"]':'.settings-modal [aria-label="Starting map view"]',text:'Open Starting map view. Trip lodging starts at the lodging of your trip for that day; My current location uses your location. World map starts zoomed out. Choose A place I choose for a custom starting position.',completeOn:'.dropdown-menu[aria-label="Starting map view"] [role="option"]'},
   {title:'Custom starting position',text:'Press Choose starting location on map. Pan and zoom to the view you want, then press Use this map view. This substep is skipped automatically when you choose another starting mode.',target:c=>c.modal==='map-preference'?'.modal[aria-label="Starting map location"]':'.settings-modal',skipWhen:c=>c.mapStart!=='custom',completeOn:'.modal[aria-label="Starting map location"] .primary'},
   {title:'Clock and time zone',target:()=>document.querySelector('.dropdown-menu[aria-label="Clock"]')?'.dropdown-menu[aria-label="Clock"]':'.settings-modal [aria-label="Clock"]',text:'Open Clock to choose whether displayed time follows your trip lodging, your device or another available zone. The Active clock line shows the zone currently in use.',completeOn:'.dropdown-menu[aria-label="Clock"] [role="option"]'},
-  {title:'Trip retention',target:'.settings-modal .checkbox-field',text:'Automatically remove old trips controls cleanup for your own account. Turn it off to keep trips indefinitely, or choose a period under Remove from my account after the trip ends. Other travelers keep their copies.'},
+  {title:'Trip retention',action:'.settings-modal .checkbox-field input',actionEvents:['focusout'],completeOn:'.settings-modal .checkbox-field input, .dropdown-menu[aria-label="Remove from my account after the trip ends"] [role="option"]',target:'.settings-modal .checkbox-field',text:'Review Automatically remove old trips and leave the checkbox when finished, or choose a cleanup period below. You can keep the current values. Turning removal off keeps trips indefinitely. Other travelers keep their copies.'},
   {title:'Profile and saving',target:'.settings-modal button.primary',text:'Display name and Choose image edit your profile. Manage sign-in methods handles account access and is disabled in practice. Press Save preferences; Guided tour at the bottom restarts this guide later.',completeOn:'.settings-modal button.primary'},
  ],
 };
@@ -113,7 +110,6 @@ function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));
 export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore,profileSettings}:{profileSettings?:Partial<Settings>;practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>(()=>practice?'running':ready&&seenBefore===false&&!seen(userId)?'welcome':'closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
  const [acted,setActed]=useState<number[]>([]);
- const latest=useRef({context,acted});latest.current={context,acted};
  const occluders=useRef<SVGGElement>(null);
  const outline=useRef<HTMLDivElement>(null),cutouts=useRef<SVGGElement>(null),shield=useRef<SVGPathElement>(null);
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
@@ -148,32 +144,19 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  // Record the user's action before a picker disappears, even when done out of order.
  useEffect(()=>{
   if(status!=='running')return;
-  const record=(event:Event)=>{if(!(event.target instanceof Element))return;const target=event.target;const indexes=(current.instructions??[]).flatMap((item,index)=>{const selector=event.type==='click'?item.completeOn:item.action;return selector&&target.closest(selector)?[index]:[];});if(indexes.length)setActed(previous=>[...new Set([...previous,...indexes])]);};
-  for(const name of ['click','input','change','journas-field-edit'])document.addEventListener(name,record,true);
-  return()=>{for(const name of ['click','input','change','journas-field-edit'])document.removeEventListener(name,record,true);};
+  const pending=new Set<number>();
+  const record=(event:Event)=>{if(!(event.target instanceof Element)||event.target.closest(':disabled,[inert]'))return;const target=event.target;if(event.type==='keydown'&&!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes((event as KeyboardEvent).key))return;
+   const indexes=(current.instructions??[]).flatMap((item,index)=>{
+    const choice=event.type==='click'&&item.completeOn&&target.closest(item.completeOn);
+    const interaction=item.action&&(item.actionEvents??['input','change','journas-field-edit','focusout']).includes(event.type)&&target.closest(item.action);
+    return choice||interaction?[index]:[];
+   });if(indexes.length){const apply=()=>setActed(previous=>[...new Set([...previous,...indexes])]);if(event.type==='focusout'){const frame=requestAnimationFrame(()=>{pending.delete(frame);apply();});pending.add(frame);}else apply();}};
+  const events=['click','input','change','journas-field-edit','focusout','pointerup','keydown'];
+  for(const name of events)document.addEventListener(name,record,true);
+  return()=>{for(const name of events)document.removeEventListener(name,record,true);for(const frame of pending)cancelAnimationFrame(frame);};
  },[status,step]);
- useEffect(()=>{
-  if(status!=='running')return;
-  const completed=(current.instructions??[]).flatMap((item,index)=>item.done?.(context)&&!acted.includes(index)?[index]:[]);
-  if(completed.length)setActed(previous=>[...new Set([...previous,...completed])]);
- },[status,step,context,revision,acted]);
  const autoDelay=status==='running'&&instruction&&current.instructions?tourSubstepDelay(instruction,part,current.instructions.length,acted,context):null;
  useLayoutEffect(()=>{if(status!=='running')return;if((!current.instructions||part===current.instructions.length-1)&&current.done?.(context))advanceStage();else if(instruction?.skipWhen?.(context)){setSkipped(previous=>[...previous,part]);next();}else if(instruction?.done?.(context)||((instruction?.completeOn||instruction?.done)&&acted.includes(part)&&(!instruction.ready||instruction.ready(context)))||autoDelay===0)next();},[status,step,part,context,revision,acted,autoDelay]);
- useEffect(()=>{
-  if(autoDelay===null||autoDelay===0||!instruction)return;
-  let timer=0,held=false,live=true;
-  const schedule=(delay=autoDelay)=>{window.clearTimeout(timer);timer=window.setTimeout(()=>{
-   if(!live)return;
-   const selector=typeof current.target==='function'?current.target(latest.current.context):current.target;
-   if(held||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])')||editingTourFields(`${selector} input, ${selector} textarea, ${selector} [contenteditable=true]`)||!findTourTarget(selector)){schedule(250);return;}
-   const state=latest.current;
-   if(tourSubstepDelay(instruction,part,current.instructions!.length,state.acted,state.context)!==null)next();
-  },delay);};
-  const activity=(event:Event)=>{if(!(event.target instanceof Element)||event.target.closest('.guided-tour'))return;if(event.type==='pointerdown')held=true;if(event.type==='pointerup'||event.type==='pointercancel')held=false;schedule();};
-  const events=['input','change','keydown','pointerdown','pointerup','pointercancel','wheel','journas-field-edit'];
-  for(const event of events)document.addEventListener(event,activity,true);
-  schedule();return()=>{live=false;window.clearTimeout(timer);for(const event of events)document.removeEventListener(event,activity,true);};
- },[status,step,part,autoDelay]);
  useLayoutEffect(()=>setBox(null),[step]);
  const target=current.target;const selector=typeof target==='function'?target(context):target;
  useEffect(()=>{

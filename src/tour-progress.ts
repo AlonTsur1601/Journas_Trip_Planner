@@ -20,14 +20,12 @@ export function tourNeedsNext(stage:{done?:unknown;instructions?:unknown[]},inst
  if(stage.instructions&&index<stage.instructions.length-1)return false;
  return Boolean(instruction?.closeOnNext||(!instruction?.done&&!instruction?.completeOn&&(!stage.done||Boolean(stage.instructions&&index<stage.instructions.length-1))));
 }
-export function tourInstructionComplete<T>(instruction:{ready?:(context:T)=>boolean;action?:string;completeOn?:string;completeWhenReady?:boolean},index:number,part:number,acted:number[],context:T){
- const ready=instruction.ready?.(context);
- return ready!==false&&(index<part||acted.includes(index)||Boolean(ready)&&(Boolean(instruction.completeWhenReady)||index===part&&!instruction.action&&!instruction.completeOn));
+export function tourInstructionComplete<T>(instruction:{ready?:(context:T)=>boolean;action?:string;completeOn?:string},index:number,part:number,acted:number[],context:T){
+ return instruction.ready?.(context)!==false&&(index<part||acted.includes(index));
 }
 
-/** Substeps advance after a completed field or a quiet reading interval; stage exits stay explicit. */
+/** Valid defaults and elapsed time never count as a user's action. */
 export function tourSubstepDelay<T>(instruction:{text:string;ready?:(context:T)=>boolean;action?:string;done?:unknown;completeOn?:string;closeOnNext?:string},index:number,count:number,acted:number[],context:T){
  if(index>=count-1||instruction.done||instruction.completeOn||instruction.closeOnNext)return null;
- if(instruction.ready)return instruction.ready(context)&&(!instruction.action||acted.includes(index))?0:null;
- return Math.max(4000,Math.min(9000,instruction.text.length*32));
+ return Boolean(instruction.action)&&acted.includes(index)&&instruction.ready?.(context)!==false?0:null;
 }

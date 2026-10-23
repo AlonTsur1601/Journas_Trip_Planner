@@ -28,6 +28,6 @@ export function tourInstructionComplete<T>(instruction:{ready?:(context:T)=>bool
 /** Substeps advance after a completed field or a quiet reading interval; stage exits stay explicit. */
 export function tourSubstepDelay<T>(instruction:{text:string;ready?:(context:T)=>boolean;action?:string;done?:unknown;completeOn?:string;closeOnNext?:string},index:number,count:number,acted:number[],context:T){
  if(index>=count-1||instruction.done||instruction.completeOn||instruction.closeOnNext)return null;
- if(instruction.ready)return instruction.ready(context)&&(!instruction.action||acted.includes(index))?1000:null;
+ if(instruction.ready)return instruction.ready(context)&&(!instruction.action||acted.includes(index))?0:null;
  return Math.max(4000,Math.min(9000,instruction.text.length*32));
 }

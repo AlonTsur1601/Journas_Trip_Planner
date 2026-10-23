@@ -1,3 +1,4 @@
+import type {Settings} from "./types";
 import {tourNeedsNext,tourInstructionComplete,tourSubstepDelay} from './tour-progress';
 import {findTourTarget,observeTourTarget} from './tour-target';
 import {tourCardPosition,tourCardWidth} from './tour-layout';
@@ -39,7 +40,7 @@ export const tourSteps:Step[]=[
 ];
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
-  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. The guide continues after you finish typing.'},
+  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. The guide continues as soon as the name is valid.'},
   {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars. The guide continues after you choose valid dates.'},
   {title:'Choose a trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol, then select an icon or emoji from the grid. You can search above the grid. The selected symbol becomes your trip logo.',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
   {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
@@ -108,7 +109,7 @@ for(const stage of tourSteps)stage.instructions=instructions[stage.title];
 const keyFor=tourStorageKey;
 function remember(uid:string){void api('tour.seen').catch(()=>{});try{localStorage.setItem(keyFor(uid),'seen');}catch{/* The guide remains usable when storage is unavailable. */}}
 function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));}catch{return false;}}
-export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
+export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore,profileSettings}:{profileSettings?:Partial<Settings>;practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>(()=>practice?'running':ready&&seenBefore===false&&!seen(userId)?'welcome':'closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
  const [acted,setActed]=useState<number[]>([]);
  const latest=useRef({context,acted});latest.current={context,acted};
@@ -155,10 +156,10 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
   const completed=(current.instructions??[]).flatMap((item,index)=>item.done?.(context)&&!acted.includes(index)?[index]:[]);
   if(completed.length)setActed(previous=>[...new Set([...previous,...completed])]);
  },[status,step,context,revision,acted]);
- useEffect(()=>{if(status!=='running')return;if((!current.instructions||part===current.instructions.length-1)&&current.done?.(context))advanceStage();else if(instruction?.skipWhen?.(context)){setSkipped(previous=>[...previous,part]);next();}else if(instruction?.done?.(context)||((instruction?.completeOn||instruction?.done)&&acted.includes(part)&&(!instruction.ready||instruction.ready(context))))next();},[status,step,part,context,revision,acted]);
  const autoDelay=status==='running'&&instruction&&current.instructions?tourSubstepDelay(instruction,part,current.instructions.length,acted,context):null;
+ useLayoutEffect(()=>{if(status!=='running')return;if((!current.instructions||part===current.instructions.length-1)&&current.done?.(context))advanceStage();else if(instruction?.skipWhen?.(context)){setSkipped(previous=>[...previous,part]);next();}else if(instruction?.done?.(context)||((instruction?.completeOn||instruction?.done)&&acted.includes(part)&&(!instruction.ready||instruction.ready(context)))||autoDelay===0)next();},[status,step,part,context,revision,acted,autoDelay]);
  useEffect(()=>{
-  if(autoDelay===null||!instruction)return;
+  if(autoDelay===null||autoDelay===0||!instruction)return;
   let timer=0,held=false,live=true;
   const schedule=(delay=autoDelay)=>{window.clearTimeout(timer);timer=window.setTimeout(()=>{
    if(!live)return;
@@ -210,7 +211,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
    <div className="tour-variants">{(intro?[undefined]:current.instructions??[undefined]).map((item,index)=>{const active=intro||!current.instructions||index===part;return <div key={index} className="tour-variant" data-active={active} aria-hidden={!active} inert={!active}>
     <p aria-live={active?'polite':undefined}>{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':complete?'You can now plan with trips, places, schedules, tasks, sharing, home shortcuts and settings. Your practice workspace will be discarded when you finish.':item?.text??current.text}</p>
     {!intro&&!box&&<small>Open the highlighted panel to continue.</small>}
-    <div className="tour-actions">{(intro||tourNeedsNext(current,item,index))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&((item?.ready&&!item.ready(context))||(item?.action&&!acted.includes(index))))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
+    <div className="tour-actions">{(intro||tourNeedsNext(current,item,index))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&((item?.ready&&!item.ready(context))||(item?.action&&!acted.includes(index))))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:{active:true,profile:profileSettings}}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
    </div>;})}</div>
   </section></MotionSurface>
  </div>,document.body);

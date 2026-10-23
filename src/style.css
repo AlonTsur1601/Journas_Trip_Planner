@@ -2555,3 +2555,16 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
  .home-section-heading{margin-bottom:10px;}
  .home-pins-section .home-pins,.home-recents .home-list{gap:10px;}
 }
+
+/* Hidden maps retain their renderer, but no child may paint over another panel. */
+.workspace .map-panel{isolation:isolate;}
+.workspace .map-panel[aria-hidden="true"]:not([data-workspace-exit]){opacity:0;}
+.view-controls button:not(.active):focus-visible{outline-color:var(--muted);}
+.view-controls button:not(.active):is(:hover,:active){background:transparent;color:var(--muted);box-shadow:none;}
+.workspace[data-map]{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);}
+@media(min-width:701px){
+ .workspace[data-map="true"][data-timeline="true"]{grid-template-columns:var(--workspace-split) 6px minmax(0,1fr);}
+}
+@media(max-width:700px){
+ .workspace[data-map="true"][data-timeline="true"]{grid-template-rows:var(--workspace-split) 12px minmax(0,1fr);}
+}

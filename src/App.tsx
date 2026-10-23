@@ -1,4 +1,5 @@
 import type {Connection} from "./types";
+import type {CSSProperties} from "react";
 import {ConnectionDetails} from "./ConnectionDetails";
 import {PlanLinkField} from "./PlanLinkField";
 import {connectionTitle} from "./connection-label";
@@ -1351,7 +1352,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           ].map(([key, Icon, label]: any) => (
             <button
               key={key}
-              aria-label={label}
+              aria-label={label}
+              aria-pressed={Boolean(layout[key as keyof Layout])}
               className={layout[key as keyof Layout] ? "active" : ""}
               onClick={() => {
                 if (
@@ -1371,13 +1373,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </div>
       <WorkspaceMotion map={layout.map} timeline={layout.timeline}><div
         className="workspace"
-        style={{
-          gridTemplateRows: innerWidth<=700&&layout.map&&layout.timeline ? `${layout.split}% 12px minmax(0,1fr)` : undefined,
-          gridTemplateColumns:
-            layout.map && layout.timeline && innerWidth>700
-              ? `${layout.split}% 6px minmax(0,1fr)`
-              : "1fr",
-        }}
+        data-map={layout.map}
+        data-timeline={layout.timeline}
+        style={{"--workspace-split":`${layout.split}%`} as CSSProperties}
       >
         {(
           <MotionSurface><section className="panel map-panel" aria-hidden={!layout.map} inert={!layout.map}>

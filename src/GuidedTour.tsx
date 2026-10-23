@@ -38,7 +38,7 @@ export const tourSteps:Step[]=[
  {title:'Personalize Journas',text:'Open Settings to finish the tour with your preferences.',target:'.home-account [aria-label="Settings"]',done:c=>c.modal==='settings'},
  {title:'Choose your preferences',text:'Choose a theme and accent, map starting view, clock and retention preferences. By default, trip dates use the lodging location and time zone; dates outside the trip use your current location and local time. Account settings manages your sign-in methods. Save changes if you adjust anything. To restart, open Settings and choose Guided tour at the bottom.',target:'.settings-modal'},
 ];
-function editingTourFields(selector:string){return Boolean(document.activeElement?.closest(selector)||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])'));}
+function editingTourFields(selector:string){return Boolean(document.activeElement?.closest(selector)||selector.includes('.date-field')&&document.querySelector('.field-calendar:not([inert]):not([data-motion-exit])')||selector.includes('.time-field')&&document.querySelector('.time-picker-popover:not([inert]):not([data-motion-exit])'));}
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
   {title:'Trip name',ready:()=>!editingTourFields('.trip-modal [name=name]')&&Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. Finish entering the name, then leave the field to continue.'},
@@ -165,7 +165,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
   const schedule=(delay=autoDelay)=>{window.clearTimeout(timer);timer=window.setTimeout(()=>{
    if(!live)return;
    const selector=typeof current.target==='function'?current.target(latest.current.context):current.target;
-   if(held||editingTourFields(`${selector} input, ${selector} textarea, ${selector} [contenteditable=true]`)||!findTourTarget(selector)){schedule(250);return;}
+   if(held||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])')||editingTourFields(`${selector} input, ${selector} textarea, ${selector} [contenteditable=true]`)||!findTourTarget(selector)){schedule(250);return;}
    const state=latest.current;
    if(tourSubstepDelay(instruction,part,current.instructions!.length,state.acted,state.context)!==null)next();
   },delay);};

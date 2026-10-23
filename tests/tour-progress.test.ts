@@ -68,3 +68,10 @@ describe('finishing the entire field group',()=>{
   doc.activeElement.closest=()=>null;expect(instruction.ready!(context as any)).toBe(true);
  });
 });
+
+it('waits for the date picker to close without undoing completed name fields',()=>{
+ const steps=tourSteps.find(s=>s.title==='Make the trip yours')!.instructions!;let calendar=true;
+ vi.stubGlobal('document',{activeElement:null,querySelector:(selector:string)=>selector==='.trip-modal [name=name]'?{value:'Paris'}:selector==='.trip-modal form'?{querySelector:()=>({value:'2026-10-23'})}:selector.startsWith('.field-calendar')&&calendar?{}:null});
+ expect(steps[0].ready!({} as any)).toBe(true);expect(steps[1].ready!({} as any)).toBe(false);
+ calendar=false;expect(steps[1].ready!({} as any)).toBe(true);
+});

@@ -38,28 +38,29 @@ export const tourSteps:Step[]=[
  {title:'Personalize Journas',text:'Open Settings to finish the tour with your preferences.',target:'.home-account [aria-label="Settings"]',done:c=>c.modal==='settings'},
  {title:'Choose your preferences',text:'Choose a theme and accent, map starting view, clock and retention preferences. By default, trip dates use the lodging location and time zone; dates outside the trip use your current location and local time. Account settings manages your sign-in methods. Save changes if you adjust anything. To restart, open Settings and choose Guided tour at the bottom.',target:'.settings-modal'},
 ];
+function editingTourFields(selector:string){return Boolean(document.activeElement?.closest(selector)||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])'));}
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
-  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. The guide continues as soon as the name is valid.'},
-  {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars. The guide continues after you choose valid dates.'},
+  {title:'Trip name',ready:()=>!editingTourFields('.trip-modal [name=name]')&&Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. Finish entering the name, then leave the field to continue.'},
+  {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{if(editingTourFields('.trip-modal .date-field'))return false;const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars. Finish both dates, then leave the date fields to continue.'},
   {title:'Choose a trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol, then select an icon or emoji from the grid. You can search above the grid. The selected symbol becomes your trip logo.',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
   {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
   {title:'Choose lodging',ready:c=>c.lodgingChosen,completeWhenReady:true,text:'Select a lodging location from search results or click the map. That completes this step. The suggested name, color and symbol can stay as they are; changing them is optional.'},
   {title:'Create the trip',text:'Press Create trip at the bottom of this window. If it is disabled, check that you chose a lodging location (and uploaded an image if you selected Image).'},
  ],
  'Find and customize a place':[
-  {title:'Position and name',ready:c=>Boolean(c.draft?.title?.trim()),text:'Keep the suggested Place name, or change it if you want. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
+  {title:'Position and name',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'Keep the suggested Place name, or change it if you want. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
   {title:'Note and appearance',text:'Place note, Color and Symbol are optional. Keep the suggested appearance, or customize it. The guide continues after a short pause; editing gives you more time.'},
   {title:'Save the place',text:'Press Create pin at the bottom. This saves a place on the map, rather than a home-page shortcut.'},
  ],
  'Link your schedule to a place':[
   {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place or connection"] [role="option"]',ready:c=>Boolean(c.draft?.pinId||c.draft?.connectionId),text:'Open Linked place or connection below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
-  {title:'Choose dates',ready:c=>{const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Keep the suggested Start date and End date, or choose dates with the fields or calendars. Keep the same day for one activity, or choose a later End date to span days.'},
-  {title:'Set the time',ready:c=>{const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Keep the suggested times, or edit Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
+  {title:'Choose dates',ready:c=>{if(editingTourFields('.item-modal .date-field'))return false;const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Keep the suggested Start date and End date, or choose dates with the fields or calendars. Keep the same day for one activity, or choose a later End date to span days.'},
+  {title:'Set the time',ready:c=>{if(editingTourFields('.item-modal .time-field'))return false;const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Keep the suggested times, or edit Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
   {title:'Details and save',text:'Edit Title, Details, Color or Symbol if needed, then press Create time block at the bottom. The same block appears on each included day, clipped to that day; editing any part updates the shared block.'},
  ],
  'Connect a task to the plan':[
-  {title:'Write the task',ready:c=>Boolean(c.draft?.title?.trim()),text:'In Task at the top, enter a short action such as Buy tickets. You will choose its place and activity links in the next step.'},
+  {title:'Write the task',ready:c=>!editingTourFields('.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])')&&Boolean(c.draft?.title?.trim()),text:'In Task at the top, enter a short action such as Buy tickets. You will choose its place and activity links in the next step.'},
   {title:'Link and save',text:'Open Linked place or connection and choose your saved place. In Linked time, choose the activity you created. Press Create task at the bottom; both links are optional in everyday use.'},
  ],
  'Add another place':[
@@ -134,7 +135,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  const advanceStage=()=>{setPart(0);setSkipped([]);setActed([]);if(step===tourSteps.length-1){remember(userId);setStatus('complete');}else setStep(value=>value+1);};
  const next=()=>{if(current.instructions&&part<current.instructions.length-1)setPart(value=>value+1);else advanceStage();};
  // DOM state is used only for explicitly named picker steps, never to choose an arbitrary popup.
- useEffect(()=>{if(status!=='running')return;let frame=0;const changed=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh(value=>value+1);});};const observer=new MutationObserver(changed);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["inert","aria-hidden"]});document.addEventListener('input',changed);document.addEventListener('change',changed);return()=>{observer.disconnect();document.removeEventListener('input',changed);document.removeEventListener('change',changed);cancelAnimationFrame(frame);};},[status]);
+ useEffect(()=>{if(status!=='running')return;let frame=0;const changed=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh(value=>value+1);});};const observer=new MutationObserver(changed);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["inert","aria-hidden"]});document.addEventListener('input',changed);document.addEventListener('change',changed);document.addEventListener('focusin',changed);document.addEventListener('focusout',changed);return()=>{observer.disconnect();document.removeEventListener('input',changed);document.removeEventListener('change',changed);document.removeEventListener('focusin',changed);document.removeEventListener('focusout',changed);cancelAnimationFrame(frame);};},[status]);
  // A form must stay open until its final instruction, even if Save is pressed early.
  useEffect(()=>{
   if(status!=='running'||!current.instructions||part===current.instructions.length-1)return;
@@ -164,7 +165,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
   const schedule=(delay=autoDelay)=>{window.clearTimeout(timer);timer=window.setTimeout(()=>{
    if(!live)return;
    const selector=typeof current.target==='function'?current.target(latest.current.context):current.target;
-   if(held||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])')||!findTourTarget(selector)){schedule(250);return;}
+   if(held||editingTourFields(`${selector} input, ${selector} textarea, ${selector} [contenteditable=true]`)||!findTourTarget(selector)){schedule(250);return;}
    const state=latest.current;
    if(tourSubstepDelay(instruction,part,current.instructions!.length,state.acted,state.context)!==null)next();
   },delay);};

@@ -1,7 +1,10 @@
-import {describe,it,expect,vi} from 'vitest';
+import {describe,it,expect,vi,beforeEach,afterEach} from 'vitest';
 vi.mock('../src/firebase',()=>({api:vi.fn()}));
 import {tourSteps} from '../src/GuidedTour';
 import {tourShieldPath,tourNeedsNext,tourInstructionComplete,tourSubstepDelay} from '../src/tour-progress';
+
+beforeEach(()=>vi.stubGlobal('document',{activeElement:null,querySelector:()=>null}));
+afterEach(()=>vi.unstubAllGlobals());
 
 describe('guide progression',()=>{
  const part=(stage:string,title:string)=>tourSteps.find(s=>s.title===stage)!.instructions!.find(p=>p.title===title)!;
@@ -47,4 +50,21 @@ describe('automatic substeps',()=>{
  it('never shows Next between substeps anywhere in the catalog',()=>{for(const step of tourSteps)for(let index=0;index<(step.instructions?.length??0)-1;index++)expect(tourNeedsNext(step,step.instructions![index],index)).toBe(false);});
  it('waits for required valid input and an explicit trip date choice',()=>{const p={text:'Dates',ready:(c:{valid:boolean})=>c.valid,action:'.date-field'};expect(tourSubstepDelay(p,0,2,[],{valid:true})).toBeNull();expect(tourSubstepDelay(p,0,2,[0],{valid:false})).toBeNull();expect(tourSubstepDelay(p,0,2,[0],{valid:true})).toBe(0);});
  it('provides reading time for optional explanations without auto-exiting a main stage',()=>{const p={text:'Read the optional appearance settings.'};expect(tourSubstepDelay(p,0,2,[],{})).toBeGreaterThanOrEqual(4000);expect(tourSubstepDelay(p,1,2,[],{})).toBeNull();});
+});
+
+
+describe('finishing the entire field group',()=>{
+ it.each([
+  ['Make the trip yours','Trip name',{},'.trip-modal [name=name]'],
+  ['Make the trip yours','Trip dates',{},'.trip-modal .date-field'],
+  ['Find and customize a place','Position and name',{draft:{title:'Museum'}},'.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])'],
+  ['Connect a task to the plan','Write the task',{draft:{title:'Buy tickets'}},'.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])'],
+  ['Link your schedule to a place','Choose dates',{date:'2026-10-23',draft:{}},'.item-modal .date-field'],
+  ['Link your schedule to a place','Set the time',{date:'2026-10-23',draft:{start:'09:00',end:'10:00'}},'.item-modal .time-field'],
+ ])('keeps %s / %s active throughout editing', (stage,title,context,selector)=>{
+  const instruction=tourSteps.find(s=>s.title===stage)!.instructions!.find(p=>p.title===title)!;
+  const doc={activeElement:{closest:(s:string)=>s===selector?{}:null},querySelector:(s:string)=>s==='.trip-modal [name=name]'?{value:'Paris weekend'}:s==='.trip-modal form'?{querySelector:()=>({value:'2026-10-23'})}:null};
+  vi.stubGlobal('document',doc);expect(instruction.ready!(context as any)).toBe(false);
+  doc.activeElement.closest=()=>null;expect(instruction.ready!(context as any)).toBe(true);
+ });
 });

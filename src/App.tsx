@@ -450,7 +450,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
   useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings,user.uid);},[ready,user?.uid,practice,settings.theme,settings.accent]);
-  const settingsRef=useRef(settings);settingsRef.current=settings;
+  const settingsRef=useRef(settings);settingsRef.current=settings;
+  const savedAccountName=useRef<string|undefined>(undefined);
   const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
@@ -623,6 +624,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         releaseInitialProfile(user.uid);
         const list=result.trips,r={settings:result.settings};
         setTourSeen(result.tourSeen);
+        savedAccountName.current=(result.settings.displayName??"").trim();
         setChooseName(!practice&&!result.settings.displayName?.trim());
         setTrips(list);
         const restoredHome=availableHome(result.home??emptyHome(),list);
@@ -1192,10 +1194,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   const [accountNameValid,setAccountNameValid]=useState(true);
   async function saveSettings(next: Settings) {
-    if(!practice&&!accountNameValid){setMessage("Choose an available account name before saving.");return false;}
+    if(!practice&&(next.displayName??"").trim()!==savedAccountName.current&&!accountNameValid){setMessage("Choose an available account name before saving.");return false;}
     try {
       const savedTrip=tripRef.current?.id,savedDate=dateRef.current,savedView=layoutRef.current;
-      await api("settings.save", { settings: next });
+      await api("settings.save", { settings: next });
+      savedAccountName.current=(next.displayName??"").trim();
 
       const view=await startingLayout(next,lodgingForDate(trip,date));
       if(settingsRef.current===next&&tripRef.current?.id===savedTrip&&dateRef.current===savedDate&&layoutRef.current===savedView)changeLayout({center:view.center,zoom:view.zoom});
@@ -1226,7 +1229,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
   if(user&&verified===null&&!hasOpenedWorkspace())return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
-  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
+  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
@@ -2293,7 +2296,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           >
             <div className="settings-account">
             <div className="settings-identity">
-            <AccountNameField value={settings.displayName??""} onChange={displayName=>setSettings({...settings,displayName})} onValidity={setAccountNameValid} check={!practice} disabled={practice}/>
+            <AccountNameField value={settings.displayName??""} onChange={displayName=>setSettings({...settings,displayName})} onValidity={setAccountNameValid} check={!practice&&(settings.displayName??"").trim()!==savedAccountName.current} disabled={practice}/>
 
             <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
@@ -2397,7 +2400,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Automatic removal affects your account only. Other travelers keep
               their copy of the shared trip.
             </p>
-            <button className="button primary full" disabled={!user||(!practice&&!accountNameValid)}>
+            <button className="button primary full" disabled={!user||(!practice&&(settings.displayName??"").trim()!==savedAccountName.current&&!accountNameValid)}>
               Save preferences
             </button>
             <div className="settings-footer">

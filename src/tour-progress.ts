@@ -15,3 +15,11 @@ export function tourShieldPath(width:number,height:number,openings:TourRect[]){
  }
  return path;
 }
+
+export function tourNeedsNext(stage:{done?:unknown;instructions?:unknown[]},instruction:{done?:unknown;completeOn?:string;closeOnNext?:string}|undefined,index:number){
+ return Boolean(instruction?.closeOnNext||(!instruction?.done&&!instruction?.completeOn&&(!stage.done||Boolean(stage.instructions&&index<stage.instructions.length-1))));
+}
+export function tourInstructionComplete<T>(instruction:{ready?:(context:T)=>boolean;action?:string;completeOn?:string;completeWhenReady?:boolean},index:number,part:number,acted:number[],context:T){
+ const ready=instruction.ready?.(context);
+ return ready!==false&&(index<part||acted.includes(index)||Boolean(ready)&&(Boolean(instruction.completeWhenReady)||index===part&&!instruction.action&&!instruction.completeOn));
+}

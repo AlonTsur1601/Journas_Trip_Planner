@@ -1,3 +1,4 @@
+import {tourNeedsNext,tourInstructionComplete} from './tour-progress';
 import {findTourTarget,observeTourTarget} from './tour-target';
 import {tourCardPosition,tourCardWidth} from './tour-layout';
 import {tourSpotlight} from './tour-spotlight';
@@ -9,7 +10,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Compass,X} from 'lucide-react';
 export type TourContext={draft:Record<string,any>|null;lodgingChosen:boolean;mapStart:string;home:boolean;modal:string|null;editKind:string|null;editId:string|null;tripId:string|null;trips:number;pins:number;blocks:number;tasks:number;checkedTasks:number;connections:number;homePins:number;checklist:boolean;date:string};
-type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean;action?:string};
+type Instruction={title:string;text:string;target?:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;skipWhen?:(context:TourContext)=>boolean;completeOn?:string;closeOnNext?:string;ready?:(context:TourContext)=>boolean;action?:string;completeWhenReady?:boolean};
 type Step={title:string;text:string;target:string|((context:TourContext)=>string);done?:(context:TourContext)=>boolean;instructions?:Instruction[]};
 export const tourSteps:Step[]=[
  {title:'Start a simple trip',text:'Choose Create new trip. We will build a short itinerary together, using your own places and dates.',target:'.home-create',done:c=>c.modal==='new-trip'},
@@ -43,18 +44,18 @@ const instructions:Record<string,Instruction[]>={
   {title:'Choose the trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol to open the icon and emoji grid, where you will choose the logo for this trip.',target:'.trip-appearance-options [aria-label="Choose symbol"]',done:()=>Boolean(document.querySelector('.symbol-menu[data-symbol-context="trip"]:not([inert])'))},
   {title:'Pick a symbol',text:'Select an icon from the grid, use the search above it, or switch to Emoji. Your selection becomes the trip logo and closes the picker.',target:'.symbol-menu',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
   {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
-  {title:'Choose lodging',ready:c=>c.lodgingChosen,text:'Under Lodging location, search an address and select a result, or click the map. You can then edit the lodging pin name, color and symbol below the map.'},
+  {title:'Choose lodging',ready:c=>c.lodgingChosen,completeWhenReady:true,text:'Select a lodging location from search results or click the map. That completes this step. The suggested name, color and symbol can stay as they are; changing them is optional.'},
   {title:'Create the trip',text:'Press Create trip at the bottom of this window. If it is disabled, check that you chose a lodging location (and uploaded an image if you selected Image).'},
  ],
  'Find and customize a place':[
-  {title:'Position and name',ready:c=>Boolean(c.draft?.title?.trim()),text:'Edit Place name at the top. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
-  {title:'Note and appearance',text:'Write a reminder in Place note. Below it, choose a Color swatch and open Choose symbol to select an icon or emoji.'},
+  {title:'Position and name',ready:c=>Boolean(c.draft?.title?.trim()),text:'Keep the suggested Place name, or change it if you want. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
+  {title:'Note and appearance',text:'Place note, Color and Symbol are optional. Keep the suggested appearance, or customize it, then press Next step.'},
   {title:'Save the place',text:'Press Create pin at the bottom. This saves a place on the map, rather than a home-page shortcut.'},
  ],
  'Link your schedule to a place':[
   {title:'Link a place',completeOn:'.dropdown-menu[aria-label="Linked place or connection"] [role="option"]',ready:c=>Boolean(c.draft?.pinId||c.draft?.connectionId),text:'Open Linked place or connection below the date and time fields and choose the place you just saved. Its name, note, color and symbol fill the block; anything you customize yourself is kept when changing the linked place.'},
-  {title:'Choose dates',action:'.item-modal .date-field',ready:c=>{const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Under Start date and End date, type a date or use each calendar button. Keep the same day for one activity, or choose a later End date to span days.'},
-  {title:'Set the time',action:'.item-modal .field:has(.segmented-time)',ready:c=>{const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Type hours and minutes in Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
+  {title:'Choose dates',ready:c=>{const start=c.draft?.startDate??c.date,end=c.draft?.endDate??start;return Boolean(start&&end&&end>=start);},text:'Keep the suggested Start date and End date, or choose dates with the fields or calendars. Keep the same day for one activity, or choose a later End date to span days.'},
+  {title:'Set the time',ready:c=>{const start=c.draft?.start,end=c.draft?.end,startDate=c.draft?.startDate??c.date,endDate=c.draft?.endDate??startDate;return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start??'')&&/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(end??'')&&(endDate>startDate||endDate===startDate&&end>start);},text:'Keep the suggested times, or edit Starts at and Ends at. Or press the clock beside either field, scroll the Hours and Minutes wheels, then press Done. For an overnight activity, choose the following End date; 24:00 ends at midnight.'},
   {title:'Details and save',text:'Edit Title, Details, Color or Symbol if needed, then press Create time block at the bottom. The same block appears on each included day, clipped to that day; editing any part updates the shared block.'},
  ],
  'Connect a task to the plan':[
@@ -70,7 +71,7 @@ const instructions:Record<string,Instruction[]>={
   {title:'Edit places and routes',closeOnNext:'.modal:not([inert]) > header [aria-label="Close"]',text:'Click a marker to edit its place or use Delete to remove it. Connections lets you edit or delete routes. Next step closes any open editor before continuing; hiding and reopening the map keeps its view.'},
  ],
  'Navigate the trip dates':[
-  {title:'Open the calendar',text:'Press the date in the top bar to open its calendar. Select a day, or close it and use the arrows beside the date. Dots mark dates belonging to trips; the legend scrolls if it has many trips.'},
+  {title:'Open the calendar',done:()=>Boolean(document.querySelector('.calendar-popover:not([inert])')),text:'Press the date in the top bar to open its calendar. Select a day, or close it and use the arrows beside the date. Dots mark dates belonging to trips; the legend scrolls if it has many trips.'},
   {title:'Check an overnight activity',text:'Move to another day covered by your block. The schedule runs from midnight to midnight and shows only that day’s portion. Click a block to edit it, or drag it to adjust its time; linked parts stay synchronized.'},
  ],
  'Arrange your workspace':[
@@ -79,7 +80,7 @@ const instructions:Record<string,Instruction[]>={
  ],
  'Undo, redo and save':[
   {title:'Undo and redo',text:'Use Undo and Redo in the top bar to reverse or restore recent edits. Keyboard shortcuts are Ctrl+Z and Ctrl+Shift+Z.'},
-  {title:'Save without waiting',text:'Press Save planning in the top bar, or Ctrl+S. Its dot turns amber during saving, and the small status at the bottom shows background work. You can keep planning while it saves.'},
+  {title:'Save without waiting',completeOn:'[aria-label="Save planning"]',text:'Press Save planning in the top bar to continue. Outside the guide, Ctrl+S does the same. Its dot turns amber during saving, and the small status at the bottom shows background work. You can keep planning while it saves.'},
  ],
  'Share and collaborate':[
   {title:'Trip settings',text:'In Trip details, use Edit trip dates and lodging to change its name, dates, appearance or lodging. Return to Trip details after reviewing the editor.'},
@@ -189,11 +190,11 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
    <button className="icon tour-close" aria-label="Close guide" onClick={close}><X size={18}/></button>
    <div className="tour-eyebrow"><Compass size={17}/>{welcome?'Welcome to Journas':complete?'Tour complete':`Step ${step+1} of ${tourSteps.length}`}</div>
    <h2>{welcome?'Plan your first trip together':complete?'You’re ready to plan your next trip!':current.title}</h2>
-   {!intro&&current.instructions&&<ol className="tour-substeps" aria-label="Steps in this window">{current.instructions.map((item,index)=>{const complete=!skipped.includes(index)&&((index<part||acted.includes(index)||index===part&&Boolean(item.ready?.(context))&&!item.action&&!item.completeOn)&&(!item.ready||item.ready(context)));return <li key={item.title} className={[index===part?'current':'',skipped.includes(index)?'skipped':complete?'complete':''].filter(Boolean).join(' ')} aria-current={index===part?'step':undefined}>{complete||skipped.includes(index)?<span aria-label={skipped.includes(index)?'Skipped':'Completed'}>{skipped.includes(index)?'–':'✓'}</span>:<span>{index+1}</span>}<span className="tour-substep-label" data-label={item.title}><span>{item.title}</span></span></li>;})}</ol>}
+   {!intro&&current.instructions&&<ol className="tour-substeps" aria-label="Steps in this window">{current.instructions.map((item,index)=>{const complete=!skipped.includes(index)&&tourInstructionComplete(item,index,part,acted,context);return <li key={item.title} className={[index===part?'current':'',skipped.includes(index)?'skipped':complete?'complete':''].filter(Boolean).join(' ')} aria-current={index===part?'step':undefined}>{complete||skipped.includes(index)?<span aria-label={skipped.includes(index)?'Skipped':'Completed'}>{skipped.includes(index)?'–':'✓'}</span>:<span>{index+1}</span>}<span className="tour-substep-label" data-label={item.title}><span>{item.title}</span></span></li>;})}</ol>}
    <div className="tour-variants">{(intro?[undefined]:current.instructions??[undefined]).map((item,index)=>{const active=intro||!current.instructions||index===part;return <div key={index} className="tour-variant" data-active={active} aria-hidden={!active} inert={!active}>
     <p aria-live={active?'polite':undefined}>{welcome?'Follow the highlights to try the map, schedule, tasks and sharing tools. This practice trip is not saved to your profile. Restart anytime with Guided tour at the bottom of Settings.':complete?'You can now plan with trips, places, schedules, tasks, sharing, home shortcuts and settings. Your practice workspace will be discarded when you finish.':item?.text??current.text}</p>
     {!intro&&!box&&<small>Open the highlighted panel to continue.</small>}
-    <div className="tour-actions">{(intro||item?.closeOnNext||(!item?.done&&!item?.completeOn&&(!current.done||Boolean(current.instructions&&index<current.instructions.length-1))))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&((item?.ready&&!item.ready(context))||(item?.action&&!acted.includes(index))))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
+    <div className="tour-actions">{(intro||tourNeedsNext(current,item,index))&&<button className={intro?"button":"button primary"} disabled={!intro&&Boolean(active&&((item?.ready&&!item.ready(context))||(item?.action&&!acted.includes(index))))} onClick={()=>{if(item?.closeOnNext){document.querySelector<HTMLButtonElement>(item.closeOnNext)?.click();if(!current.done)next();return;}if(complete){close();return;}if(welcome){setStep(0);setPart(0);if(practice)setStatus('running');else{setStatus('closed');window.dispatchEvent(new CustomEvent('journas-practice',{detail:true}));}}else next();}}>{welcome?'Start guide':complete?'Finish tour':step===tourSteps.length-1&&(!current.instructions||index===current.instructions.length-1)?'Finish tour':'Next step'}<ArrowRight size={15}/></button>}</div>
    </div>;})}</div>
   </section></MotionSurface>
  </div>,document.body);

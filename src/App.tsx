@@ -1,3 +1,4 @@
+import {userErrorMessage} from "./user-error";
 import type {Connection} from "./types";
 import type {CSSProperties} from "react";
 import {ConnectionDetails} from "./ConnectionDetails";
@@ -189,7 +190,7 @@ function EmailVerification({user,onVerified,onLogout}:{user:User;onVerified:()=>
     if(sending.current)return;sending.current=true;setBusy(true);setNotice("Sending verification email…");
     sessionStorage.setItem(`journas-verification-sent:${user.uid}`,String(Date.now()));setResendWait(30);
     try{const plainText=new URLSearchParams(window.location.search).get("email-format")==="text";await api("auth.email-verification",{returnClientId:await verificationReturnClient(),...(plainText?{format:"text"}:{})});setNotice(plainText?"Plain-text verification email sent. Check your inbox and spam folder.":"Verification email sent. Check your inbox and spam folder.");}
-    catch(e:any){if(e.code==='EMAIL_RATE_LIMIT'){const wait=Math.min(3600,Math.max(1,Number(e.details?.retryAfter)||30));sessionStorage.setItem(`journas-verification-sent:${user.uid}`,String(Date.now()-(30-wait)*1000));setResendWait(wait);}else{sessionStorage.removeItem(`journas-verification-sent:${user.uid}`);setResendWait(0);}setNotice(e.code==='EMAIL_RATE_LIMIT'?'Please wait before sending another verification email.':e.code==='auth/too-many-requests'?"Firebase temporarily limited email requests. Please wait before trying again.":e.code==='auth/network-request-failed'?"The email request could not reach Firebase. Check your connection and try again.":`Unable to send verification email (${e.code??'unknown error'}). Please try again.`);}
+    catch(e:any){if(e.code==='EMAIL_RATE_LIMIT'){const wait=Math.min(3600,Math.max(1,Number(e.details?.retryAfter)||30));sessionStorage.setItem(`journas-verification-sent:${user.uid}`,String(Date.now()-(30-wait)*1000));setResendWait(wait);}else{sessionStorage.removeItem(`journas-verification-sent:${user.uid}`);setResendWait(0);}setNotice(e.code==='EMAIL_RATE_LIMIT'?'Please wait before sending another verification email.':e.code==='auth/too-many-requests'?"Too many email requests. Please wait a few minutes and try again.":e.code==='auth/network-request-failed'?"We couldn’t send the email. Check your connection and try again.":userErrorMessage(e,"We couldn’t send the verification email. Please try again."));}
     finally{sending.current=false;setBusy(false);}
   }
   useEffect(()=>{const sent=Number(sessionStorage.getItem(`journas-verification-sent:${user.uid}`));if(sent&&Date.now()-sent<30000)setNotice("A verification email was recently sent. Check your inbox and spam folder.");else void send();},[user.uid]);
@@ -230,7 +231,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
     try {
       await fn();
     } catch (e: any) {
-      onError(e.message);
+      onError(userErrorMessage(e));
     } finally {
       finish();
       setBusy(false);

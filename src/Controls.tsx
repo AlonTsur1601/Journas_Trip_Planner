@@ -1,3 +1,4 @@
+import {userErrorMessage} from "./user-error";
 import {isBlackAccent} from './appearance-cache';
 import {createPortal} from 'react-dom';
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
@@ -79,6 +80,6 @@ export function Toast({ message }: { message: string; onDismiss: () => void }) {
   }, [message]);
   if (!displayed) return null;
   return createPortal(<div className={`toast${leaving ? " leaving" : ""}`} role="status">
-    {displayed}
+    {userErrorMessage(displayed)}
   </div>,document.body);
 }

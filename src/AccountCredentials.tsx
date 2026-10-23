@@ -1,3 +1,4 @@
+import {userErrorMessage} from "./user-error";
 import {PasswordField} from './PasswordField';
 import {useEffect,useState} from 'react';
 import {beginActivity} from './activity';
@@ -14,7 +15,7 @@ export function AccountCredentials({user,onMessage,onChanged}: {user:User;onMess
  const providers=user.providerData.map(p=>p.providerId);
  const password=providers.includes('password'),google=providers.includes('google.com');
  const canDisconnect=password&&google;
- const error=(e:any)=>onMessage(e.code==='auth/credential-already-in-use'||e.code==='auth/email-already-in-use'?'This sign-in method belongs to another account. Sign in to that account instead.':e.code==='auth/invalid-credential'?'The current password is incorrect.':e.code==='auth/popup-closed-by-user'?'Google sign-in was closed.':e.message);
+ const error=(e:any)=>onMessage(e.code==='auth/credential-already-in-use'||e.code==='auth/email-already-in-use'?'This sign-in method belongs to another account. Sign in to that account instead.':e.code==='auth/invalid-credential'?'The current password is incorrect.':e.code==='auth/popup-closed-by-user'?'Google sign-in was closed.':userErrorMessage(e));
  async function submit(e:React.FormEvent<HTMLFormElement>){
   e.preventDefault();if(busy)return;const form=new FormData(e.currentTarget);if(mode!=='email'&&String(form.get('newPassword')??'').length<6){onMessage('Use at least 6 characters for your password.');return;}if(mode!=='email'&&form.get('newPassword')!==form.get('confirmPassword')){onMessage('Passwords do not match.');return;}setBusy(true);
   try{

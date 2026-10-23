@@ -2284,7 +2284,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={async () => {if(await saveSettings(settingsRef.current))setModal(null);}}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => {setModal(null);void saveSettings(settingsRef.current);}}>
           <form
             onSubmit={(e) => {
               e.preventDefault();

@@ -2568,3 +2568,12 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 @media(max-width:700px){
  .workspace[data-map="true"][data-timeline="true"]{grid-template-rows:var(--workspace-split) 12px minmax(0,1fr);}
 }
+
+/* Keep both symbol lists equally tall; emoji categories add only their own row. */
+.symbol-menu .symbol-scroll{flex:none;height:190px;min-height:68px;max-height:calc(100dvh - 216px);}
+.bounded-popover.symbol-menu{height:auto;}
+.tour-actions:empty{display:none;}
+.tour-variant>p{margin-bottom:0;}
+.tour-variant>.tour-actions:not(:empty){margin-top:14px;}
+
+.tour-variant[data-active="false"] .tour-actions{display:none;}

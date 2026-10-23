@@ -12,7 +12,7 @@ export class PracticeStore implements Store {
 }
 export async function practiceExecute(uid:string,input:Data){
  const action=String(input.action);
- if(!/^(planner\.restore|trip\.(create|update|get|list|remove|members)|item\.(patch|delete)|home\.save|settings\.(get|save)|profile\.save|layout\.save|history\.(status|undo|redo))$/.test(action))throw new ApiError(400,'PRACTICE_ONLY','Sharing and account changes are unavailable during the guided tutorial.');
+ if(!/^(planner\.restore|trip\.(create|update|get|list|remove|members)|item\.(patch|delete|copy-pin)|home\.save|settings\.(get|save)|profile\.save|layout\.save|history\.(status|undo|redo))$/.test(action))throw new ApiError(400,'PRACTICE_ONLY','Sharing and account changes are unavailable during the guided tutorial.');
  const store=new PracticeStore(input.practiceDocuments);const {practiceDocuments,...request}=input;
  const result=await new JournasService(store).execute(uid,request);
  return {practiceResult:result,practiceDocuments:[...store.docs]};

@@ -1,3 +1,9 @@
+import {AsyncButton} from './AsyncButton';
+import {optimisticTaskList} from './optimistic-tasks';
+import {LoadingSpinner} from './LoadingScreen';
+import {useLiveLocation} from './live-location';
+import {nearbyActivities,nearbyTasks} from './nearby-activity';
+import {canPasteCopiedPin,type CopiedPin} from './pin-clipboard';
 import {userErrorMessage} from "./user-error";
 import type {Connection} from "./types";
 import type {CSSProperties} from "react";
@@ -9,7 +15,7 @@ import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appear
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
-import { Activity, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Activity, memo, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
 
   GoogleAuthProvider,
@@ -160,16 +166,16 @@ function Modal({ title, children, onClose, inactive=false, locked=false }: any) 
     >
       <section
         ref={box}
-        className={`modal${title === "Your preferences" ? " settings-modal" : /pin|place|time block/i.test(title) ? " item-modal" : /^(Create|Edit) trip$/.test(title) ? " trip-modal" : /task/i.test(title) ? " task-modal" : title === "Trip details" ? " share-modal" : title === "Confirm deletion" ? " confirm-modal" : ""}`}
+        className={`modal${title === "Your preferences" ? " settings-modal" : title === "Places" ? " places-modal" : /pin|place|time block/i.test(title) ? " item-modal" : /^(Create|Edit) trip$/.test(title) ? " trip-modal" : /task/i.test(title) ? " task-modal" : title === "Trip details" ? " share-modal" : title === "Confirm deletion" ? " confirm-modal" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <header>
           <h2>{title}</h2>
-          {!locked && <button className="icon" onClick={onClose} aria-label="Close">
+          {!locked && <AsyncButton className="icon" onClick={onClose} aria-label="Close">
             <X size={20} />
-          </button>}
+          </AsyncButton>}
         </header>
         {children}
       </section>
@@ -205,8 +211,8 @@ function EmailVerification({user,onVerified,onLogout}:{user:User;onVerified:()=>
     <p>Verify <strong>{user.email}</strong> before continuing to Journas.</p>
     <p>We are asking everyone to confirm their email once more. After confirmation, you will not be asked again for this check.</p><p>Open your inbox and click the verification link. Check your spam folder if the email is missing.</p>
     <p role="status" aria-live="polite">{notice}</p>
-    <div className="email-verification-actions"><button className="button primary" disabled={busy||resendWait>0} onClick={()=>void send()}>{resendWait>0?`Resend email (${resendWait}s)`:"Resend email"}</button>
-    <button className="button" disabled={busy} onClick={()=>void onLogout()}>Back</button></div>
+    <div className="email-verification-actions"><AsyncButton className="button primary" disabled={busy||resendWait>0} onClick={send}>{resendWait>0?`Resend email (${resendWait}s)`:"Resend email"}</AsyncButton>
+    <AsyncButton className="button" disabled={busy} onClick={onLogout}>Back</AsyncButton></div>
   </Modal></main>;
 }
 function TripFeatures({ className = "" }: { className?: string }) {
@@ -219,7 +225,7 @@ function TripFeatures({ className = "" }: { className?: string }) {
   );
 }
 
-function AuthScreen({ onError }: { onError: (s: string) => void }) {
+const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) => void }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [confirmPassword, setConfirmPassword] = useState(""),
@@ -284,7 +290,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
           </div>
         ) : (
           <>
-            <button
+            <AsyncButton
               className="google button"
               disabled={busy}
               onClick={() =>
@@ -292,9 +298,9 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
               }
             >
               <img className="google-logo" src="/google-logo.svg" alt="" width="20" height="20" /> Continue with Google
-            </button>
+            </AsyncButton>
             <div className="divider">or continue with email</div>
-            <form
+            <form name="journas-auth" autoComplete="on"
               onSubmit={(e) => {
                 e.preventDefault();
                 run(async () => {
@@ -316,12 +322,13 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 label="Email address"
                 type="email"
                 required
-                autoComplete="email"
+                name="email"
+                autoComplete={register?"email":"username"}
                 value={email}
                 onChange={(e: any) => setEmail(e.target.value)}
               />
               <PasswordField
-                label="Password"
+                label="Password" name="password"
                 required
                 minLength={6}
                 autoComplete={register ? "new-password" : "current-password"}
@@ -329,38 +336,38 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
                 onChange={(e: any) => setPassword(e.target.value)}
               />
               {register && <PasswordField label="Confirm password" required minLength={6} autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} />}
-              <button className="button primary full" disabled={busy}>
+              <AsyncButton pending={busy} className="button primary full" disabled={busy}>
                 {busy
                   ? "Please wait…"
                   : register
                     ? "Create account"
                     : "Sign in"}
                 <ArrowUpRight size={17} />
-              </button>
+              </AsyncButton>
             </form>
-            <button
+            <AsyncButton
               className="text-button"
               onClick={() => {
                 if (!email) {
                   onError("Enter your email address first.");
                   return;
                 }
-                run(async () => {
+                return run(async () => {
                   await api('auth.password-reset',{email});
                   onError("Password reset email sent.");
                 },'Sending your password reset email…');
               }}
             >
               Forgot password?
-            </button>
+            </AsyncButton>
             <p className="auth-switch auth-signup-prompt">
               {register ? "Already have an account?" : "New to Journas?"}{" "}
-              <button
+              <AsyncButton
                 className="button primary"
                 onClick={() => setRegister(!register)}
               >
                 {register ? "Sign in" : "Create an account"}
-              </button>
+              </AsyncButton>
             </p>
           </>
         )}
@@ -368,7 +375,7 @@ function AuthScreen({ onError }: { onError: (s: string) => void }) {
       </section>
     </main>
   );
-}
+});
 export default function App(){
  const [practice,setPracticeMode]=useState(practiceActive());
  const verification=useSessionVerification();
@@ -437,7 +444,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [lodgingView,setLodgingView]=useState(defaultLayout());
   const [profileOpen,setProfileOpen]=useState(false);const profileAnchor=useRef<HTMLDivElement>(null);
   const [ambiguousTime,setAmbiguousTime]=useState(false);
+  const [copiedPin,setCopiedPin]=useState<CopiedPin|null>(null);
+  const [pastingPin,setPastingPin]=useState(false);
+  const pinPasteBusy=useRef(false);
+  const liveLocation=useLiveLocation(ready&&(!home||shareTrip)&&!practice);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
+  const [pendingDayNavigation,setPendingDayNavigation]=useState<{tripId:string;date:string;direction:'next'|'previous'}|null>(null);
+  const finishDayNavigation=(tripId:string,loadedDate:string)=>setPendingDayNavigation(previous=>previous?.tripId===tripId&&previous.date===loadedDate?null:previous);
+  useEffect(()=>{if(home||!trip||(!user&&!shareTrip)||date<trip.startDate||date>trip.endDate)setPendingDayNavigation(null);},[home,trip?.id,trip?.startDate,trip?.endDate,date,user?.uid,shareTrip]);
   const [taskPage,setTaskPage]=useState(0);
   const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:57);
   const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
@@ -453,7 +467,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings,user.uid);},[ready,user?.uid,practice,settings.theme,settings.accent]);
   const settingsRef=useRef(settings);settingsRef.current=settings;
   const savedAccountName=useRef<string|undefined>(undefined);
-  const [settingsMapView,setSettingsMapView]=useState(defaultLayout());
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
 
@@ -567,6 +580,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const clean=availableHome(next,availableTrips),signature=JSON.stringify(clean);if(signature===homeLastQueued.current)return;setHomeState(clean);homeRef.current=clean;homeLastQueued.current=signature;
     if(!user)return;const uid=user.uid;
     homeWrites.current=homeWrites.current.catch(()=>{}).then(async()=>{if(auth?.currentUser?.uid===uid)await api('home.save',{home:clean});}).catch((e:any)=>{if(homeLastQueued.current===signature)homeLastQueued.current='';setMessage(e.message);});
+    return homeWrites.current;
   }
   useEffect(()=>{if(!ready||home||!user||shareTrip||!trip||date<trip.startDate||date>trip.endDate)return;const target={tripId:trip.id,date};setLastTarget(target);persistHome(recordVisit(homeRef.current,target));},[home,ready,user?.uid,trip?.id,date,trips.map(t=>t.id).join(',')]);
   function rememberDay(){
@@ -581,7 +595,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const key=selected?`${selected.id}:${nextDate}`:'',cached=dayCache.current.get(key);
     let local:Layout|null=null;try{local=selected?JSON.parse(localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`)??'null'):null;}catch{}
     const lodging=lodgingForDate(selected,nextDate);
-    const view=local??cached?.layout??{...defaultLayout(),...(settings.mapStart==='custom'?{center:settings.mapCenter,zoom:settings.mapZoom}:lodging?{center:[lodging.lng,lodging.lat] as [number,number],zoom:14}:{})};
+    const view=local??cached?.layout??{...defaultLayout(),...(lodging?{center:[lodging.lng,lodging.lat] as [number,number],zoom:14}:{})};
     initialTripRequest.current=cached&&selected?{tripId:selected.id,date:nextDate,promise:Promise.resolve({trip:selected,day:cached.day,layout:view})}:null;
     layoutLoading.current=true;setTrip(selected);setDate(nextDate);setLayout(view);setDay(cached?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
     if(!selected||nextDate<selected.startDate||nextDate>selected.endDate){layoutLoading.current=false;void startingLayout(settings,lodging).then(view=>{if(tripRef.current?.id===selected?.id&&dateRef.current===nextDate&&!dirty.current)setLayout(view);});}
@@ -637,7 +651,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
         if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${hasSaved?saved.date:today()}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
-        const preferences = { ...defaultSettings, ...r.settings,mapStart:r.settings.mapStart==="current"&&!r.settings.mapStartConfigured?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
+        const preferences = { ...defaultSettings, ...r.settings,mapStart:(r.settings.mapStart==="custom"||r.settings.mapStart==="current"&&!r.settings.mapStartConfigured)?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
@@ -696,16 +710,19 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         );
         const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
         if (cancelled) return;
-        setLayout({ ...defaultLayout(), ...nextLayout });
+        setLayout({ ...defaultLayout(), ...nextLayout });
+        finishDayNavigation(r.trip.id,date);
       })
       .catch((e) => {
         if (!cancelled) {
+          if(trip)finishDayNavigation(trip.id,date);
           setDay(emptyDay());
           setMessage(e.message);
         }
       });
     return () => {
-      cancelled = true;
+      cancelled = true;
+      if(trip)finishDayNavigation(trip.id,date);
     };
   }, [token, date, shareTrip, shareReady, joinedToken, user?.uid]);
   useEffect(() => {
@@ -739,6 +756,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         const layoutChanged=layoutRef.current!==layoutAtRequest;
         if(!layoutChanged)setLayout({ ...defaultLayout(), ...nextLayout });
         dirty.current = Boolean(local)||layoutChanged;
+        finishDayNavigation(trip.id,date);
         requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!cancelled)layoutLoading.current=false;}));
         const draft = localStorage.getItem(
           `journas-drafts:${user.uid}:${trip.id}:${date}`,
@@ -757,9 +775,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             scroller.current.scrollTop = nextLayout.scroll ?? 400;
         }, 0);
       })
-      .catch((e) => {layoutLoading.current=false;setMessage(e.message);});
+      .catch((e) => {if(cancelled)return;layoutLoading.current=false;finishDayNavigation(trip.id,date);setMessage(e.message);});
     let stop=()=>{},stopTrip=()=>{};
-    if(practice){const update=()=>{void api<{day:Day}>('trip.get',{tripId:trip.id,date}).then(result=>{if(!cancelled)setDay(result.day);});};window.addEventListener('journas-practice-updated',update);return()=>{cancelled=true;window.removeEventListener('journas-practice-updated',update);};}
+    if(practice){const update=()=>{void api<{day:Day}>('trip.get',{tripId:trip.id,date}).then(result=>{if(!cancelled)setDay(result.day);});};window.addEventListener('journas-practice-updated',update);return()=>{cancelled=true;finishDayNavigation(trip.id,date);window.removeEventListener('journas-practice-updated',update);};}
     void import('./live-database').then(({db,collection,doc,onSnapshot})=>{
       if(cancelled)return;
     stop = onSnapshot(
@@ -784,7 +802,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     const lostAccess = () => {
       if (cancelled) return;
-      cancelled = true;
+      cancelled = true;
+      finishDayNavigation(trip.id,date);
       setHome(true);
       setTrip(null);
       setDay(emptyDay());
@@ -819,7 +838,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     }).catch(()=>{if(!cancelled)setMessage('Live updates could not load. Please reconnect.');});
     return () => {
-      cancelled = true;
+      cancelled = true;
+      finishDayNavigation(trip.id,date);
       stop();
       stopTrip();
     };
@@ -950,6 +970,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   async function plannedInitialLayout(prefs:Settings,selected:Trip|null,nextDate:string){
     if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,lodgingForDate(selected,nextDate));
   }
+  function navigateDay(direction:'next'|'previous'){
+    const next=new Date(`${date}T12:00:00`);next.setDate(next.getDate()+(direction==='next'?1:-1));const value=next.toLocaleDateString('en-CA');
+    if(practice&&trip&&(value<trip.startDate||value>trip.endDate))return;
+    const within=Boolean(trip&&value>=trip.startDate&&value<=trip.endDate);
+    const cached=trip&&!shareTrip&&dayCache.current.has(`${trip.id}:${value}`);
+    setPendingDayNavigation(within&&(user||shareTrip)&&!cached?{tripId:trip!.id,date:value,direction}:null);
+    void switchDate(value);
+  }
   async function switchDate(value:string){
     if(practice&&trip&&(value<trip.startDate||value>trip.endDate))return;
     if(shareTrip&&trip){value=value<trip.startDate?trip.startDate:value>trip.endDate?trip.endDate:value;if(value===date)return;void saveLayout();setDate(value);setDay(emptyDay());setCalendar(false);return;}
@@ -1135,7 +1163,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const key=`journas-drafts:${user?.uid}:${tripId}:${dayDate}`;
     const drafts=JSON.parse(localStorage.getItem(key)??'{}');localStorage.setItem(key,JSON.stringify({...drafts,[task.id]:draft}));
     try{
-      const result=await api<{item:Day['tasks'][number]}>('item.patch',{tripId,date:dayDate,kind:'tasks',id:task.id,patch:{checked},baseVersions:task.versions});
+      const result=await api<{item:Day['tasks'][number]}>('item.patch',{tripId,date:dayDate,kind:'tasks',id:task.id,patch:{checked},baseVersions:task.versions},undefined,true);
       if(tripRef.current?.id===tripId&&dateRef.current===dayDate)setDay(previous=>({...previous,tasks:previous.tasks.map(t=>t.id===task.id?result.item:t)}));
       const pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[task.id];if(Object.keys(pending).length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);
       setTime(new Date());
@@ -1193,8 +1221,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     try{const pending=placementSaves.current.then(()=>api('settings.save',{settings:{[key]:value}}));placementSaves.current=pending.then(()=>{},()=>{});await pending;}catch(e:any){setSettings(current=>({...current,[key]:previous}));setMessage(e.message);}
   }
   const [accountNameValid,setAccountNameValid]=useState(true);
+  const [settingsSaving,setSettingsSaving]=useState(false);
   async function saveSettings(next: Settings) {
     if(!practice&&(next.displayName??"").trim()!==savedAccountName.current&&!accountNameValid){setMessage("Choose an available account name before saving.");return false;}
+    setSettingsSaving(true);
     try {
       const savedTrip=tripRef.current?.id,savedDate=dateRef.current,savedView=layoutRef.current;
       await api("settings.save", { settings: next });
@@ -1206,16 +1236,35 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       return true;
     } catch (e: any) {
       setMessage(e.message);return false;
-    }
+    }finally{setSettingsSaving(false);}
   }
+  const displayTasks=optimisticTaskList(day.tasks,optimisticTasks);
   const taskIsCurrent=(task:Day['tasks'][number])=>{
-    if(optimisticTasks[task.id]?.checked??task.checked)return false;const block=day.blocks.find(b=>b.id===task.blockId);if(!block)return false;
+    if(task.checked)return false;const block=day.blocks.find(b=>b.id===task.blockId);if(!block)return false;
 
     const range=blockRange(block,date);const minute=(value:string)=>{const [h,m]=value.split(':').map(Number);return h*60+m;};return date===displayedToday&&nowMinutes>=minute(range.start)&&nowMinutes<minute(range.end);
   };
+  const nearby=nearbyActivities(day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
+  const nearbyTodo=nearbyTasks(displayTasks,day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
+  const activePinIds=useMemo(()=>[...new Set([...nearby.pinIds,...nearbyTodo.pinIds])],[nearby.pinIds.join(','),nearbyTodo.pinIds.join(',')]);
+  const canPastePin=!readonly&&!practice&&!pastingPin&&canPasteCopiedPin(copiedPin,trip?.id,date,day.pins);
+  function copyPin(pin:Pin){
+    if(!trip||practice||pin.id==='trip-lodging')return;
+    setCopiedPin({sourceTripId:trip.id,sourceDate:date,sourceId:pin.id,origin:pin.copyOrigin??{tripId:trip.id,date,id:pin.id}});
+    setMessage('Place copied. Open another trip day and right-click the map to paste it.');
+  }
+  async function pastePin(){
+    if(!canPastePin||!copiedPin||!trip||pinPasteBusy.current)return;
+    const tripId=trip.id,targetDate=date;pinPasteBusy.current=true;setPastingPin(true);
+    const finish=beginActivity('Pasting your place…');
+    try{const result=await api<{item:Pin}>('item.copy-pin',{tripId,date:targetDate,sourceTripId:copiedPin.sourceTripId,sourceDate:copiedPin.sourceDate,sourceId:copiedPin.sourceId});
+      if(tripRef.current?.id===tripId&&dateRef.current===targetDate)setDay(current=>({...current,pins:[...current.pins.filter(pin=>pin.id!==result.item.id),result.item]}));
+      setMessage('Place pasted into this day.');
+    }catch(error:any){setMessage(error.message);}finally{pinPasteBusy.current=false;setPastingPin(false);finish();}
+  }
   const taskPageSize=Math.max(1,Math.floor(((innerWidth<=700?innerHeight-90:layout.todoHeight)-112)/52));
   const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
-  const visibleTasks=[...day.tasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
+  const visibleTasks=[...displayTasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
   if (!ready && !user && !hasOpenedWorkspace())
     return (
       <LoadingScreen startup text="Getting Journas ready…"/>
@@ -1256,7 +1305,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               </option>
             ))}
           </Dropdown> : <span className="no-trips">No trips created yet</span>}
-          <button
+          <AsyncButton
             className="icon"
             title="Create trip"
             aria-label="Create trip"
@@ -1264,25 +1313,21 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             disabled={practice || !user || trips.length >= 100}
           >
             <Plus size={18} />
-          </button>
+          </AsyncButton>
         </div>
         <div className="date-picker">
-          <button
+          <AsyncButton
             className="icon"
-            aria-label="Next day"
+            aria-label="Next day" pending={pendingDayNavigation?.direction==='next'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
             disabled={
               date >= maxDate() ||
               Boolean((shareTrip || practice) && trip && date >= trip.endDate)
             }
-            onClick={() => {
-              const d = new Date(`${date}T12:00:00`);
-              d.setDate(d.getDate() + 1);
-              switchDate(d.toLocaleDateString("en-CA"));
-            }}
+            onClick={()=>navigateDay('next')}
           >
             <ChevronLeft size={17} />
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             className="date-button" aria-expanded={calendar}
             onClick={() => {setMonth(date.slice(0,7));setCalendar(!calendar);}}
           >
@@ -1294,44 +1339,40 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 year: "numeric",
               })}
             </span>
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             className="icon"
-            aria-label="Previous day"
+            aria-label="Previous day" pending={pendingDayNavigation?.direction==='previous'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
             disabled={Boolean((shareTrip || practice) && trip && date <= trip.startDate)}
-            onClick={() => {
-              const d = new Date(`${date}T12:00:00`);
-              d.setDate(d.getDate() - 1);
-              switchDate(d.toLocaleDateString("en-CA"));
-            }}
+            onClick={()=>navigateDay('previous')}
           >
             <ChevronRight size={17} />
-          </button>
+          </AsyncButton>
         </div>
         <div className="top-actions">
           <div className="planning-history-actions">
-          <button className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
-          <button className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
+          <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
+          <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
           <div className="save-control">
           <span className={`save-indicator${manualSaving || pendingItems.length>0 || status.startsWith("Saving") ? " saving" : status.startsWith("All") ? " saved" : " pending"}`} role="status" title={manualSaving||pendingItems.length?"Saving…":status} aria-label={manualSaving||pendingItems.length?"Saving…":status} />
-          <button className="icon" aria-label="Save planning" title="Save planning (Ctrl+S)" disabled={!user || manualSaving || saving} onClick={saveManually}>
+          <AsyncButton className="icon" aria-label="Save planning" title="Save planning (Ctrl+S)" disabled={!user || manualSaving || saving} onClick={saveManually}>
             <Save size={18} />
-          </button>
+          </AsyncButton>
           </div>
           </div>
           {trip && (
-            <button
+            <AsyncButton
               className="button subtle"
               aria-label="Trip details"
               onClick={() => setModal("trip")}
             >
               <Info size={16} />
               <span>Trip details</span>
-            </button>
+            </AsyncButton>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <button className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></button>
-            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><button role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</button>{user&&<button role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</button>}</Popover>}
+            <AsyncButton className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></AsyncButton>
+            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</Popover>}
           </div>
         </div>
       </header>
@@ -1355,7 +1396,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             ["timeline", Clock3, "Schedule"],
             ["todo", CheckSquare, "Tasks"],
           ].map(([key, Icon, label]: any) => (
-            <button
+            <AsyncButton
               key={key}
               aria-label={label}
               aria-pressed={Boolean(layout[key as keyof Layout])}
@@ -1372,7 +1413,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               <Icon size={15} />
               <span>{label}</span>
-            </button>
+            </AsyncButton>
           ))}
         </div>
       </div>
@@ -1398,7 +1439,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
                 onConnection={connection=>setEdit({kind:"connections",item:connection})}
-                onConnections={trip?()=>setModal("connections"):undefined}
+                onConnections={trip?()=>setModal("connections"):undefined}
+                onPlaces={trip?()=>setModal("places"):undefined}
+                liveLocation={liveLocation.position??undefined}
+                locationStatus={liveLocation.status} onLocate={practice?undefined:liveLocation.request}
+                lodging={lodgingForDate(trip,date)} activePinIds={activePinIds}
+                contextKey={`${trip?.id}:${date}`} contextMenuDisabled={practice}
+                onCopyPin={!readonly&&!practice?copyPin:undefined}
+                onPastePin={!readonly&&!practice?pastePin:undefined} canPastePin={canPastePin}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
                 onView={(center, zoom) => changeLayout({ center, zoom })}
@@ -1454,13 +1502,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 <h2>Daily itinerary</h2>
               </div>
               {!readonly && (
-                <button
+                <AsyncButton
                   className="icon"
                   aria-label="Add time block"
                   onClick={() => newItem("blocks")}
                 >
                   <Plus size={19} />
-                </button>
+                </AsyncButton>
               )}
             </div>
             <div className="schedule-subhead">
@@ -1507,8 +1555,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   const lane = overlaps.findIndex((o) => o.id === b.id),
                     lanes = Math.max(1, overlaps.length);
                   return (
-                    <button
-                      className="time-block"
+                    <AsyncButton
+                      className={`time-block${nearby.blockIds.includes(b.id)?" nearby-now":""}`}
                       aria-label={`${field("title")}, ${segment.start} to ${segment.end}`}
                       key={b.id}
                       style={{
@@ -1540,8 +1588,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                         </span>{" "}
                         {field("title")}
                       </strong>
+                      {nearby.blockIds.includes(b.id)&&<span className="nearby-activity-label">You’re here</span>}
                       <small>{field("detail")}</small>
-                    </button>
+                    </AsyncButton>
                   );
                 })}
                 {date === displayedToday && (
@@ -1602,10 +1651,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 <CheckSquare size={17} />
                 <h2>Travel checklist</h2>
                 <span className="count task-progress" title="Completed tasks / total tasks">
-                  {day.tasks.filter((t) => optimisticTasks[t.id]?.checked??t.checked).length}/{day.tasks.length}
+                  {displayTasks.filter(t=>t.checked).length}/{day.tasks.length}
                 </span>
               </div>
-              <button
+              <AsyncButton
                 className="icon"
                 aria-label="Close tasks"
                 onClick={() =>
@@ -1616,23 +1665,24 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 }
               >
                 <X size={17} />
-              </button>
+              </AsyncButton>
             </div>
             <div className="task-list">
               {visibleTasks.map((t) => (
-                <div className={`task-row${taskIsCurrent(t)?" due-now":""}`} key={t.id}>
+                <div className={`task-row${taskIsCurrent(t)?" due-now":""}${nearbyTodo.taskIds.includes(t.id)?" nearby-now":""}`} key={t.id}>
                   <input
                     type="checkbox"
                     aria-label={`Complete ${t.title}`}
-                    checked={optimisticTasks[t.id]?.checked??t.checked}
+                    checked={t.checked}
                     disabled={readonly||optimisticTasks[t.id]?.saving}
                     onChange={() => toggleTask(t)}
-                  />
-                  <button onClick={() => setEdit({ kind: "tasks", item: t })}>
-                    <span className={(optimisticTasks[t.id]?.checked??t.checked) ? "completed" : ""}>
+                  />
+                  {optimisticTasks[t.id]?.saving&&<span className="task-save-spinner" role="status" aria-label={`Saving ${t.title}`}><LoadingSpinner/></span>}
+                  <AsyncButton onClick={() => setEdit({ kind: "tasks", item: t })}>
+                    <span className={t.checked ? "completed" : ""}>
                       {t.title}
                     </span>
-                    {taskIsCurrent(t)&&<span className="task-now">Now</span>}
+                    {nearbyTodo.taskIds.includes(t.id)?<span className="nearby-activity-label">You’re here</span>:taskIsCurrent(t)&&<span className="task-now">Now</span>}
                     <small>
                       {[
                         day.pins.find((p) => p.id === t.pinId)?.title,
@@ -1642,7 +1692,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                         .filter(Boolean)
                         .join(" · ")}
                     </small>
-                  </button>
+                  </AsyncButton>
                 </div>
               ))}
               {!day.tasks.length && (
@@ -1652,11 +1702,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 </div>
               )}
             </div>
-            {taskPages>1&&<div className="picker-pages task-pages"><button className="icon" aria-label="Previous tasks page" disabled={!currentTaskPage} onClick={()=>setTaskPage(currentTaskPage-1)}><ChevronLeft size={16}/></button><span>{currentTaskPage+1} / {taskPages}</span><button className="icon" aria-label="Next tasks page" disabled={currentTaskPage===taskPages-1} onClick={()=>setTaskPage(currentTaskPage+1)}><ChevronRight size={16}/></button></div>}
+            {taskPages>1&&<div className="picker-pages task-pages"><AsyncButton className="icon" aria-label="Previous tasks page" disabled={!currentTaskPage} onClick={()=>setTaskPage(currentTaskPage-1)}><ChevronLeft size={16}/></AsyncButton><span>{currentTaskPage+1} / {taskPages}</span><AsyncButton className="icon" aria-label="Next tasks page" disabled={currentTaskPage===taskPages-1} onClick={()=>setTaskPage(currentTaskPage+1)}><ChevronRight size={16}/></AsyncButton></div>}
             {!readonly && (
-              <button className="todo-add" onClick={() => newItem("tasks")}>
+              <AsyncButton className="todo-add" onClick={() => newItem("tasks")}>
                 <Plus size={17} /> Add a task
-              </button>
+              </AsyncButton>
             )}
             <div
               className="resize-grip"
@@ -1708,7 +1758,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {calendar && (
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
           <header>
-            <button
+            <AsyncButton
               className="icon"
               aria-label="Next month"
               onClick={() => {
@@ -1718,14 +1768,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               }}
             >
               <ChevronLeft size={18} />
-            </button>
+            </AsyncButton>
             <strong>
               {new Date(`${month}-15`).toLocaleDateString("en-US", {
                 month: "long",
                 year: "numeric",
               })}
             </strong>
-            <button
+            <AsyncButton
               className="icon"
               aria-label="Previous month"
               onClick={() => {
@@ -1735,7 +1785,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               }}
             >
               <ChevronRight size={18} />
-            </button>
+            </AsyncButton>
           </header>
           <div className="calendar-grid">
             {["S", "M", "T", "W", "T", "F", "S"].map((x, i) => (
@@ -1761,7 +1811,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     (t) => t.startDate <= d && t.endDate >= d,
                   );
                 return (
-                  <button
+                  <AsyncButton
                     key={d}
                     disabled={
                       d > maxDate() ||
@@ -1781,7 +1831,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                         <i key={t.id} />
                       ))}
                     </div>
-                  </button>
+                  </AsyncButton>
                 );
               },
             )}
@@ -1793,7 +1843,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   t.startDate <= `${month}-31` && t.endDate >= `${month}-01`,
               )
               .map((t) => (
-                <button
+                <AsyncButton
                   key={t.id}
                   onClick={async () => {
                     await saveLayout();
@@ -1804,7 +1854,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 >
                   <i />
                   {t.name}
-                </button>
+                </AsyncButton>
               ))}
           </div>
         </div></MotionSurface>
@@ -1849,19 +1899,19 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               required
             />
             <DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={maxDate()}/>
-            <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><button type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</button><button type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</button></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><button type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</button></div>}</div></div></div>
+            <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><AsyncButton type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</AsyncButton><AsyncButton type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</AsyncButton></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><AsyncButton type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</AsyncButton></div>}</div></div></div>
             </div><div className="trip-location-column"><span className="lodging-label">Lodging location</span>
             <LocationPicker value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
               setLodgingDraft(previous=>({...previous,lng:place.lng,lat:place.lat,name:lodgingName(previous?.name,place.name,lodgingNameEdited.current),timezone:tzlookup(place.lat,place.lng)}));
             }}/>
 
             {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=true;setLodgingDraft({...lodgingDraft!,name:e.target.value});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
-            </div><button
+            </div><AsyncButton
               className="button primary full"
-              disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
+              pending={tripSaving} disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
-            </button>
+            </AsyncButton>
             {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/100 saved trips</small>}
           </form>
         </Modal>
@@ -2148,36 +2198,43 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             {!readonly && (
               <div className="modal-actions">
                 {Object.keys(edit.item.versions ?? {}).length > 0 && (
-                  <button
+                  <AsyncButton
                     type="button"
                     className="button danger"
                     onClick={() => remove(edit.kind, edit.item)}
                   >
                     <Trash2 size={15} /> Delete
-                  </button>
+                  </AsyncButton>
                 )}
-                <button className="button primary" disabled={saving||(edit.kind==="pins"&&edit.locationSelected===false)}>
+                <AsyncButton pending={saving} className="button primary" disabled={saving||(edit.kind==="pins"&&edit.locationSelected===false)}>
                   {saving ? "Saving…" : (edit.item.id === "trip-lodging" || Object.keys(edit.item.versions??{}).length) ? "Save changes" : edit.kind==="pins" ? "Create pin" : edit.kind==="blocks" ? "Create time block" : edit.kind==="tasks" ? "Create task" : "Create connection"}
                   <Check size={16} />
-                </button>
+                </AsyncButton>
               </div>
             )}
           </form>
 
         </Modal>
       )}
+      {modal === "places" && <Modal title="Places" onClose={()=>setModal(null)}>
+        <div className="connections-list places-list">{mapPins.length?mapPins.map(pin=><div className="connection-row" key={pin.id}>
+          <span className="connection-list-title"><SymbolIcon value={pin.symbol}/><span>{pin.title}{pin.id==='trip-lodging'&&<small>Trip lodging</small>}{pin.note&&<small>{pin.note}</small>}</span></span>
+          <span className="place-list-actions"><AsyncButton className="button subtle" aria-label={`Focus ${pin.title}`} onClick={()=>{changeLayout({center:[pin.lng,pin.lat],zoom:15});setModal(null);}}>Focus</AsyncButton>
+          {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit place ${pin.title}`} onClick={()=>{setModal(null);setEdit({kind:'pins',item:pin});}}>Edit</AsyncButton>}</span>
+        </div>):<p>No places for this day.</p>}</div>
+      </Modal>}
       {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
         <div className="connections-list">{day.connections.length?day.connections.map(connection=><div className="connection-row" key={connection.id}>
           <span className="connection-list-title">{connection.symbol&&<SymbolIcon value={connection.symbol}/>}<span>{connectionTitle(connection,mapPins)}{connection.detail&&<small>{connection.detail}</small>}</span></span>
-          {!readonly&&<button className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</button>}
+          {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</AsyncButton>}
         </div>):<p>No connections for this day.</p>}</div>
       </Modal>}
       {modal === "trip" && trip && (
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<button className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</button>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
-          {!shareTrip&&<button className="button" onClick={()=>{lodgingNameEdited.current=Boolean(trip.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(trip.lodging.name));setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</button>}
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=Boolean(trip.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(trip.lodging.name));setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
               <p>
@@ -2187,15 +2244,15 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               </p>
               {publicMode === "editor" &&
                 (!user ? (
-                  <button
+                  <AsyncButton
                     className="button primary"
                     disabled={!configured}
                     onClick={() => setModal("share-auth")}
                   >
                     Sign in to participate
-                  </button>
+                  </AsyncButton>
                 ) : (
-                  <button
+                  <AsyncButton
                     className="button primary"
                     onClick={async () => {
                       try {
@@ -2215,7 +2272,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     }}
                   >
                     Join this trip
-                  </button>
+                  </AsyncButton>
                 ))}
             </>
           ) : (
@@ -2230,7 +2287,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     <option value="viewer">View only</option>
                     <option value="editor">View and join as an editor</option>
                   </Select>
-                  <button
+                  <AsyncButton
                     className="button primary full"
                     onClick={async () => {
                       if(practice){setMessage('Sharing is unavailable during the guided tutorial.');return;}
@@ -2246,9 +2303,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     }}
                   >
                     <Share2 size={16} /> Create share link
-                  </button>
-                  <div className="share-links" aria-label="Existing share links">{!shareLinks.length&&<small>No active sharing links</small>}{shareLinks.map(link=><div className="share-link-row" key={link.id}><span>{link.mode==='editor'?'View and join as an editor':'View only'}</span>{link.token?<div className="share-result"><input readOnly aria-label={`${link.mode==='editor'?'Editor':'Viewer'} share link`} value={`${location.origin}/?share=${encodeURIComponent(link.token)}`}/><button className="button" onClick={()=>navigator.clipboard.writeText(`${location.origin}/?share=${encodeURIComponent(link.token)}`).then(()=>setMessage('Link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}>Copy</button></div>:<small>Older link: URL unavailable. Revoke and create a new link to copy it.</small>}</div>)}</div>
-                  <button
+                  </AsyncButton>
+                  <div className="share-links" aria-label="Existing share links">{!shareLinks.length&&<small>No active sharing links</small>}{shareLinks.map(link=><div className="share-link-row" key={link.id}><span>{link.mode==='editor'?'View and join as an editor':'View only'}</span>{link.token?<div className="share-result"><input readOnly aria-label={`${link.mode==='editor'?'Editor':'Viewer'} share link`} value={`${location.origin}/?share=${encodeURIComponent(link.token)}`}/><AsyncButton className="button" onClick={()=>navigator.clipboard.writeText(`${location.origin}/?share=${encodeURIComponent(link.token)}`).then(()=>setMessage('Link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}>Copy</AsyncButton></div>:<small>Older link: URL unavailable. Revoke and create a new link to copy it.</small>}</div>)}</div>
+                  <AsyncButton
                     className="text-button"
                     onClick={async () => {
                       try {
@@ -2261,12 +2318,12 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     }}
                   >
                     Revoke sharing links
-                  </button>
+                  </AsyncButton>
 
                 </>
               )}
               <div className="delete-trip">
-                <button
+                <AsyncButton
                   className="button danger"
                   onClick={() => removeTrip(trip)}
                 >
@@ -2274,7 +2331,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   {trip.ownerId === user?.uid
                     ? "Delete trip for everyone"
                     : "Remove trip"}
-                </button>
+                </AsyncButton>
               </div>
             </>
           )}
@@ -2297,7 +2354,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <div className="settings-identity">
             <AccountNameField value={settings.displayName??""} onChange={displayName=>setSettings({...settings,displayName})} onValidity={setAccountNameValid} check={!practice&&(settings.displayName??"").trim()!==savedAccountName.current} disabled={practice}/>
 
-            <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are unavailable during the guided tutorial.":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
+            <AsyncButton type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are unavailable during the guided tutorial.":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></AsyncButton>
             </div>
             <div className="field photo-field">
               <div className="settings-photo-preview"><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
@@ -2319,7 +2376,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   e.target.value="";
                 }}
               />
-              <button type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</button>
+              <AsyncButton type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</AsyncButton>
               <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&!settings.photoURL&&<small>Using your Google profile photo</small>}
             </div>
             </div>
@@ -2354,10 +2411,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               <option value="trip">Trip lodging</option>
               <option value="current">My current location</option>
-              <option value="custom">A place I choose</option>
               <option value="world">World map</option>
             </Select>
-            {settings.mapStart==='custom'&&<button type="button" className="button" onClick={()=>{setSettingsMapView({...layout,center:settings.mapCenter,zoom:settings.mapZoom});setModal('map-preference');}}>Choose starting location on map</button>}
             <Select
               label="Clock"
               value={settings.clock}
@@ -2381,28 +2436,29 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             </label>
             <Select
               label="Remove from my account after the trip ends"
-              value={settings.retentionDays}
-              disabled={!settings.autoDelete}
+              value={settings.autoDelete?settings.retentionDays:0}
               onChange={(e: any) =>
                 setSettings({
                   ...settings,
-                  retentionDays: Number(e.target.value),
+                  autoDelete: Number(e.target.value)!==0,
+                  retentionDays: Number(e.target.value)||settings.retentionDays,
                 })
               }
             >
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
-              <option value={365}>One year</option>
+              <option value={365}>One year</option>
+              <option value={0}>Never — keep trips indefinitely</option>
             </Select>
             <p className="form-note">
               Automatic removal affects your account only. Other travelers keep
               their copy of the shared trip.
             </p>
-            <button className="button primary full" disabled={!user||(!practice&&(settings.displayName??"").trim()!==savedAccountName.current&&!accountNameValid)}>
+            <AsyncButton pending={settingsSaving} className="button primary full" disabled={!user||(!practice&&(settings.displayName??"").trim()!==savedAccountName.current&&!accountNameValid)}>
               Save preferences
-            </button>
+            </AsyncButton>
             <div className="settings-footer">
-              <button type="button" className="button settings-tour-button" onClick={()=>{void saveSettings(settingsRef.current);window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</button>
+              <AsyncButton type="button" className="button settings-tour-button" onClick={()=>{void saveSettings(settingsRef.current);window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</AsyncButton>
               <small>
                 Journas · Version 1.0.0
               </small>
@@ -2474,7 +2530,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             </tbody>
           </table>
           <div className="modal-actions">
-            <button
+            <AsyncButton
               className="button"
               onClick={() => {
                 const draftKey = `journas-drafts:${user?.uid}:${trip?.id}:${date}`;
@@ -2494,25 +2550,24 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               }}
             >
               Use latest version
-            </button>
-            <button
+            </AsyncButton>
+            <AsyncButton
               className="button primary"
               onClick={() =>
                 mutate(conflict.draft.kind, conflict.draft.item, true)
               }
             >
               Keep my changes
-            </button>
+            </AsyncButton>
           </div>
         </Modal>
       )}
       {tripCrop&&<Modal title="Crop trip image" onClose={()=>setTripCrop(null)}><Suspense fallback={<Compass/>}><ProfilePhotoCropper file={tripCrop} onCancel={()=>setTripCrop(null)} onError={setMessage} onApply={image=>{setTripLook(previous=>({...previous,image,mode:'image'}));setTripCrop(null);}}/></Suspense></Modal>}
       {photoCrop&&<Modal title="Crop profile photo" onClose={()=>setPhotoCrop(null)}><Suspense fallback={<div>Loading photo editor...</div>}><ProfilePhotoCropper file={photoCrop} onCancel={()=>setPhotoCrop(null)} onError={setMessage} onApply={photo=>{setSettings(previous=>({...previous,photoURL:photo}));setPhotoCrop(null);}}/></Suspense></Modal>}
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);}}/></Modal>}
-      {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
-      {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
+      {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><AsyncButton className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</AsyncButton><AsyncButton className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</AsyncButton></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}

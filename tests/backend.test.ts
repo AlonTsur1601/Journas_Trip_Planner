@@ -597,3 +597,78 @@ describe('connection metadata and plan links',()=>{
  it.each(['connection','endpoint'])('clears links when deleting the %s and restores everything through undo',async removed=>{const ctx=await linkedSetup();await ctx.patch('blocks','ride',{...block,pinId:null,connectionId:'route'});await ctx.patch('tasks','ticket',{...task,pinId:null,blockId:'ride',connectionId:'route'});const endpoint=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;const item=removed==='connection'?ctx.connection:endpoint.pins.find((p:any)=>p.id==='from');await ctx.service.execute('alice',{action:'item.delete',tripId:ctx.id,date:day,kind:removed==='connection'?'connections':'pins',id:item.id,baseVersions:item.versions});let data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;expect(data.connections).toHaveLength(0);expect(data.blocks[0].connectionId).toBeNull();expect(data.tasks[0].connectionId).toBeNull();await ctx.service.execute('alice',{action:'history.undo',tripId:ctx.id});data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;expect(data.connections).toHaveLength(1);expect(data.blocks[0].connectionId).toBe('route');expect(data.tasks[0].connectionId).toBe('route');});
 
 });
+
+describe('copying a place to another date',()=>{
+ async function copySetup(){const state=await setup();await state.service.execute('alice',{action:'trip.update',tripId:state.id,name:'Paris',startDate:day,endDate:'2026-10-05',lodging:{name:'Test lodging',lng:2.3,lat:48.8}});await state.patch('pins','pin',pin);return state;}
+ it('copies only place fields with fresh identity and supports undo/redo',async()=>{
+  const {service,id,store,patch}=await copySetup();await patch('tasks','task',{...task,blockId:null});
+  const {item}=await service.execute('alice',{action:'item.copy-pin',tripId:id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'});
+  expect(item).toMatchObject({...pin,kind:'pins',copyOrigin:{tripId:id,date:day,id:'pin'}});expect((item as Data).id).not.toBe('pin');
+  const copiedDay=(await service.execute('alice',{action:'trip.get',tripId:id,date:'2026-10-02'})).day;
+  expect(copiedDay).toMatchObject({pins:[expect.objectContaining(pin)],tasks:[],blocks:[],connections:[]});
+  await service.execute('alice',{action:'history.undo',tripId:id});expect(store.docs.has(`trips/${id}/days/2026-10-02/items/${(item as Data).id}`)).toBe(false);
+  await service.execute('alice',{action:'history.redo',tripId:id});expect(store.docs.has(`trips/${id}/days/2026-10-02/items/${(item as Data).id}`)).toBe(true);
+ });
+ it('blocks original dates, duplicate dates and duplicate copies of copies',async()=>{
+  const {service,id}=await copySetup();const request={action:'item.copy-pin',tripId:id,sourceTripId:id,sourceDate:day,sourceId:'pin'};
+  await expect(service.execute('alice',{...request,date:day})).rejects.toMatchObject({code:'PIN_COPY_ORIGINAL_DATE'});
+  const {item}=await service.execute('alice',{...request,date:'2026-10-02'});
+  await expect(service.execute('alice',{...request,date:'2026-10-02'})).rejects.toMatchObject({code:'PIN_COPY_EXISTS'});
+  const copied={...request,sourceDate:'2026-10-02',sourceId:(item as Data).id};
+  await expect(service.execute('alice',{...copied,date:day})).rejects.toMatchObject({code:'PIN_COPY_ORIGINAL_DATE'});
+  const {item:third}=await service.execute('alice',{...copied,date:'2026-10-03'});expect((third as Data).copyOrigin).toEqual({tripId:id,date:day,id:'pin'});
+  await expect(service.execute('alice',{...request,date:'2026-10-03'})).rejects.toMatchObject({code:'PIN_COPY_EXISTS'});
+ });
+ it('enforces membership, date bounds, type, provenance immutability and trip scope',async()=>{
+  const {service,id,patch}=await copySetup();const request={action:'item.copy-pin',tripId:id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'};
+  await expect(service.execute('eve',request)).rejects.toMatchObject({status:403});
+  await expect(service.execute('alice',{...request,date:'2026-10-06'})).rejects.toMatchObject({code:'DATE_OUTSIDE_TRIP'});
+  await expect(service.execute('alice',{...request,sourceDate:'2026-09-30'})).rejects.toMatchObject({code:'DATE_OUTSIDE_TRIP'});
+  await expect(service.execute('alice',{...request,sourceTripId:'other-trip'})).rejects.toMatchObject({status:404});
+  await expect(service.execute('alice',{...request,sourceId:'missing'})).rejects.toMatchObject({status:404});
+  await patch('tasks','task',{...task,blockId:null});await expect(service.execute('alice',{...request,sourceId:'task'})).rejects.toMatchObject({status:404});
+  await expect(patch('pins','pin',{copyOrigin:{tripId:id,date:day,id:'fake'}})).rejects.toMatchObject({code:'INVALID_FIELD'});
+ });
+ it('allows one concurrent paste and enforces destination limits',async()=>{
+  const {service,id,store}=await copySetup();const request={action:'item.copy-pin',tripId:id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'};
+  const results=await Promise.allSettled([service.execute('alice',request),service.execute('alice',request)]);expect(results.filter(result=>result.status==='fulfilled')).toHaveLength(1);expect(results.filter(result=>result.status==='rejected')).toHaveLength(1);
+  for(let index=0;index<199;index++)store.docs.set(`trips/${id}/days/2026-10-03/items/place-${index}`,{id:`place-${index}`,kind:'pins',...pin,versions:{}});
+  await expect(service.execute('alice',{...request,date:'2026-10-03'})).rejects.toMatchObject({code:'DAY_LIMIT'});
+ });
+});
+it('keeps trips and content indefinitely after saving automatic deletion off',async()=>{
+ const {service,id,patch,store,setNow}=await setup();await patch('pins','museum',pin);await service.execute('alice',{action:'settings.save',settings:{autoDelete:false}});
+ expect(store.docs.get(`users/alice/trips/${id}`)?.cleanupAt).toBe(Number.MAX_SAFE_INTEGER);
+ setNow(Date.parse('2126-10-03T00:00:00Z'));await service.cleanup();
+ expect((await service.execute('alice',{action:'settings.get'})).settings).toMatchObject({autoDelete:false});
+ expect((await service.execute('alice',{action:'trip.get',tripId:id,date:day})).day).toMatchObject({pins:[expect.objectContaining(pin)]});
+});
+
+it('a pin-copy origin reservation prevents duplicate redo after another editor pastes',async()=>{
+ const {service,id,patch,store}=await setup();await service.execute('alice',{action:'trip.update',tripId:id,name:'Paris',startDate:day,endDate:'2026-10-05',lodging:{name:'Lodging',lng:2.3,lat:48.8}});await patch('pins','pin',pin);await join(service,id);
+ store.docs.set(`trips/${id}/days/2026-10-02`,{date:'2026-10-02',updatedAt:Date.parse(day+'T12:00:00Z')});
+ const request={action:'item.copy-pin',tripId:id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'};
+ await service.execute('alice',request);await service.execute('alice',{action:'history.undo',tripId:id});await service.execute('bob',request);
+ await expect(service.execute('alice',{action:'history.redo',tripId:id})).rejects.toMatchObject({code:'HISTORY_CONFLICT'});
+ expect((await service.execute('alice',{action:'trip.get',tripId:id,date:'2026-10-02'})).day).toMatchObject({pins:[expect.objectContaining(pin)]});
+});
+it('deleting a copied pin releases its destination reservation for another paste',async()=>{
+ const {service,id,patch}=await setup();await service.execute('alice',{action:'trip.update',tripId:id,name:'Paris',startDate:day,endDate:'2026-10-05',lodging:{name:'Lodging',lng:2.3,lat:48.8}});await patch('pins','pin',pin);
+ const request={action:'item.copy-pin',tripId:id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'};const {item}=await service.execute('alice',request) as {item:Data};
+ await service.execute('alice',{action:'item.delete',tripId:id,date:'2026-10-02',kind:'pins',id:item.id,baseVersions:item.versions});
+ const {item:replacement}=await service.execute('alice',request) as {item:Data};expect(replacement.id).not.toBe(item.id);expect(replacement.copyOrigin).toEqual(item.copyOrigin);
+});
+
+it('copies across editable trips, keeps original provenance and checks both trip permissions',async()=>{
+ const {service,id,patch}=await setup();await patch('pins','pin',pin);
+ const {trip}=await service.execute('alice',{action:'trip.create',name:'Second trip',startDate:day,endDate:'2026-10-05',lodging:{name:'Lodging',lng:2.3,lat:48.8}}) as {trip:Trip};
+ const request={action:'item.copy-pin',tripId:trip.id,date:'2026-10-02',sourceTripId:id,sourceDate:day,sourceId:'pin'};
+ const {item}=await service.execute('alice',request) as {item:Data};expect(item.copyOrigin).toEqual({tripId:id,date:day,id:'pin'});
+ await expect(service.execute('alice',request)).rejects.toMatchObject({code:'PIN_COPY_EXISTS'});
+ await expect(service.execute('alice',{...request,date:day})).rejects.toMatchObject({code:'PIN_COPY_ORIGINAL_DATE'});
+ const {item:copyOfCopy}=await service.execute('alice',{...request,date:'2026-10-03',sourceTripId:trip.id,sourceDate:'2026-10-02',sourceId:item.id}) as {item:Data};expect(copyOfCopy.copyOrigin).toEqual(item.copyOrigin);
+ await join(service,id,'bob');await expect(service.execute('bob',request)).rejects.toMatchObject({status:403});
+ await join(service,trip.id,'eve');await expect(service.execute('eve',{...request,date:'2026-10-04'})).rejects.toMatchObject({status:403});
+ await service.execute('alice',{action:'history.undo',tripId:trip.id});expect(((await service.execute('alice',{action:'trip.get',tripId:trip.id,date:'2026-10-03'})).day as Data).pins).toEqual([]);
+ await service.execute('alice',{action:'history.redo',tripId:trip.id});expect(((await service.execute('alice',{action:'trip.get',tripId:trip.id,date:'2026-10-03'})).day as Data).pins).toHaveLength(1);
+});

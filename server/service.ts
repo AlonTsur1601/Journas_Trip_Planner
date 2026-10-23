@@ -31,6 +31,7 @@ const tripPath = (id: string) => `trips/${id}`;
 const userPath = (uid: string) => `users/${uid}`;
 const membershipPath = (uid: string, id: string) => `users/${uid}/trips/${id}`;
 const itemsPath = (id: string, day: string) => `trips/${id}/days/${day}/items`;
+const pinCopyPath = (id:string,day:string,origin:Data) => `trips/${id}/days/${day}/pinCopies/${hash(JSON.stringify([origin.tripId,origin.date,origin.id]))}`;
 const layoutPath = (uid: string, id: string, day: string) => `users/${uid}/layouts/${id}_${day}`;
 const isColor = (x: unknown) => typeof x === 'string' && /^#[a-fA-F0-9]{6}$/.test(x);
 const finite = (x: unknown, min: number, max: number) => typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max;
@@ -367,6 +368,28 @@ export class JournasService {
                 tx.set(layoutPath(userId, id, day), { tripId: id, date: day, layout, updatedAt: this.now() });
                 return { ok: true };
             }
+            if(action==='item.copy-pin'){
+                const sourceTripId=identifier(input.sourceTripId),sourceDate=date(input.sourceDate),sourceId=identifier(input.sourceId);
+                const sourceTrip=sourceTripId===id?trip:await this.member(tx,sourceTripId,userId);
+                this.dayWithin(sourceTrip,sourceDate);
+                const source=await tx.get(`${itemsPath(sourceTripId,sourceDate)}/${sourceId}`) as Item|undefined;
+                if(!source||source.kind!=='pins')fail(404,'NOT_FOUND','The copied place no longer exists.');
+                const recorded=source.copyOrigin===undefined?null:object(source.copyOrigin);
+                const origin=recorded?{tripId:identifier(recorded.tripId),date:date(recorded.date),id:identifier(recorded.id)}:{tripId:sourceTripId,date:sourceDate,id:sourceId};
+                if(day===sourceDate||day===origin.date)fail(409,'PIN_COPY_ORIGINAL_DATE','Choose a different date to paste this place.');
+                const copyPath=pinCopyPath(id,day,origin);
+                if(await tx.get(copyPath))fail(409,'PIN_COPY_EXISTS','This date already contains a copy of that place.');
+                const all=await tx.list(itemsPath(id,day)) as Item[];
+                if(all.some(item=>{if(item.kind!=='pins')return false;const previous=item.copyOrigin as Data|undefined;return previous?previous.tripId===origin.tripId&&previous.date===origin.date&&previous.id===origin.id:day===origin.date&&item.id===origin.id;}))fail(409,'PIN_COPY_EXISTS','This date already contains a copy of that place.');
+                if(all.filter(item=>item.kind==='pins').length+(trip.lodging?1:0)>=200||all.length+(trip.lodging?1:0)>=400)fail(409,'DAY_LIMIT','This day has reached its item limit (200 per type, 400 total)');
+                const patch=Object.fromEntries(fields.pins.map(key=>[key,source[key]]));
+                validateItem('pins',patch);
+                const item={...bump({id:randomUUID(),kind:'pins',versions:{}},patch),copyOrigin:origin};
+                tx.set(`${itemsPath(id,day)}/${item.id}`,item);
+                tx.set(copyPath,{id:item.id,origin});
+                tx.set(`trips/${id}/days/${day}`,{date:day,updatedAt:this.now()});
+                return {item};
+            }
             if (action !== 'item.patch' && action !== 'item.delete')
                 fail(400, 'UNKNOWN_ACTION', 'Unknown operation');
             const kind = input.kind as Kind;
@@ -494,6 +517,7 @@ export class JournasService {
     private async readShare(input: Data) { return this.store.transaction(async (tx) => { const share = await this.share(tx, input.token); const trip = await tx.get(tripPath(identifier(share.tripId))) as Trip; const day = input.date ? date(input.date) : trip.startDate; this.dayWithin(trip, day); return { trip: { ...trip, memberIds: [], ownerId: '' }, day: await this.day(tx, trip.id, day), mode: share.mode }; }); }
     private async deleteItem(tx: Transaction, id: string, day: string, item: Item, all: Item[]) {
         tx.delete(`${itemsPath(id, day)}/${item.id}`);
+        if(item.kind==='pins'&&item.copyOrigin)tx.delete(pinCopyPath(id,day,item.copyOrigin as Data));
         const removedConnections=new Set(item.kind==='connections'?[item.id]:item.kind==='pins'?all.filter(related=>related.kind==='connections'&&(related.from===item.id||related.to===item.id)).map(related=>related.id):[]);
         for (const related of all) {
             const patch: Data = {};

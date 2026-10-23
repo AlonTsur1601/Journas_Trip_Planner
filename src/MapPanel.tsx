@@ -1,10 +1,14 @@
 import {connectionTitle} from './connection-label';
-import { useEffect, useRef, useState } from "react";
-import { MapPinPlus, Route, Waypoints, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { MapPinPlus, MapPinned, LocateFixed, House, Copy, Pencil, Focus, Compass, ClipboardPaste, Route, Waypoints, X } from "lucide-react";
+import {createPortal} from 'react-dom';
+import {MotionSurface} from './MotionSurface';
+import {LoadingSpinner} from './LoadingScreen';
 import { symbolMarkup } from "./PlannerControls";
 import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 maplibregl.setWorkerUrl(workerURL);
+const noActivePins:string[]=[];
 import { worldViewportLimits } from "./map-viewport";
 import type { Connection, Layout, Pin } from "./types";
 export default function MapPanel({
@@ -25,6 +29,7 @@ export default function MapPanel({
   arrowPreference = true,
   onArrowPreferenceChange,
   onStartPinSearch,
+  onPlaces,liveLocation,lodging,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",
 }: {
   pins: Pin[];
   connections: Connection[];
@@ -43,9 +48,37 @@ export default function MapPanel({
   arrowPreference?: boolean;
   onArrowPreferenceChange?: (checked:boolean)=>void;
   onStartPinSearch?: ()=>void;
+  onPlaces?:()=>void;
+  liveLocation?:{lng:number;lat:number;accuracy?:number}|null;
+  lodging?:{lng:number;lat:number;name?:string}|null;
+  activePinIds?:string[];
+  onCopyPin?:(pin:Pin)=>void;
+  onPastePin?:()=>void|Promise<void>;
+  canPastePin?:boolean;
+  contextKey?:string;
+  contextMenuDisabled?:boolean;
+  onLocate?:()=>void;
+  locationStatus?:"idle"|"pending"|"active"|"denied"|"unavailable";
 }) {
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
   const [source,setSource]=useState<string|null>(null);
+  const [pendingPaste,setPendingPaste]=useState(false);
+  const pasteFromMenu=async()=>{if(pendingPaste||!onPastePin)return;const result=onPastePin();if(result&&typeof result.then==='function'){setPendingPaste(true);try{await result;}finally{setPendingPaste(false);setContextMenu(null);}}else setContextMenu(null);};
+  const [contextMenu,setContextMenu]=useState<{x:number;y:number;lng:number;lat:number;pin?:Pin}|null>(null);
+  const menuBox=useRef<HTMLDivElement>(null);
+  const liveMarker=useRef<maplibregl.Marker|null>(null);
+  const liveLocationRef=useRef(liveLocation);liveLocationRef.current=liveLocation;
+  const updateLiveMarker=useRef<()=>void>(()=>{});
+  const focusPoint=(point:{lng:number;lat:number})=>{map.current?.flyTo({center:[point.lng,point.lat],zoom:Math.max(map.current.getZoom(),15),essential:true});setContextMenu(null);};
+  useEffect(()=>{setContextMenu(null);setMode(null);setSource(null);},[contextKey]);
+  useEffect(()=>{if(contextMenuDisabled)setContextMenu(null);},[contextMenuDisabled]);
+  useLayoutEffect(()=>{
+    const box=menuBox.current;if(!box||!contextMenu)return;
+    const position=()=>{const rect=box.getBoundingClientRect();box.style.left=`${Math.max(8,Math.min(contextMenu.x,innerWidth-rect.width-8))}px`;box.style.top=`${Math.max(8,Math.min(contextMenu.y,innerHeight-rect.height-8))}px`;};
+    position();const outside=(event:PointerEvent)=>{if(!box.contains(event.target as Node))setContextMenu(null);};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setContextMenu(null);}if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){const items=[...box.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];if(!items.length)return;event.preventDefault();const current=items.indexOf(document.activeElement as HTMLButtonElement),next=event.key==='Home'?0:event.key==='End'?items.length-1:(current+(event.key==='ArrowUp'?-1:1)+items.length)%items.length;items[next].focus();}};
+    document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);window.addEventListener('resize',position);
+    return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);window.removeEventListener('resize',position);};
+  },[contextMenu]);
   const arrow=arrowPreference;
   const action=useRef({mode,source,placementMode,arrow}); action.current={mode,source,placementMode,arrow};
   const viewport = useRef<HTMLDivElement>(null);
@@ -209,7 +242,7 @@ export default function MapPanel({
     let gestureDragged=false;
     m.on('mousedown',()=>{gestureDragged=false;});
     m.on('touchstart',()=>{gestureDragged=false;});
-    m.on('dragstart',()=>{gestureDragged=true;container.current?.classList.add('map-dragging');});
+    m.on('dragstart',()=>{setContextMenu(null);gestureDragged=true;container.current?.classList.add('map-dragging');});
     m.on('dragend',()=>container.current?.classList.remove('map-dragging'));
     const connectionAt=(point:maplibregl.Point)=>{const layers=(m.getStyle()?.layers??[]).filter(layer=>layer.id.startsWith('route-')&&layer.id.endsWith(':hit')).map(layer=>layer.id);if(!layers.length)return;const id=m.queryRenderedFeatures(point,{layers})[0]?.properties?.connectionId;return callbacks.current.connections.find(connection=>connection.id===id);};
     m.on('click',e=>{if(gestureDragged||(e.originalEvent.target as HTMLElement)?.closest('button'))return;if(!callbacks.current.readonly&&(action.current.mode==='add'||action.current.placementMode)){callbacks.current.onAdd(e.lngLat.lng,e.lngLat.lat);setMode(null);}else if(!action.current.mode&&!action.current.placementMode&&!callbacks.current.movingPinId){const connection=connectionAt(e.point);if(connection)callbacks.current.onConnection?.(connection);}});
@@ -273,6 +306,7 @@ export default function MapPanel({
       m.off('render',revealRenderedMap);
       cancelAnimationFrame(resizeFrame);
       restoringView.current = true;
+      liveMarker.current?.remove();liveMarker.current=null;
       m.remove();
       map.current = null;
     };
@@ -285,7 +319,8 @@ export default function MapPanel({
     markers.current = pins.map((pin) => {
       const el = document.createElement("button");
       el.type="button";
-      el.className = "map-pin";
+      el.className = "map-pin"+(activePinIds.includes(pin.id)?" is-active":"");
+      if(activePinIds.includes(pin.id))el.setAttribute("aria-current","true");
       el.style.background = pin.color;
       const content=document.createElement('span');content.className='pin-symbol';const markup=symbolMarkup(pin.symbol);if(markup)content.innerHTML=markup;else content.textContent=pin.symbol;el.appendChild(content);
       el.setAttribute("aria-label", `Place: ${pin.title}`);
@@ -301,6 +336,7 @@ export default function MapPanel({
       el.addEventListener('focus',showTooltip);
       el.addEventListener('blur',()=>tooltip.remove());
       el.addEventListener('pointerdown',()=>tooltip.remove());
+      el.oncontextmenu=event=>{if(contextMenuDisabled){event.preventDefault();event.stopPropagation();return;}if(placementMode||movingPinId)return;event.preventDefault();event.stopPropagation();tooltip.remove();setContextMenu({x:event.clientX,y:event.clientY,lng:pin.lng,lat:pin.lat,pin});};
       let ignoreClick=false;
       el.onclick = (event) => {event.preventDefault();event.stopPropagation();if(placementMode)return;if(ignoreClick){ignoreClick=false;return;}if(action.current.mode==='connect'){if(!action.current.source){setSource(pin.id);}else if(action.current.source!==pin.id){callbacks.current.onConnect?.(action.current.source,pin.id,action.current.arrow);setSource(null);setMode(null);}}else if(!movingPinId&&!placementMode)callbacks.current.onPin(pin);};
       const marker=new maplibregl.Marker({ element: el, draggable: false })
@@ -442,7 +478,7 @@ export default function MapPanel({
       m.off("style.load", draw);
       m.off("move", updateArrows);
     };
-  }, [pins, connections, movingPinId, placementMode, readonly]);
+  }, [pins, connections, movingPinId, placementMode, readonly,activePinIds,contextMenuDisabled]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -457,10 +493,29 @@ export default function MapPanel({
       restoringView.current = false;
     }
   }, [layout.center[0], layout.center[1], layout.zoom]);
+  useEffect(()=>{
+    const m=map.current,element=viewport.current;if(!m||!element)return;
+    const panel=element.closest('.map-panel');
+    const update=()=>{
+      const location=liveLocationRef.current;
+      const hidden=Boolean(panel?.getAttribute('aria-hidden')==='true'||element.closest('[hidden]'));
+      if(hidden){liveMarker.current?.remove();liveMarker.current=null;setContextMenu(null);return;}
+      if(!location){liveMarker.current?.remove();liveMarker.current=null;return;}
+      if(!liveMarker.current){const dot=document.createElement('span');dot.className='map-live-location';dot.setAttribute('role','img');dot.setAttribute('aria-label','My live location');liveMarker.current=new maplibregl.Marker({element:dot}).setLngLat([location.lng,location.lat]).addTo(m);}
+      else liveMarker.current.setLngLat([location.lng,location.lat]);
+    };
+    updateLiveMarker.current=update;update();const observer=new MutationObserver(update);if(panel)observer.observe(panel,{attributes:true,attributeFilter:['aria-hidden','hidden']});
+    return()=>{updateLiveMarker.current=()=>{};observer.disconnect();liveMarker.current?.remove();liveMarker.current=null;};
+  },[]);
+  useEffect(()=>updateLiveMarker.current(),[liveLocation?.lng,liveLocation?.lat]);
   return (
-    <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`}>
+    <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`} onContextMenu={event=>{if(contextMenuDisabled){event.preventDefault();return;}if(placementMode||movingPinId||(event.target as HTMLElement).closest('button,.map-tools,.map-focus-tools,.map-live-location'))return;const m=map.current;if(!m)return;event.preventDefault();const rect=m.getCanvas().getBoundingClientRect(),point=m.unproject([event.clientX-rect.left,event.clientY-rect.top]);setContextMenu({x:event.clientX,y:event.clientY,lng:point.lng,lat:point.lat});}}>
       <div ref={viewport} className="map-viewport"><div ref={container} className="map-canvas" /></div>
-      {!placementMode&&(!readonly||onConnections)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{if(onStartPinSearch){onStartPinSearch();return;}setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>onArrowPreferenceChange?.(e.target.checked)}/><span>Arrow</span></label></>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
+      {!placementMode&&(!readonly||onConnections||onPlaces)&&<div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{if(onStartPinSearch){onStartPinSearch();return;}setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>onArrowPreferenceChange?.(e.target.checked)}/><span>Arrow</span></label></>}{onPlaces&&<button className="icon places-button" aria-label="Places" title="Places" onClick={()=>{setMode(null);setSource(null);onPlaces();}}><MapPinned size={19}/></button>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div>}
+      {!placementMode&&(liveLocation||onLocate||lodging)&&<div className="map-focus-tools">{(liveLocation||onLocate)&&<button className="icon" aria-label="Focus my location" aria-busy={locationStatus==='pending'} disabled={locationStatus==='pending'} title={locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission is blocked in your browser. Allow location access and try again.':liveLocation?'Focus my location':'Find my location'} onClick={()=>liveLocation?focusPoint(liveLocation):onLocate?.()}>{locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={19}/>}</button>}{lodging&&<button className="icon" aria-label="Focus lodging" title={lodging.name?`Focus ${lodging.name}`:'Focus lodging'} onClick={()=>focusPoint(lodging)}><House size={19}/></button>}</div>}
+      {contextMenu&&createPortal(<MotionSurface><div ref={menuBox} className="map-context-menu" role="menu" aria-label={contextMenu.pin?`Actions for ${contextMenu.pin.title}`:'Map actions'} style={{left:contextMenu.x,top:contextMenu.y}}>
+        {contextMenu.pin?<>{!readonly&&<button role="menuitem" onClick={()=>{onPin(contextMenu.pin!);setContextMenu(null);}}><Pencil size={16}/>Edit place</button>}{onCopyPin&&contextMenu.pin.id!=='trip-lodging'&&<button role="menuitem" onClick={()=>{onCopyPin(contextMenu.pin!);setContextMenu(null);}}><Copy size={16}/>Copy pin</button>}<button role="menuitem" onClick={()=>focusPoint(contextMenu.pin!)}><Focus size={16}/>Focus place</button></>:<>{!readonly&&<button role="menuitem" onClick={()=>{onAdd(contextMenu.lng,contextMenu.lat);setContextMenu(null);}}><MapPinPlus size={16}/>Add place here</button>}{!readonly&&(canPastePin||pendingPaste)&&onPastePin&&<button role="menuitem" disabled={pendingPaste} aria-busy={pendingPaste} onClick={()=>void pasteFromMenu()}>{pendingPaste?<LoadingSpinner/>:<ClipboardPaste size={16}/>}Paste pin</button>}{lodging&&<button role="menuitem" onClick={()=>focusPoint(lodging)}><House size={16}/>Focus lodging</button>}{(liveLocation||onLocate)&&<button role="menuitem" disabled={locationStatus==='pending'} onClick={()=>{if(liveLocation)focusPoint(liveLocation);else{onLocate?.();setContextMenu(null);}}}>{locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={16}/>} {locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission blocked — try again':'Focus my location'}</button>}<button role="menuitem" onClick={()=>{map.current?.resetNorth();setContextMenu(null);}}><Compass size={16}/>Reset north</button></>}
+      </div></MotionSurface>,document.body)}
       {(mode||movingPinId)&&<div className="map-mode-note" role="status"><strong>{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}</strong><button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>
   );

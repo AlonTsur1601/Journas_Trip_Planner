@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {ApiError,type Data,type Store,type Transaction} from './types.js';
 const lifetime=600000;
-const mutations=new Set(['item.patch','item.delete']);
+const mutations=new Set(['item.patch','item.delete','item.copy-pin']);
 const stable=(value:any):string=>JSON.stringify(value===undefined?null:Array.isArray(value)?value.map(v=>JSON.parse(stable(v))):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(k=>!['versions','updatedAt','updatedBy'].includes(k)).map(k=>[k,JSON.parse(stable(value[k]))])):value);
 export async function historyTransaction(store:Store,uid:string,input:Data,now:number,run:(tx:Transaction)=>Promise<Data>):Promise<Data>{
  if(!mutations.has(String(input.action))&&!String(input.action).startsWith('history.'))return store.transaction(run);
@@ -19,7 +19,7 @@ export async function historyTransaction(store:Store,uid:string,input:Data,now:n
    if(!entry)throw new ApiError(409,'HISTORY_EMPTY','No recent action to restore');
    const changes=entry.changes as {path:string;before:Data|null;after:Data|null}[];
    const originalTripId=String(entry.tripId??'');
-   if(originalTripId&&['item.patch','item.delete','trip.update','share.create','share.revoke','member.remove'].includes(String(entry.action))){
+   if(originalTripId&&['item.patch','item.delete','item.copy-pin','trip.update','share.create','share.revoke','member.remove'].includes(String(entry.action))){
     const trip=await raw.get(`trips/${originalTripId}`);
     if(!trip||trip.deleted||!(trip.memberIds as string[]).includes(uid))throw new ApiError(403,'FORBIDDEN','Your access to this trip has changed');
     if(['share.create','share.revoke','member.remove'].includes(String(entry.action))&&trip.ownerId!==uid)throw new ApiError(403,'FORBIDDEN','Only the owner can restore sharing changes');

@@ -28,7 +28,7 @@ async function scanRenderableEmoji(entries:EmojiChoice[],surface?:OffscreenCanva
   for(let index=0;index<group.length;index++){const x=index%columns*cellWidth,y=Math.floor(index/columns)*cellHeight;context.save();context.beginPath();context.rect(x,y,cellWidth,cellHeight);context.clip();context.fillText(group[index],x,y);context.restore();}
   const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
   for(let index=0;index<group.length;index++){let ink=false,color=false,hash=2166136261,second=5381;const left=index%columns*cellWidth,top=Math.floor(index/columns)*cellHeight;for(let y=0;y<cellHeight;y++)for(let x=0;x<cellWidth;x++){const pixel=((top+y)*canvas.width+left+x)*4;if(pixels[pixel+3]){ink=true;color||=pixels[pixel]!==pixels[pixel+1]||pixels[pixel]!==pixels[pixel+2];}if(pixels[pixel+3]){hash=Math.imul(hash^(y*cellWidth+x),16777619);for(let channel=0;channel<4;channel++){hash=Math.imul(hash^pixels[pixel+channel],16777619);second=Math.imul(second,33)^pixels[pixel+channel];}}}rasters.set(group[index],{width:context.measureText(group[index]).width,pixels:new Uint8ClampedArray(0),signature:`${hash}:${second}`,ink,color});}
-  await new Promise<void>(resolve=>{const channel=new MessageChannel();channel.port1.onmessage=()=>{channel.port1.close();channel.port2.close();resolve();};channel.port2.postMessage(null);});
+  if(!surface)await new Promise<void>(resolve=>setTimeout(resolve,0));
  }
  const draw=(text:string)=>rasters.get(text)!;const width=draw('\u{1f600}').width;
  return entries.filter(entry=>emojiIsRenderable(entry.unicode,draw,width));

@@ -2581,3 +2581,19 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 .planning-history-actions{display:flex;align-items:center;gap:0;}
 @media(max-width:700px){.planning-history-actions{grid-row:3;grid-column:2/5;justify-self:stretch;}.planning-history-actions>.save-control{flex:1;}.planning-history-actions>.icon{flex-shrink:0;}}
+
+.map-live-location{z-index:4;width:17px;height:17px;border:3px solid white;border-radius:50%;background:#2582ee;box-shadow:0 0 0 7px #2582ee33,0 2px 7px #0004;pointer-events:none!important;}
+.map-pin.is-active{box-shadow:0 0 0 4px var(--surface),0 0 0 7px var(--accent),0 3px 12px #0005;}
+.map-focus-tools{position:absolute;top:10px;right:10px;z-index:4;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:5px;background:var(--surface);overflow:hidden;}
+.map-focus-tools>.icon{border:0;border-radius:0;width:34px;height:34px;}.map-focus-tools>.icon+.icon{border-top:1px solid var(--line);}
+.map-tools>.places-button{border-left:1px solid var(--line);border-radius:0;}.map-tools>.places-button:only-child{border:0;border-radius:5px;}
+.map-context-menu{position:fixed;z-index:85;min-width:190px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;padding:5px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 7px 28px #0003;}
+.map-context-menu>button{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;border:0;border-radius:4px;background:transparent;color:var(--ink);font:inherit;text-align:left;}.map-context-menu>button:hover,.map-context-menu>button:focus-visible{background:var(--subtle);}
+/* Location-aware activities keep their normal category colors. */
+.time-block.nearby-now,.task-row.nearby-now{outline:2px solid var(--accent);outline-offset:-2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent);}
+.nearby-activity-label{display:inline-flex;align-items:center;gap:4px;padding:1px 5px;border-radius:4px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;line-height:1.5;white-space:nowrap;}
+.time-block>.nearby-activity-label{display:inline-flex;width:max-content;max-width:100%;margin:3px 0;}.task-row .nearby-activity-label{margin-left:6px;}
+.place-list-actions{display:flex;flex-shrink:0;gap:6px;}.places-list .connection-list-title{display:flex;align-items:center;gap:9px;}.places-list .connection-list-title>svg{flex-shrink:0;width:23px;height:23px;}.places-list .connection-list-title small{display:block;color:var(--muted);font-size:12px;}
+
+.task-save-spinner{display:inline-flex;align-items:center;flex-shrink:0;margin-left:4px;}.task-save-spinner>.loading-spinner{width:13px;height:13px;border-width:2px;}
+.map-focus-tools .loading-spinner,.map-context-menu .loading-spinner{width:16px;height:16px;border-width:2px;}

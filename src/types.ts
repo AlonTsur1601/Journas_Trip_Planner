@@ -1,7 +1,9 @@
+export type PinCopyOrigin = {tripId:string;date:string;id:string};
 export type Pin = {
   id: string;
   title: string;
   note: string;
+  copyOrigin?: PinCopyOrigin;
   color: string;
   symbol: string;
   lng: number;

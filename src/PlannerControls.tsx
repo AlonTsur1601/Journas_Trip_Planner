@@ -1,3 +1,4 @@
+import {AsyncButton} from './AsyncButton';
 import TimePicker from './TimePicker';
 import {boundedDate} from './date-limits';
 import {MotionSurface} from "./MotionSurface";
@@ -6,9 +7,10 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Dropdown } from './Controls';
 import {Popover} from './Popover';
-import {loadEmojiCatalog,type EmojiChoice} from './emoji-catalog';
+import {loadEmojiCatalog,preloadEmojiCatalog,type EmojiChoice} from './emoji-catalog';
 import {SymbolChoices} from './SymbolChoices';
 import {LoadingSpinner} from './LoadingScreen';
+preloadEmojiCatalog();
 
 const iso = (d: Date) => d.toLocaleDateString('en-CA');
 export function MonthCalendar({value,onChange,min,max,focusValue,rangeStart,rangeEnd}:any) {
@@ -80,12 +82,12 @@ const emojiGroups = ['Smileys & emotion','People & body','Components','Animals &
 export function SymbolPicker({value,onChange}:any){
  const [open,setOpen]=useState(false),[search,setSearch]=useState(''),[categoryIndex,setCategoryIndex]=useState(-2),[tab,setTab]=useState('symbols');const root=useRef<HTMLDivElement>(null);const q=search.trim().toLowerCase();
  const closePicker=useCallback(()=>setOpen(false),[]);
- const [emojiEntries,setEmojiEntries]=useState<EmojiChoice[]>([]),[emojiError,setEmojiError]=useState(''),[retry,setRetry]=useState(0);
- useEffect(()=>{let alive=true;setEmojiError('');void loadEmojiCatalog().then(entries=>{if(alive)setEmojiEntries(entries);}).catch(()=>{if(alive)setEmojiError('Unable to load emoji.');});return()=>{alive=false;};},[retry]);
+ const [emojiEntries,setEmojiEntries]=useState<EmojiChoice[]>([]),[emojiError,setEmojiError]=useState(''),[retry,setRetry]=useState(0),[retrying,setRetrying]=useState(false);
+ useEffect(()=>{let alive=true;setEmojiError('');void loadEmojiCatalog().then(entries=>{if(alive){setEmojiEntries(entries);setRetrying(false);}}).catch(()=>{if(alive){setEmojiError('Unable to load emoji.');setRetrying(false);}});return()=>{alive=false;};},[retry]);
  const custom=pinSymbols.filter(s=>s[1].toLowerCase().includes(q)).map(s=>({id:`icon:${s[0]}`,label:s[1]}));
  const emoji=emojiEntries.filter(e=>q?(e.label+' '+e.tags.join(' ')).toLowerCase().includes(q):categoryIndex===-2||e.group===categoryIndex).map(e=>({id:e.unicode,label:e.label}));
  const choices=q?[...custom,...emoji]:tab==='symbols'?custom:emoji;
- return <div className="field symbol-picker" ref={root}><span>Symbol</span><button type="button" className="button symbol-trigger" aria-label="Choose symbol" aria-expanded={open} onClick={()=>setOpen(!open)}><SymbolIcon value={value}/> Choose symbol</button>{open&&<Popover anchor={root} width={340} height={420} className="symbol-menu" data-symbol-context={root.current?.closest(".trip-appearance-options")?"trip":undefined} onClose={closePicker}><input aria-label="Search symbols and emoji" placeholder="Search symbols and emoji" value={search} onChange={e=>setSearch(e.target.value)}/><div className="symbol-tabs"><button type="button" className={tab==='symbols'?'selected':''} onClick={()=>setTab('symbols')}>Journas symbols</button><button type="button" className={tab==='emoji'?'selected':''} onClick={()=>setTab('emoji')}>Emoji</button></div>{tab==='emoji'&&!q&&<div className="symbol-category"><Dropdown scrollable aria-label="Emoji category" value={categoryIndex} onChange={(e:any)=>setCategoryIndex(Number(e.target.value))}><option value={-2}>All emojis</option>{emojiGroups.map((group,index)=><option key={group} value={index}>{group}</option>)}<option value={-1}>Other components</option></Dropdown></div>}<SymbolChoices key={`${tab}:${categoryIndex}:${q}`} choices={choices} value={value} renderIcon={id=><SymbolIcon value={id}/>} onPick={id=>{onChange({target:{value:id}});setOpen(false);}}/>{(tab==='emoji'||q)&&!emojiEntries.length&&(emojiError?<button type="button" className="text-button" onClick={()=>setRetry(value=>value+1)}>{emojiError} Retry</button>:<span className="emoji-loading" role="status"><LoadingSpinner/>Loading emoji…</span>)}{!choices.length&&emojiEntries.length>0&&<span>No matching symbols</span>}</Popover>}</div>;
+ return <div className="field symbol-picker" ref={root}><span>Symbol</span><button type="button" className="button symbol-trigger" aria-label="Choose symbol" aria-expanded={open} onClick={()=>setOpen(!open)}><SymbolIcon value={value}/> Choose symbol</button>{open&&<Popover anchor={root} width={340} height={420} className="symbol-menu" data-symbol-context={root.current?.closest(".trip-appearance-options")?"trip":undefined} onClose={closePicker}><input aria-label="Search symbols and emoji" placeholder="Search symbols and emoji" value={search} onChange={e=>setSearch(e.target.value)}/><div className="symbol-tabs"><button type="button" className={tab==='symbols'?'selected':''} onClick={()=>setTab('symbols')}>Journas symbols</button><AsyncButton type="button" pending={tab==='emoji'&&!emojiEntries.length&&!emojiError} className={tab==='emoji'?'selected':''} onClick={()=>setTab('emoji')}>Emoji</AsyncButton></div>{tab==='emoji'&&!q&&<div className="symbol-category"><Dropdown scrollable aria-label="Emoji category" value={categoryIndex} onChange={(e:any)=>setCategoryIndex(Number(e.target.value))}><option value={-2}>All emojis</option>{emojiGroups.map((group,index)=><option key={group} value={index}>{group}</option>)}<option value={-1}>Other components</option></Dropdown></div>}<SymbolChoices key={`${tab}:${categoryIndex}:${q}`} choices={choices} value={value} renderIcon={id=><SymbolIcon value={id}/>} onPick={id=>{onChange({target:{value:id}});setOpen(false);}}/>{(tab==='emoji'||q)&&!emojiEntries.length&&((emojiError||retrying)?<AsyncButton type="button" pending={retrying} className="text-button" onClick={()=>{setRetrying(true);setRetry(value=>value+1);}}>{emojiError||'Loading emoji.'} Retry</AsyncButton>:<span className="emoji-loading" role="status"><LoadingSpinner/>Loading emoji…</span>)}{!choices.length&&emojiEntries.length>0&&<span>No matching symbols</span>}</Popover>}</div>;
 }
 export function TimezonePicker({value,onChange}:any){const zones=Array.from(new Set(['', 'UTC',value,...Intl.supportedValuesOf('timeZone')]));return <div className="field"><span>Destination time zone</span><Dropdown aria-label="Destination time zone" searchable value={value} onChange={onChange}>{zones.map(zone=><option key={zone} value={zone}>{zone?zone.replaceAll('_',' '):'Automatic from planned places'}</option>)}</Dropdown></div>;}
 

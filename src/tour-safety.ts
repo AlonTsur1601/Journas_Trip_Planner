@@ -22,6 +22,7 @@ export function tourClickAllowed(stage:string,target:Element){
  if(within('.map-panel [aria-label="Add pin on map"]')&&!['Add your first place','Add another place'].includes(stage))return false;
  if(within('.map-panel [aria-label="Connect pins on map"]')&&stage!=='Connect your places')return false;
  if(within('.map-panel [aria-label="Connections"]'))return false;
+ if(within('.map-panel [aria-label="Places"]'))return false;
  if(within('.map-panel .map-pin')){
   if(stage!=='Connect your places')return false;
   if(!target.closest('.map-panel')?.querySelector('[aria-label="Connect pins on map"].active'))return false;

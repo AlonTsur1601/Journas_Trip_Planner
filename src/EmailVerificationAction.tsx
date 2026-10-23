@@ -1,3 +1,4 @@
+import {AsyncButton} from './AsyncButton';
 import {useEffect,useState} from 'react';
 import {Compass,Check,AlertCircle} from 'lucide-react';
 import {signInWithCustomToken} from 'firebase/auth';
@@ -57,7 +58,7 @@ export default function EmailVerificationAction(){
       <div className={`verification-action-symbol${busy?' is-loading':''}`} aria-hidden="true">{phase==='error'?<AlertCircle/>:phase==='complete'?<Check/>:<Compass/>}</div>
       <h1 id="verification-title">{phase==='verifying'?'One moment, you’re almost there.':phase==='opening'?'Welcome to Journas.':phase==='complete'?'You’re all set.':'Let’s try that again.'}</h1>
       <p className="verification-action-message" role="status" aria-live="polite">{message}</p>
-      {phase==='error'&&retryable&&<button className="button primary" onClick={()=>setAttempt(value=>value+1)}>Try again</button>}
+      {((phase==='error'&&retryable)||(busy&&attempt>0))&&<AsyncButton pending={busy} className="button primary" onClick={()=>setAttempt(value=>value+1)}>{busy?'Trying again…':'Try again'}</AsyncButton>}
     </section>
   </main>;
 }

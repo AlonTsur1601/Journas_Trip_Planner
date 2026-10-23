@@ -18,10 +18,10 @@ it("falls back to the world when location access fails", async () => {
   expect(await startingLayout(defaultSettings)).toMatchObject({ center: [0, 0], zoom: 0 });
 });
 
-it("opens custom and world views without asking for location", async () => {
+it("ignores removed custom coordinates and opens world view without location", async () => {
   const getCurrentPosition = vi.fn();
   vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
-  expect(await startingLayout({ ...defaultSettings, mapStart: "custom", mapCenter: [-74, 40.7], mapZoom: 10 })).toMatchObject({ center: [-74, 40.7], zoom: 10 });
+  expect(await startingLayout({ ...defaultSettings, mapStart: "custom", mapCenter: [-74, 40.7], mapZoom: 10 },{lng:2.35,lat:48.85})).toMatchObject({ center: [2.35,48.85], zoom: 14 });
   expect(await startingLayout({ ...defaultSettings, mapStart: "world" })).toMatchObject({ center: [0, 0], zoom: 0 });
   expect(getCurrentPosition).not.toHaveBeenCalled();
 });

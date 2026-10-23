@@ -1,4 +1,4 @@
-import {tourNeedsNext,tourInstructionComplete} from './tour-progress';
+import {tourNeedsNext,tourInstructionComplete,tourSubstepDelay} from './tour-progress';
 import {findTourTarget,observeTourTarget} from './tour-target';
 import {tourCardPosition,tourCardWidth} from './tour-layout';
 import {tourSpotlight} from './tour-spotlight';
@@ -39,17 +39,16 @@ export const tourSteps:Step[]=[
 ];
 const instructions:Record<string,Instruction[]>={
  'Make the trip yours':[
-  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page, then press Next step.'},
-  {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars, then press Next step.'},
-  {title:'Choose the trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol to open the icon and emoji grid, where you will choose the logo for this trip.',target:'.trip-appearance-options [aria-label="Choose symbol"]',done:()=>Boolean(document.querySelector('.symbol-menu[data-symbol-context="trip"]:not([inert])'))},
-  {title:'Pick a symbol',text:'Select an icon from the grid, use the search above it, or switch to Emoji. Your selection becomes the trip logo and closes the picker.',target:'.symbol-menu',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
+  {title:'Trip name',ready:()=>Boolean(document.querySelector<HTMLInputElement>('.trip-modal [name=name]')?.value.trim()),text:'Enter a Trip name at the top of the form. Use a name that will be easy to recognize on your home page. The guide continues after you finish typing.'},
+  {title:'Trip dates',action:'.trip-modal .date-field',ready:()=>{const form=document.querySelector('.trip-modal form');const start=form?.querySelector<HTMLInputElement>('[name=start]')?.value;const end=form?.querySelector<HTMLInputElement>('[name=end]')?.value;return Boolean(start&&end&&end>=start);},text:'Choose First day and Last day for your trip. For this guide, use two or three days. Type MM/DD/YYYY or use the calendars. The guide continues after you choose valid dates.'},
+  {title:'Choose a trip symbol',text:'Keep Symbol selected under the trip preview. Press Choose symbol, then select an icon or emoji from the grid. You can search above the grid. The selected symbol becomes your trip logo.',completeOn:'.symbol-menu[data-symbol-context="trip"] .symbol-grid button'},
   {title:'Choose a color',completeOn:'.trip-appearance-options .color-swatches button',text:'Under Trip color, click a color swatch. For a photo logo later, choose Image instead of Symbol, upload a photo and confirm its crop.'},
   {title:'Choose lodging',ready:c=>c.lodgingChosen,completeWhenReady:true,text:'Select a lodging location from search results or click the map. That completes this step. The suggested name, color and symbol can stay as they are; changing them is optional.'},
   {title:'Create the trip',text:'Press Create trip at the bottom of this window. If it is disabled, check that you chose a lodging location (and uploaded an image if you selected Image).'},
  ],
  'Find and customize a place':[
   {title:'Position and name',ready:c=>Boolean(c.draft?.title?.trim()),text:'Keep the suggested Place name, or change it if you want. Your clicked position is already selected. To search instead, turn off Place pin on map, type in Place, street or address, and select a result.'},
-  {title:'Note and appearance',text:'Place note, Color and Symbol are optional. Keep the suggested appearance, or customize it, then press Next step.'},
+  {title:'Note and appearance',text:'Place note, Color and Symbol are optional. Keep the suggested appearance, or customize it. The guide continues after a short pause; editing gives you more time.'},
   {title:'Save the place',text:'Press Create pin at the bottom. This saves a place on the map, rather than a home-page shortcut.'},
  ],
  'Link your schedule to a place':[
@@ -112,6 +111,7 @@ function seen(uid:string){try{return Boolean(localStorage.getItem(keyFor(uid)));
 export default function GuidedTour({userId,ready,context,onHome,practice,seenBefore}:{practice:boolean;userId:string;ready:boolean;context:TourContext;onHome:()=>void;seenBefore?:boolean}){
  const [status,setStatus]=useState<'closed'|'welcome'|'running'|'complete'>(()=>practice?'running':ready&&seenBefore===false&&!seen(userId)?'welcome':'closed'),[step,setStep]=useState(0),[part,setPart]=useState(0),[skipped,setSkipped]=useState<number[]>([]),[revision,refresh]=useState(0),[box,setBox]=useState<{x:number;y:number;width:number;height:number}|null>(null);
  const [acted,setActed]=useState<number[]>([]);
+ const latest=useRef({context,acted});latest.current={context,acted};
  const occluders=useRef<SVGGElement>(null);
  const outline=useRef<HTMLDivElement>(null),cutouts=useRef<SVGGElement>(null),shield=useRef<SVGPathElement>(null);
  const card=useRef<HTMLElement>(null),[cardHeight,setCardHeight]=useState(250),[domModal,setDomModal]=useState(false),[banner,setBanner]=useState({x:12,y:12,embedded:false,height:43});
@@ -156,6 +156,22 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
   if(completed.length)setActed(previous=>[...new Set([...previous,...completed])]);
  },[status,step,context,revision,acted]);
  useEffect(()=>{if(status!=='running')return;if((!current.instructions||part===current.instructions.length-1)&&current.done?.(context))advanceStage();else if(instruction?.skipWhen?.(context)){setSkipped(previous=>[...previous,part]);next();}else if(instruction?.done?.(context)||((instruction?.completeOn||instruction?.done)&&acted.includes(part)&&(!instruction.ready||instruction.ready(context))))next();},[status,step,part,context,revision,acted]);
+ const autoDelay=status==='running'&&instruction&&current.instructions?tourSubstepDelay(instruction,part,current.instructions.length,acted,context):null;
+ useEffect(()=>{
+  if(autoDelay===null||!instruction)return;
+  let timer=0,held=false,live=true;
+  const schedule=(delay=autoDelay)=>{window.clearTimeout(timer);timer=window.setTimeout(()=>{
+   if(!live)return;
+   const selector=typeof current.target==='function'?current.target(latest.current.context):current.target;
+   if(held||document.querySelector('.bounded-popover:not([inert]):not([data-motion-exit])')||!findTourTarget(selector)){schedule(250);return;}
+   const state=latest.current;
+   if(tourSubstepDelay(instruction,part,current.instructions!.length,state.acted,state.context)!==null)next();
+  },delay);};
+  const activity=(event:Event)=>{if(!(event.target instanceof Element)||event.target.closest('.guided-tour'))return;if(event.type==='pointerdown')held=true;if(event.type==='pointerup'||event.type==='pointercancel')held=false;schedule();};
+  const events=['input','change','keydown','pointerdown','pointerup','pointercancel','wheel','journas-field-edit'];
+  for(const event of events)document.addEventListener(event,activity,true);
+  schedule();return()=>{live=false;window.clearTimeout(timer);for(const event of events)document.removeEventListener(event,activity,true);};
+ },[status,step,part,autoDelay]);
  useLayoutEffect(()=>setBox(null),[step]);
  const target=current.target;const selector=typeof target==='function'?target(context):target;
  useEffect(()=>{

@@ -549,52 +549,32 @@ it('supports lodging styling and defaults block epochs to lodging timezone',asyn
 
 
 
-describe("Shared time blocks across calendar days",()=>{
-  async function multi(){
-    const fixture=await setup();
-    const trip=fixture.store.docs.get(`trips/${fixture.id}`)!;
-    fixture.store.docs.set(`trips/${fixture.id}`,{...trip,endDate:"2026-10-06"});
-    const write=(date:string,patch:Data,baseVersions:Data={})=>fixture.service.execute("alice",{action:"item.patch",tripId:fixture.id,date,kind:"blocks",id:"overnight",patch,baseVersions});
-    const read=(date:string)=>fixture.service.execute("alice",{action:"trip.get",tripId:fixture.id,date});
-    const {item}=await write(day,{...block,pinId:null,startDate:day,endDate:"2026-10-03",start:"22:00",end:"07:00",timezone:"UTC",disambiguation:null});
-    return {...fixture,write,read,item:item as any};
-  }
-  it("shows one shared block on every occupied day and edits from a middle day",async()=>{
-    const {write,read,item}=await multi();
-    for(const date of [day,"2026-10-02","2026-10-03"]){const r=await read(date);expect((r.day as any).blocks[0]).toEqual(item);}
-    await write("2026-10-02",{title:"Updated from the middle",end:"08:00"},item.versions);
-    for(const date of [day,"2026-10-02","2026-10-03"]){const r=await read(date);expect((r.day as any).blocks[0]).toMatchObject({id:"overnight",title:"Updated from the middle",end:"08:00"});}
-    await expect(write(day,{title:"Stale edit"},item.versions)).rejects.toMatchObject({code:"CONFLICT"});
-  });
-  it("removes obsolete portions when shortening and excludes an endpoint at midnight",async()=>{
-    const {write,read,item}=await multi();
-    await write("2026-10-02",{endDate:"2026-10-02",end:"00:00"},item.versions);
-    expect((await read(day)).day).toMatchObject({blocks:[expect.objectContaining({end:"00:00"})]});
-    expect((await read("2026-10-02")).day).toMatchObject({blocks:[]});
-    expect((await read("2026-10-03")).day).toMatchObject({blocks:[]});
-  });
-  it("deletes all portions and unlinks tasks in their own day",async()=>{
-    const {service,id,read,item}=await multi();
-    await service.execute("alice",{action:"item.patch",tripId:id,date:"2026-10-02",kind:"tasks",id:"linked",patch:{...task,pinId:null,blockId:"overnight"},baseVersions:{}});
-    await service.execute("alice",{action:"item.delete",tripId:id,date:"2026-10-03",kind:"blocks",id:"overnight",baseVersions:item.versions});
-    for(const date of [day,"2026-10-02","2026-10-03"])expect((await read(date)).day).toMatchObject({blocks:[]});
-    expect((await read("2026-10-02")).day).toMatchObject({tasks:[expect.objectContaining({blockId:null})]});
-  });
-  it("shares inherited place details, and keeps portions together through undo",async()=>{
-    const {write,patch,read,item,service,id}=await multi();
-    const place=await patch('pins','pin',pin);
-    const linked=await write(day,{pinId:'pin'},item.versions);
-    await patch('pins','pin',{title:'A renamed place'},(place.item as any).versions);
-    for(const date of [day,'2026-10-02','2026-10-03'])expect((await read(date)).day).toMatchObject({blocks:[expect.objectContaining({title:'A renamed place'})]});
-    await service.execute('alice',{action:'history.undo',tripId:id});
-    for(const date of [day,'2026-10-02','2026-10-03'])expect((await read(date)).day).toMatchObject({blocks:[expect.objectContaining({title:pin.title})]});
-    expect(linked.item).toBeDefined();
-  });
-  it("rejects an end outside the trip and reversed dates",async()=>{
-    const {write,item}=await multi();
-    await expect(write(day,{endDate:"2026-10-07"},item.versions)).rejects.toBeDefined();
-    await expect(write(day,{startDate:"2026-10-04"},item.versions)).rejects.toMatchObject({code:"INVALID_TIME"});
-  });
+describe('single-day time blocks',()=>{
+ it('rejects cross-day fields and overnight times',async()=>{
+  const {patch}=await setup();
+  await expect(patch('blocks','overnight',{...block,pinId:null,startDate:day,endDate:'2026-10-03'})).rejects.toMatchObject({code:'INVALID_FIELD'});
+  await expect(patch('blocks','overnight',{...block,pinId:null,start:'22:00',end:'07:00'})).rejects.toMatchObject({code:'INVALID_TIME'});
+ });
+ it('keeps new blocks on the selected day, including an end at midnight',async()=>{
+  const {patch,service,id,store}=await setup();
+  const created=(await patch('blocks','evening',{...block,pinId:null,start:'22:00',end:'24:00'})).item as any;
+  expect(created).toMatchObject({startDate:day,endDate:day});
+  expect(store.docs.has(`trips/${id}/days/2026-10-02/items/evening`)).toBe(false);
+  expect((await service.execute('alice',{action:'trip.get',tripId:id,date:day})).day).toMatchObject({blocks:[expect.objectContaining({start:'22:00',end:'24:00'})]});
+ });
+ it('preserves legacy visible portions as independent daily blocks on edit and deletion',async()=>{
+  const {store,service,id}=await setup();
+  store.docs.set(`trips/${id}`,{...store.docs.get(`trips/${id}`)!,endDate:'2026-10-03'});
+  const legacy={...block,id:'overnight',kind:'blocks',pinId:'old-source',start:'22:00',end:'07:00',startDate:day,endDate:'2026-10-03',timezone:'UTC',disambiguation:null,versions:{}};
+  for(const date of [day,'2026-10-02','2026-10-03'])store.docs.set(`trips/${id}/days/${date}/items/overnight`,legacy);
+  const read=async(date:string)=>((await service.execute('alice',{action:'trip.get',tripId:id,date})).day as any).blocks[0];
+  expect(await read(day)).toMatchObject({start:'22:00',end:'24:00',startDate:day,endDate:day});
+  expect(await read('2026-10-02')).toMatchObject({start:'00:00',end:'24:00',startDate:'2026-10-02',endDate:'2026-10-02',pinId:null,connectionId:null});
+  const updated=(await service.execute('alice',{action:'item.patch',tripId:id,date:'2026-10-02',kind:'blocks',id:'overnight',patch:{title:'Only this day'},baseVersions:{}})).item as any;
+  expect(await read(day)).toMatchObject({title:block.title});expect(await read('2026-10-02')).toMatchObject({title:'Only this day'});
+  await service.execute('alice',{action:'item.delete',tripId:id,date:'2026-10-02',kind:'blocks',id:'overnight',baseVersions:updated.versions});
+  expect(await read('2026-10-02')).toBeUndefined();expect(await read(day)).toBeDefined();expect(await read('2026-10-03')).toBeDefined();
+ });
 });
 it('changing only the Journas display name preserves the uploaded profile photo',async()=>{const {service}=await setup();const photo='data:image/png;base64,aGVsbG8=';await service.execute('alice',{action:'settings.save',settings:{displayName:'Alice',photoURL:photo}});await service.execute('alice',{action:'settings.save',settings:{displayName:'Bob'}});expect((await service.execute('alice',{action:'settings.get'})).settings).toMatchObject({displayName:'Bob',photoURL:photo});});
 
@@ -615,5 +595,5 @@ describe('connection metadata and plan links',()=>{
  it('creates named connections without a symbol or description and forbids connection colors',async()=>{const ctx=await linkedSetup();expect(ctx.connection).toMatchObject({title:'Station → Museum',detail:'',symbol:''});await expect(ctx.patch('connections','route',{color:'#000000'})).rejects.toMatchObject({code:'INVALID_FIELD'});});
  it('links blocks and tasks to a connection, validates references, and preserves block color and manual overrides',async()=>{const ctx=await linkedSetup();const connection=(await ctx.patch('connections','route',{title:'Train ride',detail:'Platform 2',symbol:'🚆'},ctx.connection.versions)).item as any;const linked=(await ctx.patch('blocks','ride',{...block,pinId:null,connectionId:'route',color:'#22c55e'})).item as any;expect(linked).toMatchObject({title:'Train ride',detail:'Platform 2',symbol:'🚆',color:'#22c55e',connectionId:'route'});await ctx.patch('tasks','ticket',{...task,pinId:null,blockId:null,connectionId:'route'});await expect(ctx.patch('tasks','missing',{...task,pinId:null,blockId:null,connectionId:'absent'})).rejects.toMatchObject({code:'INVALID_LINK'});await expect(ctx.patch('blocks','both',{...block,pinId:'from',connectionId:'route'})).rejects.toMatchObject({code:'INVALID_LINK'});const custom=(await ctx.patch('blocks','ride',{title:'My custom ride',overrides:['title']},linked.versions)).item as any;await ctx.patch('connections','route',{title:'Express train',detail:'Platform 3',symbol:'icon:train'},connection.versions);const dayData=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;expect(dayData.blocks[0]).toMatchObject({title:'My custom ride',detail:'Platform 3',symbol:'icon:train',color:'#22c55e'});expect(custom.connectionId).toBe('route');});
  it.each(['connection','endpoint'])('clears links when deleting the %s and restores everything through undo',async removed=>{const ctx=await linkedSetup();await ctx.patch('blocks','ride',{...block,pinId:null,connectionId:'route'});await ctx.patch('tasks','ticket',{...task,pinId:null,blockId:'ride',connectionId:'route'});const endpoint=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;const item=removed==='connection'?ctx.connection:endpoint.pins.find((p:any)=>p.id==='from');await ctx.service.execute('alice',{action:'item.delete',tripId:ctx.id,date:day,kind:removed==='connection'?'connections':'pins',id:item.id,baseVersions:item.versions});let data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;expect(data.connections).toHaveLength(0);expect(data.blocks[0].connectionId).toBeNull();expect(data.tasks[0].connectionId).toBeNull();await ctx.service.execute('alice',{action:'history.undo',tripId:ctx.id});data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;expect(data.connections).toHaveLength(1);expect(data.blocks[0].connectionId).toBe('route');expect(data.tasks[0].connectionId).toBe('route');});
- it('updates and clears all copies of a multi-day block linked from its starting day',async()=>{const ctx=await linkedSetup();await ctx.service.execute('alice',{action:'trip.update',tripId:ctx.id,name:'Paris',startDate:day,endDate:'2026-10-03',lodging:{name:'Test lodging',lng:2.3,lat:48.8}});await ctx.patch('blocks','ride',{...block,pinId:null,connectionId:'route',startDate:day,endDate:'2026-10-03'});const updated=(await ctx.patch('connections','route',{title:'Long journey',detail:'Bring a book'},ctx.connection.versions)).item as any;let data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:'2026-10-03'})).day as any;expect(data.blocks[0]).toMatchObject({title:'Long journey',detail:'Bring a book',connectionId:'route'});await ctx.service.execute('alice',{action:'item.delete',tripId:ctx.id,date:day,kind:'connections',id:'route',baseVersions:updated.versions});data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:'2026-10-03'})).day as any;expect(data.blocks[0].connectionId).toBeNull();});
+
 });

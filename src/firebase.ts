@@ -61,6 +61,7 @@ async function request<T = unknown>(
   background=false,
   practice:PracticeData|null=getPracticeSession(),
 ): Promise<T> {
+  if(practice&&action.startsWith('share.'))throw Object.assign(new Error('Sharing is unavailable during the guided tutorial.'),{code:'PRACTICE_ONLY'});
   if(practice&&action==='planner.restore'&&practice.documents.length===0)return {trips:[],settings:{...defaultSettings},home:{pins:[],recentTrips:[],recentDays:[]},restore:null} as T;
   if(practice&&!action.startsWith('auth.')&&!action.startsWith('tour.')&&!action.startsWith('places.'))return practiceRequest<T>(practice,async practiceDocuments=>{
     const token=await auth?.currentUser?.getIdToken();

@@ -1,7 +1,7 @@
 import {describe,it,expect,vi,beforeEach,afterEach} from 'vitest';
 vi.mock('../src/firebase',()=>({api:vi.fn()}));
 import {tourSteps} from '../src/GuidedTour';
-import {tourShieldPath,tourNeedsNext,tourInstructionComplete,tourSubstepDelay} from '../src/tour-progress';
+import {tourShieldPath,tourNeedsNext,tourInstructionComplete,tourSubstepDelay,tourStageReviewed} from '../src/tour-progress';
 
 beforeEach(()=>vi.stubGlobal('document',{activeElement:null,querySelector:()=>null}));
 afterEach(()=>vi.unstubAllGlobals());
@@ -11,13 +11,13 @@ describe('guide progression',()=>{
  it.each([
   ['Make the trip yours','Trip name'],['Make the trip yours','Trip dates'],['Make the trip yours','Choose lodging'],
   ['Find and customize a place','Position and name'],['Find and customize a place','Note and appearance'],
-  ['Link your schedule to a place','Choose dates'],['Link your schedule to a place','Set the time'],
+  ['Link your schedule to a place','Activity name'],['Link your schedule to a place','Set the time'],
   ['Connect a task to the plan','Write the task'],
  ])('%s / %s does not advance from a blur or click alone', (stage,title)=>{
   expect(part(stage,title).done).toBeUndefined();expect(part(stage,title).completeOn).toBeUndefined();
  });
  it.each([
-  ['Link your schedule to a place','Link a place'],['Make the trip yours','Choose a trip symbol'],['Make the trip yours','Choose a color'],
+['Make the trip yours','Choose a trip symbol'],['Make the trip yours','Choose a color'],
   ['Choose your preferences','Appearance'],['Choose your preferences','Map starting view'],['Choose your preferences','Clock and time zone'],
  ])('%s / %s keeps explicit choice advancement', (stage,title)=>expect(part(stage,title).completeOn).toBeTruthy());
  it('never includes field blur advancement anywhere in the catalog',()=>{
@@ -39,9 +39,9 @@ describe('required guide actions',()=>{
  it('never offers Next for a substep or stage completed by its site action',()=>{
   for(const step of tourSteps){if(!step.instructions&&step.done)expect(tourNeedsNext(step,undefined,0)).toBe(false);for(const [index,part]of (step.instructions??[]).entries()){if(part.done||part.completeOn)expect(tourNeedsNext(step,part,index)).toBe(false);if(step.done&&index===step.instructions!.length-1&&!part.closeOnNext)expect(tourNeedsNext(step,part,index)).toBe(false);}}
  });
- it('uses opening the calendar and saving planning as the advance actions',()=>{expect(stage('Navigate the trip dates').instructions![0].completeOn).toContain('date-button');expect(stage('Undo, redo and save').instructions![1].completeOn).toContain('Save planning');});
+ it('makes introductory controls optional and immediately offers Next',()=>{for(const title of ['Choose a trip','Navigate the trip dates','Arrange your workspace','Undo, redo and save','Share and collaborate','Find your plans again']){const step=stage(title);expect(step.informational).toBe(true);expect(step.instructions).toBeUndefined();expect(tourNeedsNext(step,undefined,0)).toBe(true);}});
  it('accepts lodging selected early without requiring a custom name or appearance',()=>{const steps=stage('Make the trip yours').instructions!,index=steps.findIndex(p=>p.title==='Choose lodging'),part=steps[index];expect(tourInstructionComplete(part,index,0,[index],{lodgingChosen:true}as any)).toBe(true);expect(tourInstructionComplete(part,index,0,[],{lodgingChosen:false}as any)).toBe(false);});
- it('lets valid schedule defaults stay unchanged',()=>{const steps=stage('Link your schedule to a place').instructions!;for(const title of ['Choose dates','Set the time']){const index=steps.findIndex(p=>p.title===title);expect(tourInstructionComplete(steps[index],index,index,[index],{date:'2026-10-23',draft:{start:'09:00',end:'10:00'}}as any)).toBe(true);}});
+ it('lets valid schedule defaults stay unchanged',()=>{const steps=stage('Link your schedule to a place').instructions!;for(const title of ['Set the time']){const index=steps.findIndex(p=>p.title===title);expect(tourInstructionComplete(steps[index],index,index,[index],{date:'2026-10-23',draft:{start:'09:00',end:'10:00'}}as any)).toBe(true);}});
  it('does not complete untouched trip dates just because they are valid',()=>{const part={ready:()=>true,action:'.date-field'};expect(tourInstructionComplete(part,1,1,[],{})).toBe(false);expect(tourInstructionComplete(part,1,1,[1],{})).toBe(true);});
 });
 
@@ -57,9 +57,9 @@ describe('finishing the entire field group',()=>{
  it.each([
   ['Make the trip yours','Trip name',{},'.trip-modal [name=name]'],
   ['Make the trip yours','Trip dates',{},'.trip-modal .date-field'],
-  ['Find and customize a place','Position and name',{draft:{title:'Museum'}},'.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])'],
-  ['Connect a task to the plan','Write the task',{draft:{title:'Buy tickets'}},'.item-modal input:not([type=hidden]), .task-modal input:not([type=hidden])'],
-  ['Link your schedule to a place','Choose dates',{date:'2026-10-23',draft:{}},'.item-modal .date-field'],
+  ['Find and customize a place','Position and name',{draft:{title:'Museum'}},'.item-modal fieldset > .field:first-child input, .item-modal .location-picker .place-search input'],
+  ['Connect a task to the plan','Write the task',{draft:{title:'Buy tickets'}},'.task-modal fieldset > .field:first-child input'],
+  ['Link your schedule to a place','Activity name',{draft:{title:'Museum'}},'.item-modal fieldset > .field:first-child input'],
   ['Link your schedule to a place','Set the time',{date:'2026-10-23',draft:{start:'09:00',end:'10:00'}},'.item-modal .time-field'],
  ])('keeps %s / %s active throughout editing', (stage,title,context,selector)=>{
   const instruction=tourSteps.find(s=>s.title===stage)!.instructions!.find(p=>p.title===title)!;
@@ -99,4 +99,41 @@ describe('manual completion throughout the entire guide',()=>{
   expect(tourInstructionComplete(parts[index],index,index,[],{lodgingChosen:true} as any)).toBe(false);
   expect(tourInstructionComplete(parts[index],index,index,[index],{lodgingChosen:true} as any)).toBe(true);
  });
+});
+
+
+describe('review-only values and logical progression',()=>{
+ it('allows a main stage to finish after every preceding substep has a manual action',()=>{
+  const instructions=[{action:'.title'},{action:'.time'},{action:'.link'},{completeOn:'.save'}];
+  expect(tourStageReviewed(instructions,[],{})).toBe(false);
+  expect(tourStageReviewed(instructions,[0,1],{})).toBe(false);
+  expect(tourStageReviewed(instructions,[0,1,2],{})).toBe(true);
+ });
+ it('does not demand a link when the user deliberately keeps the independent activity',()=>{
+  const part=tourSteps.find(s=>s.title==='Link your schedule to a place')!.instructions!.find(s=>s.title==='Link a place or connection')!;
+  expect(part.ready!({draft:{pinId:null,connectionId:null}} as any)).toBe(true);
+  expect(part.action).toContain('Linked place or connection');
+ });
+ it('teaches block fields in menu order and creates connections before showing link choices',()=>{
+  const stage=tourSteps.find(s=>s.title==='Link your schedule to a place')!;
+  expect(stage.instructions!.map(s=>s.title)).toEqual(['Activity name','Set the time','Link a place or connection','Details and appearance','Create the time block']);
+  expect(tourSteps.findIndex(s=>s.title==='Connect your places')).toBeLessThan(tourSteps.indexOf(stage));
+  expect(JSON.stringify(tourSteps)).not.toMatch(/overnight|multi-day|across days|start and end dates and times/i);
+ });
+ it('only skips the optional custom-map step after the preceding user choice',()=>{
+  const items=[{completeOn:'.mode'},{completeOn:'.custom',skipWhen:(c:{custom:boolean})=>!c.custom},{completeOn:'.save'}];
+  expect(tourStageReviewed(items,[0],{custom:false})).toBe(true);
+  expect(tourStageReviewed(items,[0],{custom:true})).toBe(false);
+ });
+});
+
+
+it('highlights the whole task, focuses opened navigation lists, and omits map exploration',()=>{
+ expect(tourSteps.some(step=>step.title==='Explore the map')).toBe(false);
+ expect(tourSteps.find(step=>step.title==='Check it off')!.target).toContain('.task-row');
+ expect(tourSteps.find(step=>step.title==='Undo, redo and save')!.target).toBe('.planning-history-actions');
+ const navigation=tourSteps.find(step=>step.title==='Navigate the trip dates')!;
+ vi.stubGlobal('document',{querySelector:()=>({})});expect((navigation.target as Function)({})).toBe('.calendar-popover');
+ const selector=tourSteps.find(step=>step.title==='Choose a trip')!;
+ expect((selector.target as Function)({})).toContain('Choose trip');
 });

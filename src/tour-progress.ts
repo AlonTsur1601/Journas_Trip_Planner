@@ -29,3 +29,9 @@ export function tourSubstepDelay<T>(instruction:{text:string;ready?:(context:T)=
  if(index>=count-1||instruction.done||instruction.completeOn||instruction.closeOnNext)return null;
  return Boolean(instruction.action)&&acted.includes(index)&&instruction.ready?.(context)!==false?0:null;
 }
+
+
+/** The final save/close is its own action; preceding fields only need a manual review. */
+export function tourStageReviewed<T>(instructions:{action?:string;completeOn?:string;skipWhen?:(context:T)=>boolean}[]|undefined,acted:number[],context:T){
+ return !instructions||instructions.slice(0,-1).every((item,index)=>item.skipWhen?.(context)||acted.includes(index));
+}

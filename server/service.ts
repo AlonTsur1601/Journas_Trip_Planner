@@ -7,7 +7,7 @@ import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store,
 import { resolveWallTime } from './time.js';
 import tzlookup from 'tz-lookup';
 const kinds: Kind[] = ['pins', 'blocks', 'tasks', 'connections'];
-const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'startDate', 'endDate', 'title', 'detail', 'color', 'symbol', 'pinId', 'connectionId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId', 'connectionId'], connections: ['from', 'to', 'arrow', 'title', 'detail', 'symbol'] };
+const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'title', 'detail', 'color', 'symbol', 'pinId', 'connectionId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId', 'connectionId'], connections: ['from', 'to', 'arrow', 'title', 'detail', 'symbol'] };
 function fail(status: number, code: string, message: string, details?: unknown): never { throw new ApiError(status, code, message, details); }
 const identifier = (value: unknown): string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value) ? value : fail(400, 'INVALID_ID', 'Invalid identifier');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.length <= max ? value : fail(400, 'INVALID_TEXT', `Text must contain at most ${max} characters`);
@@ -20,14 +20,11 @@ const date = (value: unknown): string => {
         return fail(400, 'INVALID_DATE', 'Invalid calendar date');
     return value;
 };
-function blockDays(item:Data,fallback:string){
-    const first=String(item.startDate??fallback),last=String(item.endDate??first),days:string[]=[];
-    for(let d=new Date(first+'T12:00:00Z');d.toISOString().slice(0,10)<=last;d.setUTCDate(d.getUTCDate()+1)){
-        const value=d.toISOString().slice(0,10);
-        if(value===last&&item.end==='00:00')break;
-        days.push(value);
-    }
-    return days;
+/** Legacy overnight copies become independent blocks on each day. */
+function dayBlock(item:Item,day:string):Item {
+    if(item.kind!=='blocks')return item;
+    const first=String(item.startDate??day),last=String(item.endDate??first);
+    return {...item,start:day>first?'00:00':item.start,end:day<last?'24:00':item.end,startDate:day,endDate:day,...(first!==day?{pinId:null,connectionId:null}:{})};
 }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const tripPath = (id: string) => `trips/${id}`;
@@ -132,8 +129,8 @@ function validateItem(kind: Kind, item: Data) {
         if (item.disambiguation !== null && item.disambiguation !== 'earlier' && item.disambiguation !== 'later')
             fail(400, 'INVALID_ITEM', 'Choose an occurrence for a repeated hour');
         const time = /^([01]\d|2[0-3]):[0-5]\d$/;
-        if (!time.test(String(item.start)) || !(time.test(String(item.end)) || item.end === '24:00') || String(item.startDate) > String(item.endDate) || item.startDate === item.endDate && String(item.start) >= String(item.end))
-            fail(400, 'INVALID_TIME', 'End date and time must follow start date and time');
+        if (!time.test(String(item.start)) || !(time.test(String(item.end)) || item.end === '24:00') || String(item.start) >= String(item.end))
+            fail(400, 'INVALID_TIME', 'End time must follow start time');
         if (!Array.isArray(item.overrides) || item.overrides.length > 4 || item.overrides.some(x => !['title', 'detail', 'color', 'symbol'].includes(String(x))))
             fail(400, 'INVALID_ITEM', 'Invalid overrides');
     }
@@ -203,7 +200,7 @@ export class JournasService {
             fail(409, 'TRIP_LIMIT', 'You have reached the 100-trip limit');
         return user;
     }
-    private async day(tx: Transaction, id: string, day: string) { const entries = await tx.list(itemsPath(id, day)); return Object.fromEntries(kinds.map(kind => [kind, entries.filter(x => x.kind === kind)])); }
+    private async day(tx: Transaction, id: string, day: string) { const entries = await tx.list(itemsPath(id, day)); return Object.fromEntries(kinds.map(kind => [kind, entries.filter(x => x.kind === kind).map(x=>dayBlock(x as Item,day))])); }
     private dayWithin(trip: Trip, day: string) {
         if (day < trip.startDate || day > trip.endDate)
             fail(400, 'DATE_OUTSIDE_TRIP', 'Choose a date within this trip');
@@ -376,7 +373,8 @@ export class JournasService {
             if (!kinds.includes(kind))
                 fail(400, 'INVALID_KIND', 'Unknown item type');
             const itemId = identifier(input.id), path = `${itemsPath(id, day)}/${itemId}`;
-            const current = await tx.get(path) as Item | undefined;
+            const stored = await tx.get(path) as Item | undefined;
+            const current = stored ? dayBlock(stored,day) : undefined;
             if (current && current.kind !== kind)
                 fail(409, 'ITEM_KIND', 'This identifier belongs to another item type');
             const base = versions(input.baseVersions);
@@ -390,31 +388,24 @@ export class JournasService {
             const conflicts = changed.filter(key => (current?.versions[key] ?? 0) !== (base[key] ?? 0));
             if (conflicts.length)
                 fail(409, 'CONFLICT', 'This item changed while you were editing it', { item: current, fields: conflicts });
-            const all = await tx.list(itemsPath(id, day)) as Item[];
+            const all = (await tx.list(itemsPath(id, day)) as Item[]).map(item=>dayBlock(item,day));
             if(trip.lodging){const place=trip.lodging as Data;all.push({id:'trip-lodging',kind:'pins',title:place.name,note:place.note??'',color:place.color??'#7c5ce7',symbol:place.symbol??'icon:stay',lng:place.lng,lat:place.lat,versions:{}});}
             if (action === 'item.delete') {
-                if (current?.kind==='blocks') {
-                    for(const blockDay of blockDays(current,day))await this.deleteItem(tx,id,blockDay,current,await tx.list(itemsPath(id,blockDay)) as Item[]);
-                } else if (current)
-                    await this.deleteItem(tx, id, day, current, all);
+                if (current) await this.deleteItem(tx, id, day, current, all);
                 return { ok: true };
             }
             if (!current && (all.filter(x => x.kind === kind).length >= 200 || all.length >= 400))
                 fail(409, 'DAY_LIMIT', 'This day has reached its item limit (200 per type, 400 total)');
             let item = bump(current ?? { id: itemId, kind, versions: {} }, patch);
             if (kind === 'blocks') {
-                if (!('startDate' in item))item=bump(item,{startDate:day});
-                if (!('endDate' in item))item=bump(item,{endDate:item.startDate});
-                const first=date(item.startDate),last=date(item.endDate);
-                this.dayWithin(trip,first);this.dayWithin(trip,last);
-                if(first>last)fail(400,'INVALID_TIME','End date must follow start date');
+                item={...item,startDate:day,endDate:day};
                 if (!('timezone' in item))
                     item = bump(item, { timezone: (trip.lodging as Data|undefined)?.timezone ?? input.clientTimezone ?? 'UTC' });
                 if (!('disambiguation' in item))
                     item = bump(item, { disambiguation: null });
             }
             if (kind === 'blocks' && item.pinId) {
-                const sourcePins=item.startDate===day?all:await tx.list(itemsPath(id,String(item.startDate))) as Item[];
+                const sourcePins=all;
                 const pin = [...sourcePins,...all.filter(x=>x.id==='trip-lodging')].find(x => x.id === item.pinId && x.kind === 'pins');
                 if (!pin)
                     fail(400, 'INVALID_LINK', 'Linked place does not exist');
@@ -430,7 +421,7 @@ export class JournasService {
                 if(!('symbol' in item))item=bump(item,{symbol:''});
             }
             if(kind==='blocks'&&item.connectionId){
-                const sources=item.startDate===day?all:await tx.list(itemsPath(id,String(item.startDate))) as Item[];
+                const sources=all;
                 const connection=sources.find(source=>source.kind==='connections'&&source.id===item.connectionId);
                 if(!connection)fail(400,'INVALID_LINK','Linked connection does not exist');
                 const defaults:Data={title:connectionTitle(connection as any,sources as any),detail:connection.detail??'',symbol:connection.symbol??''};
@@ -484,17 +475,9 @@ export class JournasService {
             return { item };
         });
     }
-    private async syncBlock(tx:Transaction,id:string,item:Item,previous:Item|undefined,day:string){
-        const active=new Set(blockDays(item,day));
-        for(const target of new Set([...active,...(previous?blockDays(previous,day):[])])){
-            const existing=await tx.list(itemsPath(id,target)) as Item[];
-            if(!active.has(target)){await this.deleteItem(tx,id,target,item,existing);continue;}
-            const collision=existing.find(other=>other.id===item.id);
-            if(collision&&(collision.kind!=='blocks'||String(collision.startDate??target)!==String(previous?.startDate??day)))fail(409,'ITEM_KIND','This identifier belongs to another item');
-            if(!collision&&(existing.filter(x=>x.kind==='blocks').length>=200||existing.length>=400))fail(409,'DAY_LIMIT','A day in this time block has reached its item limit');
-            tx.set(`${itemsPath(id,target)}/${item.id}`,item);
-            tx.set(`trips/${id}/days/${target}`,{date:target,updatedAt:this.now()});
-        }
+    private async syncBlock(tx:Transaction,id:string,item:Item,_previous:Item|undefined,day:string){
+        tx.set(`${itemsPath(id,day)}/${item.id}`,dayBlock(item,day));
+        tx.set(`trips/${id}/days/${day}`,{date:day,updatedAt:this.now()});
     }
     private async share(tx: Transaction, tokenInput: unknown) {
         const token = text(tokenInput, 100);

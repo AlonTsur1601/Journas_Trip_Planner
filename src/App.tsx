@@ -495,7 +495,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     return () => clearTimeout(timeout);
   }, [message]);
   const [blockLinkSources,setBlockLinkSources]=useState<{date:string;pins:Pin[];connections:Connection[]}|null>(null);
-  const linkDay=edit?.kind==='blocks'?(edit.item.startDate??date):date;
+  const linkDay=date;
   useEffect(()=>{setBlockLinkSources(null);if(edit?.kind!=='blocks'||linkDay===date||!trip?.id||!/^\d{4}-\d{2}-\d{2}$/.test(linkDay))return;const controller=new AbortController();void api<{day:Day}>('trip.get',{tripId:trip.id,date:linkDay},controller.signal,true).then(result=>{if(!controller.signal.aborted)setBlockLinkSources({date:linkDay,pins:result.day.pins,connections:result.day.connections});}).catch(error=>{if(!controller.signal.aborted)setMessage(error.message);});return()=>controller.abort();},[edit?.kind,linkDay,date,trip?.id]);
   const blockLinkPins=linkDay===date?day.pins:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.pins:[];
   const blockLinkConnections=linkDay===date?day.connections:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.connections:[];
@@ -951,6 +951,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if(selected&&user){const local=localStorage.getItem(`journas-layout:${user.uid}:${selected.id}:${nextDate}`);if(local)return JSON.parse(local);if(nextDate>=selected.startDate&&nextDate<=selected.endDate){const result=await api<{layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate});if(result.layout)return result.layout;}}return startingLayout(prefs,lodgingForDate(selected,nextDate));
   }
   async function switchDate(value:string){
+    if(practice&&trip&&(value<trip.startDate||value>trip.endDate))return;
     if(shareTrip&&trip){value=value<trip.startDate?trip.startDate:value>trip.endDate?trip.endDate:value;if(value===date)return;void saveLayout();setDate(value);setDay(emptyDay());setCalendar(false);return;}
     if(value===date)return;
     showPlanner(trip,value);
@@ -1049,7 +1050,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             "updatedBy",
             "startEpoch",
             "endEpoch",
-          ].includes(key) &&
+          ].includes(key) && (kind!=="blocks"||!["startDate","endDate"].includes(key)) &&
           JSON.stringify(original?.[key]) !== JSON.stringify(value),
       ),
     );
@@ -1162,8 +1163,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           }
         : kind === "blocks"
           ? {
-              startDate: date,
-              endDate: date,
               start: "09:00",
               end: "10:00",
               title: "",
@@ -1262,7 +1261,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             title="Create trip"
             aria-label="Create trip"
             onClick={createTrip}
-            disabled={!user || trips.length >= 100}
+            disabled={practice || !user || trips.length >= 100}
           >
             <Plus size={18} />
           </button>
@@ -1273,7 +1272,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             aria-label="Next day"
             disabled={
               date >= maxDate() ||
-              Boolean(shareTrip && trip && date >= trip.endDate)
+              Boolean((shareTrip || practice) && trip && date >= trip.endDate)
             }
             onClick={() => {
               const d = new Date(`${date}T12:00:00`);
@@ -1284,7 +1283,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <ChevronLeft size={17} />
           </button>
           <button
-            className="date-button"
+            className="date-button" aria-expanded={calendar}
             onClick={() => {setMonth(date.slice(0,7));setCalendar(!calendar);}}
           >
             <CalendarDays size={17} />
@@ -1299,7 +1298,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <button
             className="icon"
             aria-label="Previous day"
-            disabled={Boolean(shareTrip && trip && date <= trip.startDate)}
+            disabled={Boolean((shareTrip || practice) && trip && date <= trip.startDate)}
             onClick={() => {
               const d = new Date(`${date}T12:00:00`);
               d.setDate(d.getDate() - 1);
@@ -1309,7 +1308,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <ChevronRight size={17} />
           </button>
         </div>
-        <div className="top-actions">
+        <div className="top-actions">
+          <div className="planning-history-actions">
           <button className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></button>
           <button className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></button>
           <div className="save-control">
@@ -1318,6 +1318,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <Save size={18} />
           </button>
           </div>
+          </div>
           {trip && (
             <button
               className="button subtle"
@@ -1765,7 +1766,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     disabled={
                       d > maxDate() ||
                       Boolean(
-                        shareTrip &&
+                        (shareTrip || practice) &&
                         trip &&
                         (d < trip.startDate || d > trip.endDate),
                       )
@@ -1907,14 +1908,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   }
                 />
               )}
-              {edit.kind === "pins" && <LocationPicker key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} mapPlacement={settings.pinPlacementOnMap??true} onMapPlacementChange={value=>void savePlacementPreference('pinPlacementOnMap',value)} onChange={(place,source)=>rawSetEdit(current=>current?.kind==='pins'&&current.item.id===edit.item.id?{...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title}}:current)}/>}
+              {edit.kind === "pins" && <LocationPicker key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>current?.kind==='pins'&&current.item.id===edit.item.id?{...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title}}:current)}/>}
 
               {edit.kind === "blocks" && (
                 <>
-                  <div className="form-row">
-                    <DateField label="Start date" value={edit.item.startDate??date} min={trip?.startDate} max={trip?.endDate} required onChange={(e:any)=>setEdit({...edit,item:{...edit.item,startDate:e.target.value,disambiguation:null}})}/>
-                    <DateField label="End date" value={edit.item.endDate??edit.item.startDate??date} min={edit.item.startDate??trip?.startDate} max={trip?.endDate} required onChange={(e:any)=>setEdit({...edit,item:{...edit.item,endDate:e.target.value,disambiguation:null}})}/>
-                  </div>
                   <div className="form-row">
                     <Input
                       label="Starts at"
@@ -1937,7 +1934,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     <Input
                       label="Ends at"
                       type="time"
-                      min={(edit.item.endDate??date)===(edit.item.startDate??date)?edit.item.start:undefined}
+                      min={edit.item.start}
                       required
                       value={edit.item.end}
                       onInput={(e: any) =>
@@ -2236,6 +2233,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   <button
                     className="button primary full"
                     onClick={async () => {
+                      if(practice){setMessage('Sharing is unavailable during the guided tutorial.');return;}
                       try {
                         const r = await api<{ token: string }>("share.create", {
                           tripId: trip.id,
@@ -2299,7 +2297,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <div className="settings-identity">
             <AccountNameField value={settings.displayName??""} onChange={displayName=>setSettings({...settings,displayName})} onValidity={setAccountNameValid} check={!practice&&(settings.displayName??"").trim()!==savedAccountName.current} disabled={practice}/>
 
-            <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are disabled in practice mode":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
+            <button type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are unavailable during the guided tutorial.":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></button>
             </div>
             <div className="field photo-field">
               <div className="settings-photo-preview"><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
@@ -2371,7 +2369,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               <option value="lodging">Lodging local time</option>
               <option value="utc">UTC</option>
             </Select>
-            <small className="active-clock">Active clock: {timezone}</small>
             <label className="checkbox-field">
               <input
                 type="checkbox"

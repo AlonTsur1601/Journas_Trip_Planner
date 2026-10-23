@@ -1516,7 +1516,8 @@ fieldset:disabled .color-plane { pointer-events:none; opacity:.5; }
 .map-tools { position:absolute; left:10px; top:10px; display:flex; gap:5px; padding:3px; background:var(--surface); border:1px solid var(--line); border-radius:6px; box-shadow:0 1px 5px #0002; }
 .map-tools .active { color:var(--accent); background:color-mix(in srgb,var(--accent) 18%,var(--surface)); }
 .placing-pin .maplibregl-canvas { cursor:crosshair; }
-.map-mode-note { position:absolute; top:10px; left:100px; right:10px; width:max-content; max-width:calc(100% - 110px); display:flex; align-items:center; gap:6px; padding:4px 8px; font-size:11px; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:6px; }
+.map-mode-note { position:absolute; top:10px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 20px); display:flex; align-items:center; gap:8px; padding:9px 12px; font-size:14px; color:var(--ink); background:var(--surface); border:1px solid var(--accent); border-radius:6px; box-shadow:0 3px 12px #0002; }
+.map-mode-note strong{font-weight:700;text-align:center;}
 .map-pin { color:white; display:grid; place-items:center; }
 .compass-control .maplibregl-ctrl-compass { width:29px; height:29px; }
 .compass-control svg { width:27px; height:27px; }
@@ -1531,7 +1532,7 @@ fieldset:disabled .color-plane { pointer-events:none; opacity:.5; }
 }
 button.danger:not(:disabled):active { color:#dc3545; box-shadow:inset 0 0 0 1px #dc3545,inset 0 0 0 100vmax #dc354540; }
 button.text-button.danger:not(:disabled):active { color:#a51d2a; box-shadow:none; }
-@media(max-width:650px){ .item-modal { padding:16px; } .item-modal .form-row { flex-wrap:wrap; } .map-mode-note { top:56px; left:10px; max-width:calc(100% - 20px); } }
+@media(max-width:650px){ .item-modal { padding:16px; } .item-modal .form-row { flex-wrap:wrap; } .map-mode-note { top:56px; max-width:calc(100% - 20px); } }
 
 .advanced-color-fields .hue-slider{width:100%;max-width:none}
 
@@ -1653,7 +1654,7 @@ input::-webkit-datetime-edit-year-field:focus,input::-webkit-datetime-edit-month
  .map-mode-note{top:56px;max-width:calc(100% - 20px);}
 }
 @media(prefers-reduced-motion:reduce){.bounded-popover,.pin-symbol{animation:none;transition:none;}}
-.map-mode-note{left:180px;max-width:calc(100% - 190px);}@media(max-width:700px){.map-mode-note{left:10px;max-width:calc(100% - 20px);}}
+@media(max-width:700px){.map-mode-note{top:56px;max-width:calc(100% - 20px);}}
 .view-controls button{border-radius:5px;}
 .date-field-row input{height:36px;}
 .compass-control .maplibregl-ctrl-icon{display:grid!important;place-items:center!important;}
@@ -1671,8 +1672,8 @@ input::-webkit-datetime-edit-year-field:focus,input::-webkit-datetime-edit-month
 .date-picker>button+button{border-left:1px solid var(--line);}
 .date-picker>button:first-child{border-radius:5px 0 0 5px;}
 .date-picker>button:last-child{border-radius:0 5px 5px 0;}
-.top-actions>.save-control{padding-left:5px;}
-.top-actions>.save-control>.icon,.top-actions>.button,.top-actions>.profile-control>.profile-trigger{height:34px;border-radius:0;border:0;}
+.planning-history-actions>.save-control{padding-left:5px;}
+.planning-history-actions>.save-control>.icon,.top-actions>.button,.top-actions>.profile-control>.profile-trigger{height:34px;border-radius:0;border:0;}
 .top-actions>.button,.top-actions>.profile-control{border-left:1px solid var(--line);}
 .top-actions>.profile-control>.profile-trigger{border-radius:0 5px 5px 0;padding-left:5px;}
 .view-controls>button{border-radius:0;}
@@ -1816,9 +1817,9 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .topbar{column-gap:4px;}
  .top-actions{width:100%;max-width:100%;margin-left:0;}
  .topbar>.brand{padding-right:5px;justify-self:start;}
- .top-actions>.icon{width:24px;min-width:24px;padding:3px;height:34px;border-radius:0;}
- .top-actions>.icon:first-child{border-radius:5px 0 0 5px;}
- .top-actions>.icon+button{border-left:1px solid var(--line);}
+ .planning-history-actions>.icon{width:24px;min-width:24px;padding:3px;height:34px;border-radius:0;}
+ .planning-history-actions>.icon:first-child{border-radius:5px 0 0 5px;}
+ .planning-history-actions>.icon+button{border-left:1px solid var(--line);}
  .profile-trigger>span:not(.avatar){max-width:32px;}
  .top-actions>.profile-control{min-width:0;flex:1;}
  .top-actions>.profile-control>.profile-trigger{width:100%;min-width:0;}
@@ -1837,9 +1838,9 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .topbar{grid-template-columns:max-content minmax(0,1fr);column-gap:0;row-gap:5px;padding:4px 6px;}
  .topbar>.brand{padding-right:0;border-right:0;gap:6px;}
  .top-actions{border-left:1px solid var(--line);padding-left:0;gap:0;}
- .top-actions>.icon+button{border-left:0;}
- .top-actions>.icon{border-radius:5px;}
- .top-actions>.icon:first-child{border-radius:5px;}
+ .planning-history-actions>.icon+button{border-left:0;}
+ .planning-history-actions>.icon{border-radius:5px;}
+ .planning-history-actions>.icon:first-child{border-radius:5px;}
  .save-control{border-left:1px solid var(--line);padding-left:3px;margin-left:2px;}
  .date-picker{margin:0;padding:0;justify-self:stretch;justify-content:flex-start;}
  .date-picker>.date-button{flex:1;justify-content:center;}
@@ -1886,12 +1887,12 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
  .date-picker>.icon{width:34px!important;min-width:34px;flex-basis:34px;}
  .date-picker>.date-button{font-size:12px;padding:5px 3px;}
  .date-picker>button:last-child{border-radius:0;}
- .top-actions>.icon{grid-row:3;width:34px;min-width:34px;height:38px;border:1px solid var(--line);border-left:0;border-radius:0;}
- .top-actions>.icon:first-child{grid-column:2;border-radius:0;}
- .top-actions>.icon:nth-child(2){grid-column:3;border-radius:0;}
- .top-actions>.save-control{grid-row:3;grid-column:4;width:42px;height:38px;margin:0;padding:0;gap:0;border:1px solid var(--line);border-radius:0 5px 5px 0;justify-content:center;background:var(--surface);}
+ .planning-history-actions>.icon{grid-row:3;width:34px;min-width:34px;height:38px;border:1px solid var(--line);border-left:0;border-radius:0;}
+ .planning-history-actions>.icon:first-child{grid-column:2;border-radius:0;}
+ .planning-history-actions>.icon:nth-child(2){grid-column:3;border-radius:0;}
+ .planning-history-actions>.save-control{grid-row:3;grid-column:4;width:42px;height:38px;margin:0;padding:0;gap:0;border:1px solid var(--line);border-radius:0 5px 5px 0;justify-content:center;background:var(--surface);}
  .save-control>.save-indicator{width:5px;height:5px;flex-shrink:0;}
- .top-actions>.save-control>.icon{width:30px;min-width:30px;height:36px;padding:4px;border-radius:0 4px 4px 0;}
+ .planning-history-actions>.save-control>.icon{width:30px;min-width:30px;height:36px;padding:4px;border-radius:0 4px 4px 0;}
 }
 .pin-tooltip{pointer-events:none;z-index:5;filter:drop-shadow(0 0 1px var(--line)) drop-shadow(0 3px 6px #0002);}
 .pin-tooltip .maplibregl-popup-tip{flex-shrink:0;}
@@ -2266,7 +2267,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 @media(max-width:700px){
  .topbar .date-picker{margin-right:8px;border-radius:5px;}
  .topbar .date-picker>button:last-child{border-radius:0 5px 5px 0;}
- .top-actions>.icon:first-child{border-left:1px solid var(--line);border-radius:5px 0 0 5px;}
+ .planning-history-actions>.icon:first-child{border-left:1px solid var(--line);border-radius:5px 0 0 5px;}
 }
 
 .workspace-motion{display:contents;}.workspace{overflow:hidden;}.workspace [data-workspace-exit],.workspace [data-workspace-exit] *{pointer-events:none!important;}
@@ -2577,3 +2578,6 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .tour-variant>.tour-actions:not(:empty){margin-top:14px;}
 
 .tour-variant[data-active="false"] .tour-actions{display:none;}
+
+.planning-history-actions{display:flex;align-items:center;gap:0;}
+@media(max-width:700px){.planning-history-actions{grid-row:3;grid-column:2/5;justify-self:stretch;}.planning-history-actions>.save-control{flex:1;}.planning-history-actions>.icon{flex-shrink:0;}}

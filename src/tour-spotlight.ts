@@ -1,3 +1,4 @@
+import {activitySnapshot,subscribeActivity} from './activity';
 import {isAboveTourTarget} from './tour-stacking';
 import {mirrorSurfaceMotion,restingSurfaceRect,watchSurfaceExit,mirrorExitAnimation} from './surface-motion';
 import {tourShieldPath,type TourRect} from './tour-progress';
@@ -7,6 +8,8 @@ import {tourShieldPath,type TourRect} from './tour-progress';
 export function tourSpotlight(outline:HTMLElement,cutouts:SVGGElement,shield:SVGPathElement,occluders:SVGGElement){
  const covers=new Map<Element,{rect:SVGRectElement;motion:ReturnType<typeof mirrorSurfaceMotion>}>();
  const holes=new Map<Element,{rect:SVGRectElement;motion:ReturnType<typeof mirrorSurfaceMotion>}>();
+ let loading=activitySnapshot().length>0;
+ const stopActivity=subscribeActivity(()=>{loading=activitySnapshot().length>0;if(loading)outline.hidden=true;});
  let stopExit:(()=>void)|null=null;
  let focused:Element|null=null,focusMotion:ReturnType<typeof mirrorSurfaceMotion>|null=null;
  const bounds=(element:Element)=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};
@@ -14,8 +17,9 @@ export function tourSpotlight(outline:HTMLElement,cutouts:SVGGElement,shield:SVG
   place(target:Element|null,availableHeight:number){
    const surfaces=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].filter(el=>!el.closest('[inert],[data-motion-exit]')&&el.getBoundingClientRect().width>0);
    if(target!==focused){
-    stopExit?.();stopExit=null;focusMotion?.stop();focused=target;outline.hidden=!target;
+    stopExit?.();stopExit=null;focusMotion?.stop();focused=target;outline.hidden=loading||!target;
     if(target){focusMotion=mirrorSurfaceMotion(target,outline);stopExit=watchSurfaceExit(target,(copy,fade,lift)=>{
+     if(loading||outline.hidden)return;
      const clip=outline.parentElement!.cloneNode(false) as HTMLElement;
      Object.assign(clip.style,{position:'fixed',inset:'0',zIndex:'250'});
      const glow=outline.cloneNode(true) as HTMLElement;glow.hidden=false;
@@ -24,7 +28,8 @@ export function tourSpotlight(outline:HTMLElement,cutouts:SVGGElement,shield:SVG
      const sourcePulse=outline.firstElementChild?.getAnimations()[0],exitPulse=glow.firstElementChild?.getAnimations()[0];
      if(sourcePulse?.startTime!=null&&exitPulse)exitPulse.startTime=sourcePulse.startTime;
      const motion=mirrorExitAnimation(lift,glow),opacity=mirrorExitAnimation(fade,clip);
-     const remove=()=>{clip.remove();motion.cancel();opacity.cancel();};
+     const remove=()=>{stopExitActivity();clip.remove();motion.cancel();opacity.cancel();};
+     const stopExitActivity=subscribeActivity(()=>{if(activitySnapshot().length)remove();});
      void fade.finished.then(remove,remove);
     });}
    }
@@ -50,12 +55,12 @@ export function tourSpotlight(outline:HTMLElement,cutouts:SVGGElement,shield:SVG
     if(element===focused){
      const styles={left:`${box.x}px`,top:`${box.y}px`,width:`${box.width}px`,height:`${box.height}px`};
      for(const [name,value] of Object.entries(styles))if(outline.style[name as 'left']!==value)outline.style[name as 'left']=value;
-     outline.hidden=false;focusMotion?.sync();
+     outline.hidden=loading;focusMotion?.sync();
     }
    }
    const path=tourShieldPath(innerWidth,availableHeight,openings);
    if(shield.getAttribute('d')!==path)shield.setAttribute('d',path);
   },
-  stop(){stopExit?.();outline.hidden=true;focusMotion?.stop();for(const hole of holes.values()){hole.motion.stop();hole.rect.remove();}holes.clear();for(const cover of covers.values()){cover.motion.stop();cover.rect.remove();}covers.clear();},
+  stop(){stopActivity();stopExit?.();outline.hidden=true;focusMotion?.stop();for(const hole of holes.values()){hole.motion.stop();hole.rect.remove();}holes.clear();for(const cover of covers.values()){cover.motion.stop();cover.rect.remove();}covers.clear();},
  };
 }

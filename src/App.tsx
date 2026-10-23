@@ -9,7 +9,7 @@ import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appear
 import WorkspaceMotion from "./WorkspaceMotion";
 import {MotionSurface} from "./MotionSurface";
 import { Undo2, Redo2 } from "lucide-react";
-import { Activity, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
 
   GoogleAuthProvider,
@@ -527,7 +527,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(() => {
     return observeClock(() => setTime(new Date()));
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dark =
       settings.theme === "dark" ||
       (settings.theme === "system" &&
@@ -1227,7 +1227,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&verified===null&&!hasOpenedWorkspace())return <LoadingScreen startup text="Getting Journas ready…"/>;
+  if(user&&(verified===null||verified===true&&!ready))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (

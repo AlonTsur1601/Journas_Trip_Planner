@@ -1,6 +1,6 @@
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
 import {findTourTarget,observeTourTarget} from '../src/tour-target';
-import {registerSurfaceMotion,mirrorSurfaceMotion,restingSurfaceRect} from '../src/surface-motion';
+import {registerSurfaceMotion,mirrorSurfaceMotion,restingSurfaceRect,watchSurfaceExit,notifySurfaceExit,mirrorExitAnimation} from '../src/surface-motion';
 let frames:Map<number,FrameRequestCallback>,nextFrame:number;
 const tick=()=>{const queued=[...frames.values()];frames.clear();queued.forEach(frame=>frame(0));};
 beforeEach(()=>{
@@ -68,5 +68,22 @@ describe('shared compositor motion',()=>{
   const copy={startTime:null,playbackRate:1,cancel:vi.fn()},animate=vi.fn(()=>copy);
   const binding=mirrorSurfaceMotion(menu,{animate} as any);binding.sync();expect(animate).not.toHaveBeenCalled();
   source.startTime=100;binding.sync();expect(copy.startTime).toBe(100);binding.stop();
+ });
+});
+
+
+describe('surface exit followers',()=>{
+ it('hands off the exact exiting copy and animations, and removes obsolete subscriptions',()=>{
+  const target={} as Element,copy={} as Element,fade={} as Animation,lift={} as Animation,follow=vi.fn();
+  const stop=watchSurfaceExit(target,follow);notifySurfaceExit(target,copy,fade,lift);
+  expect(follow).toHaveBeenCalledExactlyOnceWith(copy,fade,lift);stop();notifySurfaceExit(target,copy,fade,lift);expect(follow).toHaveBeenCalledOnce();
+ });
+ it('shares pending exit start times as soon as the compositor assigns them',async()=>{
+  let start!:()=>void;const ready=new Promise<void>(resolve=>{start=resolve;});
+  const frames=[{opacity:1},{opacity:0}],timing={duration:120,easing:'linear'};
+  const source={startTime:null as number|null,playbackRate:1,ready,effect:{getKeyframes:()=>frames,getTiming:()=>timing}};
+  const follower={startTime:null,playbackRate:0},animate=vi.fn(()=>follower);
+  mirrorExitAnimation(source as any,{animate} as any);expect(animate).toHaveBeenCalledExactlyOnceWith(frames,timing);
+  source.startTime=2345;start();await ready;expect(follower.startTime).toBe(source.startTime);expect(follower.playbackRate).toBe(source.playbackRate);
  });
 });

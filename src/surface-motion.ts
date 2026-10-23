@@ -35,3 +35,16 @@ export function mirrorSurfaceMotion(element:Element,node:Element){
   stop(){copy?.cancel();},
  };
 }
+
+
+type SurfaceExit=(copy:Element,fade:Animation,lift:Animation)=>void;
+const exitFollowers=new WeakMap<Element,SurfaceExit>();
+export function watchSurfaceExit(element:Element,follow:SurfaceExit){exitFollowers.set(element,follow);return()=>{if(exitFollowers.get(element)===follow)exitFollowers.delete(element);};}
+export function notifySurfaceExit(element:Element,copy:Element,fade:Animation,lift:Animation){exitFollowers.get(element)?.(copy,fade,lift);}
+
+/** Copy an exit's compositor timeline, including animations still awaiting start. */
+export function mirrorExitAnimation(source:Animation,node:Element){
+ const copy=node.animate((source.effect as KeyframeEffect).getKeyframes(),source.effect!.getTiming());
+ const sync=()=>{copy.playbackRate=source.playbackRate;if(source.startTime!==null)copy.startTime=source.startTime;};
+ sync();void source.ready.then(sync,()=>{});return copy;
+}

@@ -1,5 +1,5 @@
 import {useLayoutEffect,useRef,type ReactNode} from 'react';
-import {registerSurfaceMotion} from './surface-motion';
+import {registerSurfaceMotion,notifySurfaceExit} from './surface-motion';
 
 const duration=280;
 const easing='cubic-bezier(.2,.7,.2,1)';
@@ -77,7 +77,8 @@ export function MotionSurface({children}:{children:ReactNode}){
       enter.cancel();lift.cancel();dividerEnter?.cancel();layoutMotion?.cancel();
       const exit=copy.animate([{opacity},{opacity:plannerPanel?1:0}],{duration:plannerPanel?duration:fadeDuration,easing:shaded?'linear':easing,fill:'forwards'});
       const exitCard=shaded?copy.querySelector<HTMLElement>('.modal'):copy;
-      exitCard?.animate([{translate:cardTranslate},{translate:plannerPanel?`${(mapPanel?-1:1)*(rect.width+12)}px 0`:'0 6px'}],{duration,easing,fill:'forwards'});
+      const exitLift=exitCard?.animate([{translate:cardTranslate},{translate:plannerPanel?`${(mapPanel?-1:1)*(rect.width+12)}px 0`:'0 6px'}],{duration,easing,fill:'forwards'});
+      if(exitCard&&exitLift){registerSurfaceMotion(exitCard,exitLift);originalNodes.forEach((node,i)=>notifySurfaceExit(node,copiedNodes[i],exit,exitLift));}
       exit.finished.then(()=>copy.remove(),()=>copy.remove());
     };
   },[]);

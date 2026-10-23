@@ -393,7 +393,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     [date, setDate] = useState(today()),
     [day, setDay] = useState<Day>(emptyDay),
     [layout, setLayout] = useState<Layout>(defaultLayout),
-    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...readAppearance(document.documentElement.dataset.appearanceUser??"")})),
+    [settings, setSettings] = useState<Settings>(()=>({...defaultSettings,...readAppearance(document.documentElement.dataset.appearanceUser??""),...(practiceData?.profile??{})})),
     [message, setMessage] = useState(""),
     [status, setStatus] = useState("All changes saved"),
     [modal, setModal] = useState<string | null>(null),
@@ -519,7 +519,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       screenReady.current=false;
       setChooseName(false);setTourSeen(undefined);
       if(u&&!token&&reloadVisit.current){try{const saved=JSON.parse(sessionStorage.getItem('journas-current-screen')??'null');if(saved?.uid===u.uid&&saved.layout){layoutLoading.current=true;setLayout({...defaultLayout(),...saved.layout});}}catch{}}
-      setSettings({...defaultSettings,...(u?readAppearance(u.uid):{})});
+      setSettings({...defaultSettings,...(u?readAppearance(u.uid):{}),...(practiceData?.profile??{})});
       setUser(u);
       setReady(practice||!u);
     });
@@ -614,7 +614,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     void loadMapPanel().catch(()=>{});
     if(saved?.uid===user.uid&&saved.tripId&&!token)void import('./live-database').catch(()=>{});
     const hasSaved=saved?.uid===user.uid&&!token;
-    const bootstrap=initialProfile(user.uid)?Promise.resolve(initialProfile(user.uid)!):api<{tourSeen?:boolean;trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
+    const bootstrap=!practice&&initialProfile(user.uid)?Promise.resolve(initialProfile(user.uid)!):api<{tourSeen?:boolean;trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
       date:hasSaved?saved.date:today(),
       ...(hasSaved&&saved.tripId?{tripId:saved.tripId}:token?{tripId:null}:{})
     });
@@ -622,7 +622,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       .then(async ([result, identity]) => {
         if(cancelled)return;
         loadedAccount.current=user.uid;
-        releaseInitialProfile(user.uid);
+        if(!practice)releaseInitialProfile(user.uid);
         const list=result.trips,r={settings:result.settings};
         setTourSeen(result.tourSeen);
         savedAccountName.current=(result.settings.displayName??"").trim();
@@ -2515,7 +2515,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal==='map-preference'&&<Modal title="Starting map location" onClose={()=>setModal('settings')}><div className="settings-location-map"><Suspense fallback={<div>Loading map…</div>}><MapPanel pins={[]} connections={[]} readonly layout={settingsMapView} onPin={()=>{}} onAdd={()=>{}} onView={(center,zoom)=>setSettingsMapView(previous=>({...previous,center,zoom}))}/></Suspense></div><button className="button primary full" onClick={()=>{setSettings({...settings,mapCenter:settingsMapView.center,mapZoom:settingsMapView.zoom});setModal('settings');}}>Use this map view</button></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><button className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</button><button className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</button></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={settings} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:day.tasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}

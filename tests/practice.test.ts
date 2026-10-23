@@ -10,13 +10,14 @@ describe('temporary tutorial data',()=>{
 });
 
 it('keeps the signed-in account identity while sandbox preference edits are discarded',async()=>{
- const profile={displayName:'Alex Rivers',photoURL:'https://example.test/avatar.png',theme:'dark',accent:'#123456'};
+ const profile={displayName:'Alex Rivers',photoURL:'https://example.test/avatar.png',theme:'dark' as const,accent:'#123456'};
  setPractice(true,'same-account',undefined,profile);const session=getPracticeSession()!;
+ expect(session.profile).toEqual(profile);
  const before=await practiceExecute('same-account',{action:'planner.restore',date:'2026-10-23',practiceDocuments:session.documents});
  expect(before.practiceResult.settings).toMatchObject(profile);
  expect(new Map(before.practiceDocuments as any).has('users/same-account')).toBe(true);
  const changed=await practiceExecute('same-account',{action:'settings.save',settings:{accent:'#abcdef'},practiceDocuments:before.practiceDocuments});
- expect((changed.practiceResult.settings as any).accent).toBe('#abcdef');expect(profile.accent).toBe('#123456');
+ expect(session.profile).toEqual(profile);expect((changed.practiceResult.settings as any).accent).toBe('#abcdef');expect(profile.accent).toBe('#123456');
  setPractice(false);expect(getPracticeSession()).toBeNull();setPractice(true,'same-account',undefined,profile);
  const restarted=await practiceExecute('same-account',{action:'settings.get',practiceDocuments:getPracticeSession()!.documents});expect(restarted.practiceResult.settings).toMatchObject(profile);setPractice(false);
 });

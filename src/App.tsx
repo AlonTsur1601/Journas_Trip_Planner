@@ -70,7 +70,7 @@ import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout, lodgingForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
-import { DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
+import { MonthCalendar, DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
 let mapPanelLoad:ReturnType<typeof importMapPanel>|undefined;
 const importMapPanel=()=>import("./MapPanel");
@@ -1757,85 +1757,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </div></WorkspaceMotion>
       {calendar && (
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
-          <header>
-            <AsyncButton
-              className="icon"
-              aria-label="Next month"
-              onClick={() => {
-                const d = new Date(`${month}-15`);
-                d.setMonth(d.getMonth() + 1);
-                setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
-              }}
-            >
-              <ChevronLeft size={18} />
-            </AsyncButton>
-            <strong>
-              {new Date(`${month}-15`).toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
-            </strong>
-            <AsyncButton
-              className="icon"
-              aria-label="Previous month"
-              onClick={() => {
-                const d = new Date(`${month}-15`);
-                d.setMonth(d.getMonth() - 1);
-                setMonth(d.toLocaleDateString("en-CA").slice(0, 7));
-              }}
-            >
-              <ChevronRight size={18} />
-            </AsyncButton>
-          </header>
-          <div className="calendar-grid">
-            {["S", "M", "T", "W", "T", "F", "S"].map((x, i) => (
-              <small key={i}>{x}</small>
-            ))}
-            {Array.from(
-              { length: new Date(`${month}-01`).getDay() },
-              (_, i) => (
-                <span key={`blank${i}`} />
-              ),
-            )}
-            {Array.from(
-              {
-                length: new Date(
-                  Number(month.slice(0, 4)),
-                  Number(month.slice(5)),
-                  0,
-                ).getDate(),
-              },
-              (_, i) => {
-                const d = `${month}-${String(i + 1).padStart(2, "0")}`,
-                  matching = trips.filter(
-                    (t) => t.startDate <= d && t.endDate >= d,
-                  );
-                return (
-                  <AsyncButton
-                    key={d}
-                    disabled={
-                      d > maxDate() ||
-                      Boolean(
-                        (shareTrip || practice) &&
-                        trip &&
-                        (d < trip.startDate || d > trip.endDate),
-                      )
-                    }
-                    className={date === d ? "selected" : ""}
-                    title={matching.map((t) => t.name).join(", ")}
-                    onClick={() => switchDate(d)}
-                  >
-                    {i + 1}
-                    <div>
-                      {matching.slice(0, 3).map((t) => (
-                        <i key={t.id} />
-                      ))}
-                    </div>
-                  </AsyncButton>
-                );
-              },
-            )}
-          </div>
+          <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={maxDate()}
+            isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
+            dayTitle={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
+            dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id}/>)}/>
           <div className="calendar-trips">
             {trips
               .filter(

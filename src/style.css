@@ -1562,7 +1562,7 @@ button.text-button.danger:not(:disabled):active { color:#a51d2a; box-shadow:none
 .map-pin:hover .pin-symbol{scale:1.08;}
 .pin-symbol{transition:scale 150ms ease;}
 .compass-control{background:white!important;border-radius:4px;}
-.compass-control .maplibregl-ctrl-compass{padding:0!important;position:relative;color:#252136!important;background:#fff!important;box-shadow:none!important;filter:none!important;border-radius:4px;}
+.compass-control .maplibregl-ctrl-compass{padding:0!important;position:relative;color:#252136!important;background:#fff!important;box-shadow:none;filter:none!important;border-radius:4px;}
 .compass-control .maplibregl-ctrl-icon{position:absolute;inset:0;display:grid;place-items:center;width:100%;height:100%;transform-origin:center center;}
 .compass-control svg{display:block;margin:0;width:27px;height:27px;}
 .compass-control .maplibregl-ctrl-compass:active{opacity:.85;}
@@ -2607,11 +2607,15 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .maplibregl-ctrl-group button,.compass-control .maplibregl-ctrl-compass{background:var(--surface)!important;color:var(--ink)!important;}
 .maplibregl-ctrl-group button+button{border-top-color:var(--line);}
 .maplibregl-ctrl-group button:not(:disabled):hover{background:var(--subtle)!important;}
-.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:none!important;position:relative;}
-.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before,.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon::before{content:'';position:absolute;inset:8px;background:currentColor;mask:linear-gradient(#000 0 0) center/100% 3px no-repeat;}
-.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before{mask:linear-gradient(#000 0 0) center/100% 3px no-repeat,linear-gradient(#000 0 0) center/3px 100% no-repeat;}
+.maplibregl-ctrl-group{border-radius:5px;overflow:hidden;}
+.maplibregl-ctrl-group button,.compass-control .maplibregl-ctrl-compass{width:34px;height:34px;border-radius:0;}
+.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:none!important;display:grid;place-items:center;width:100%;height:100%;}
+.maplibregl-ctrl-zoom-in svg,.maplibregl-ctrl-zoom-out svg{width:19px;height:19px;}
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner{background-color:var(--surface);color:var(--ink);}
-[data-theme="dark"] .maplibregl-ctrl-attrib-button::before{filter:invert(1);}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button{background-image:none;}
+.maplibregl-ctrl-attrib-button::before{content:'';position:absolute;inset:0;background:currentColor;mask:url('/map-attribution.svg') center/24px 24px no-repeat;}
+[data-theme="dark"] .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button{color:#fff;}
+[data-theme="dark"] .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner,[data-theme="dark"] .maplibregl-ctrl-attrib-inner a{color:#fff;}
 .compass-control .maplibregl-ctrl-icon>.compass-face,.compass-control .maplibregl-ctrl-icon>.compass-north{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:27px;height:27px;pointer-events:none;}
 .compass-dark{display:none;}
 [data-theme="dark"] .compass-light{display:none;}
@@ -2637,7 +2641,36 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .calendar-grid .selected i{background:var(--accent);}
 .calendar-popover{max-width:calc(100vw - 40px);}
 @media(max-width:700px){
- .topbar>.trip-selector{grid-column:1/-1;width:calc(100% - 112px);margin:0;justify-self:start;}
- .top-actions>.button[aria-label="Trip details"]{grid-column:1/-1;justify-self:end;width:108px;display:flex;gap:6px;padding:0 8px;white-space:nowrap;font-size:12px;}
+ .topbar>.trip-selector{grid-column:1/-1;width:calc(100% - 118px);margin:0;justify-self:start;}
+ .top-actions>.button[aria-label="Trip details"]{grid-column:1/-1;justify-self:end;width:110px;display:flex;gap:6px;padding:0 8px;white-space:nowrap;font-size:12px;}
  .top-actions>.button[aria-label="Trip details"]>span{display:inline;}
 }
+
+.map-focus-cover{z-index:3;pointer-events:none!important;}
+.map-focus-cover *{pointer-events:none!important;}
+.map-focus-buffer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;}
+
+/* Hover/press feedback follows the outside corners of each joined control. */
+.topbar .trip-selector,.date-picker,.top-actions,.planning-history-actions,.view-controls,.map-tools{overflow:clip;}
+.planning-history-actions{border-radius:4px 0 0 4px;}
+.map-focus-tools>.icon:first-child,.map-list-tools>.icon:first-child{border-radius:4px 0 0 4px;}
+.map-focus-tools>.icon:last-child,.map-list-tools>.icon:last-child{border-radius:0 4px 4px 0;}
+.map-focus-tools>.icon:only-child,.map-list-tools>.icon:only-child{border-radius:4px;}
+.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-in{border-radius:4px 4px 0 0;}
+.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out{border-radius:0 0 4px 4px;}
+.compass-control .maplibregl-ctrl-compass{border-radius:4px;}
+.maplibregl-ctrl-group button:focus:focus-visible{outline:1px solid var(--accent);outline-offset:-1px;box-shadow:none;}
+.map-focus-tools>.location-unavailable{color:var(--muted);opacity:.7;}
+@media(max-width:700px){
+ .planning-history-actions>.save-control>.icon{width:100%;min-width:0;height:100%;}
+ .topbar .date-picker>button:first-child{border-radius:4px 0 0 4px;}
+ .topbar .date-picker>button:last-child{border-radius:0 4px 4px 0;}
+}
+
+.topbar .trip-selector:has(>.dropdown)>.dropdown>.dropdown-trigger{border-radius:4px 0 0 4px;}
+.topbar .trip-selector:has(>.dropdown)>.icon{border-radius:0 4px 4px 0;}
+@media(min-width:701px){
+ .topbar .planning-history-actions>.icon,.topbar .planning-history-actions>.save-control>.icon{border-radius:0;}
+ .topbar .planning-history-actions>.icon:first-child{border-radius:4px 0 0 4px;}
+}
+@media(max-width:700px){.planning-history-actions{border-radius:5px;}}

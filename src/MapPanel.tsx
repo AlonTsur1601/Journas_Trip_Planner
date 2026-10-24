@@ -1,3 +1,4 @@
+import {focusLoadedMap} from "./map-focus";
 import {connectionTitle} from './connection-label';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MapPinPlus, MapPinned, LocateFixed, BedDouble, Copy, Pencil, Focus, Compass, ClipboardPaste, Route, Waypoints, X } from "lucide-react";
@@ -29,7 +30,7 @@ export default function MapPanel({
   arrowPreference = true,
   onArrowPreferenceChange,
   onStartPinSearch,
-  onPlaces,liveLocation,lodging,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",
+  onPlaces,liveLocation,lodging,onFocusError,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",
 }: {
   pins: Pin[];
   connections: Connection[];
@@ -49,6 +50,7 @@ export default function MapPanel({
   onArrowPreferenceChange?: (checked:boolean)=>void;
   onStartPinSearch?: ()=>void;
   onPlaces?:()=>void;
+  onFocusError?:(message:string)=>void;
   liveLocation?:{lng:number;lat:number;accuracy?:number}|null;
   lodging?:{lng:number;lat:number;name?:string}|null;
   activePinIds?:string[];
@@ -69,7 +71,21 @@ export default function MapPanel({
   const liveMarker=useRef<maplibregl.Marker|null>(null);
   const liveLocationRef=useRef(liveLocation);liveLocationRef.current=liveLocation;
   const updateLiveMarker=useRef<()=>void>(()=>{});
-  const focusPoint=(point:{lng:number;lat:number})=>{map.current?.flyTo({center:[point.lng,point.lat],zoom:Math.max(map.current.getZoom(),15),duration:1200,maxDuration:1400,easing:t=>.8*t+.2*t*t*(3-2*t),essential:true});setContextMenu(null);};
+  const focusAbort=useRef<AbortController|null>(null),focusTask=useRef(Promise.resolve()),focusVersion=useRef(0);
+  const [focusPreparing,setFocusPreparing]=useState<'location'|'lodging'|'place'|null>(null);
+  const focusPoint=(point:{lng:number;lat:number})=>{
+    const version=++focusVersion.current,previous=focusTask.current;focusAbort.current?.abort('replacement');setContextMenu(null);
+    focusTask.current=(async()=>{
+      await previous;if(version!==focusVersion.current||!map.current||!container.current||!viewport.current)return;
+      const controller=new AbortController();focusAbort.current=controller;setFocusPreparing(point===lodging?'lodging':point===liveLocation?'location':'place');
+      const interrupt=()=>controller.abort('interaction'),resize=()=>controller.abort('navigation');
+      const element=viewport.current;element.addEventListener('pointerdown',interrupt,true);element.addEventListener('keydown',interrupt,true);element.addEventListener('wheel',interrupt,{capture:true,passive:true});window.addEventListener('resize',resize);
+      try{await focusLoadedMap(map.current,container.current,element,point,controller.signal,()=>{if(version===focusVersion.current)setFocusPreparing(null);});}
+      catch(error){if(!controller.signal.aborted)onFocusError?.((error as Error).message);}
+      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){focusAbort.current=null;setFocusPreparing(null);if(!controller.signal.aborted&&map.current){const c=map.current.getCenter();callbacks.current.onView([c.lng,c.lat],map.current.getZoom());}}}
+    })();
+  };
+  useEffect(()=>{++focusVersion.current;focusAbort.current?.abort('navigation');setFocusPreparing(null);},[contextKey]);
   useEffect(()=>{setContextMenu(null);setMode(null);setSource(null);},[contextKey]);
   useEffect(()=>{if(contextMenuDisabled)setContextMenu(null);},[contextMenuDisabled]);
   useLayoutEffect(()=>{
@@ -114,6 +130,8 @@ export default function MapPanel({
       zoom: layout.zoom,
       attributionControl: { compact: true },
       trackResize: false,
+      maxTileCacheZoomLevels:32,
+      cancelPendingTileRequestsWhileZooming:false,
       canvasContextAttributes: {preserveDrawingBuffer:true},
       transformConstrain:(center,zoom)=>{
         const workspace=visible.closest('.workspace')??visible;
@@ -129,10 +147,13 @@ export default function MapPanel({
     map.current = m;
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
     m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "bottom-left");
+    for(const [name,path] of [['zoom-in','M12 5v14m-7-7h14'],['zoom-out','M5 12h14']]){
+      container.current.querySelector(`.maplibregl-ctrl-${name} span`)!.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="${path}"/></svg>`;
+    }
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<img class="compass-face compass-light" src="/map-compass-light.svg" alt=""/><img class="compass-face compass-dark" src="/map-compass-dark.svg" alt=""/><svg class="compass-north" viewBox="0 0 32 32" aria-hidden="true"><path class="compass-solid" d="M16 5 11 16 21 16Z"/><path class="compass-inset" fill-rule="evenodd" d="M16 5 11 16 21 16Z M16 9.3 13.4 14.5 18.6 14.5Z"/></svg>';
+    compass.querySelector("span")!.innerHTML = '<img class="compass-face compass-light" src="/map-compass-light.svg" alt=""/><img class="compass-face compass-dark" src="/map-compass-dark.svg" alt=""/><svg class="compass-north" viewBox="0 0 32 32" aria-hidden="true"><path class="compass-solid" d="M16 5 11 16.5 21 16.5Z"/><path class="compass-inset" fill-rule="evenodd" d="M16 5 11 16.5 12.65 16.5 16 8.8 19.35 16.5 21 16.5Z"/></svg>';
     let constraining = false;
     const containWorld = () => {
       if (constraining || visible.closest('[aria-hidden="true"]')) return;
@@ -234,7 +255,7 @@ export default function MapPanel({
         m.setLayoutProperty(layer.id,'text-field',['coalesce',['get','name:en'],['get','name_en'],'']);
     });
     m.on("moveend", () => {
-      if (restoringView.current || visible.closest('[aria-hidden="true"]')) return;
+      if (restoringView.current || focusAbort.current || visible.closest('[aria-hidden="true"]')) return;
       const c = m.getCenter();
       callbacks.current.onView([c.lng, c.lat], m.getZoom());
     });
@@ -295,6 +316,7 @@ export default function MapPanel({
     observer.observe(visible);
     if(visible.closest('.workspace'))observer.observe(visible.closest('.workspace')!);
     return () => {
+      ++focusVersion.current;focusAbort.current?.abort('dispose');
       attributionButton?.removeEventListener('click',toggleAttribution,true);
       attributionMotion?.cancel();
       observer.disconnect();
@@ -487,6 +509,7 @@ export default function MapPanel({
       Math.abs(c.lat - layout.center[1]) > 0.00001 ||
       Math.abs(m.getZoom() - layout.zoom) > 0.00001
     ) {
+      ++focusVersion.current;focusAbort.current?.abort('navigation');
       restoringView.current = true;
       m.jumpTo({ center: layout.center, zoom: layout.zoom });
       restoringView.current = false;
@@ -511,9 +534,9 @@ export default function MapPanel({
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`} onContextMenu={event=>{if(contextMenuDisabled){event.preventDefault();return;}if(placementMode||movingPinId||(event.target as HTMLElement).closest('button,.map-tools,.map-focus-tools,.map-list-tools,.map-live-location'))return;const m=map.current;if(!m)return;event.preventDefault();const rect=m.getCanvas().getBoundingClientRect(),point=m.unproject([event.clientX-rect.left,event.clientY-rect.top]);setContextMenu({x:event.clientX,y:event.clientY,lng:point.lng,lat:point.lat});}}>
       <div ref={viewport} className="map-viewport"><div ref={container} className="map-canvas" /></div>
       {!placementMode&&(!readonly||onConnections||onPlaces)&&<div className="map-toolbar"><div className="map-tools">{!readonly&&<><button className={`icon${mode==='add'?' active':''}`} aria-label="Add pin on map" title="Add pin: click a place on the map" onClick={()=>{if(onStartPinSearch){onStartPinSearch();return;}setMode(mode==='add'?null:'add');setSource(null);}}><MapPinPlus size={19}/></button><button className={`icon${mode==='connect'?' active':''}`} aria-label="Connect pins on map" title="Connect: select two pins" disabled={pins.length<2} onClick={()=>{setMode(mode==='connect'?null:'connect');setSource(null);}}><Route size={19}/></button><label className="map-arrow-choice" title="Create directional arrows"><input type="checkbox" aria-label="Connect with arrow" checked={arrow} onChange={e=>onArrowPreferenceChange?.(e.target.checked)}/><span>Arrow</span></label></>}</div><div className="map-list-tools">{onPlaces&&<button className="icon places-button" aria-label="Places" title="Places" onClick={()=>{setMode(null);setSource(null);onPlaces();}}><MapPinned size={19}/></button>}{onConnections&&<button className="icon connections-button" aria-label="Connections" title="Connections" onClick={()=>{setMode(null);setSource(null);onConnections();}}><Waypoints size={19}/></button>}</div></div>}
-      {!placementMode&&(liveLocation||onLocate||lodging)&&<div className="map-focus-tools">{(liveLocation||onLocate)&&<button className="icon" aria-label="Focus my location" aria-busy={locationStatus==='pending'} disabled={locationStatus==='pending'} title={locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission is blocked in your browser. Allow location access and try again.':liveLocation?'Focus my location':'Find my location'} onClick={()=>liveLocation?focusPoint(liveLocation):onLocate?.()}>{locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={19}/>}</button>}{lodging&&<button className="icon" aria-label="Focus lodging" title={lodging.name?`Focus ${lodging.name}`:'Focus lodging'} onClick={()=>focusPoint(lodging)}><BedDouble size={19}/></button>}</div>}
+      {!placementMode&&(liveLocation||onLocate||lodging)&&<div className="map-focus-tools">{(liveLocation||onLocate)&&<button className={`icon${locationStatus==='denied'||locationStatus==='unavailable'?' location-unavailable':''}`} aria-label="Focus my location" aria-busy={focusPreparing==='location'||locationStatus==='pending'} disabled={locationStatus==='pending'} title={locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission is blocked in your browser. Allow location access and try again.':liveLocation?'Focus my location':'Find my location'} onClick={()=>liveLocation?focusPoint(liveLocation):onLocate?.()}>{focusPreparing==='location'||locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={19}/>}</button>}{lodging&&<button className="icon" aria-label="Focus lodging" aria-busy={focusPreparing==='lodging'} title={lodging.name?`Focus ${lodging.name}`:'Focus lodging'} onClick={()=>focusPoint(lodging)}>{focusPreparing==='lodging'?<LoadingSpinner/>:<BedDouble size={19}/>}</button>}</div>}
       {contextMenu&&createPortal(<MotionSurface><div ref={menuBox} className="map-context-menu" role="menu" aria-label={contextMenu.pin?`Actions for ${contextMenu.pin.title}`:'Map actions'} style={{left:contextMenu.x,top:contextMenu.y}}>
-        {contextMenu.pin?<>{!readonly&&<button role="menuitem" onClick={()=>{onPin(contextMenu.pin!);setContextMenu(null);}}><Pencil size={16}/>Edit place</button>}{onCopyPin&&contextMenu.pin.id!=='trip-lodging'&&<button role="menuitem" onClick={()=>{onCopyPin(contextMenu.pin!);setContextMenu(null);}}><Copy size={16}/>Copy pin</button>}<button role="menuitem" onClick={()=>focusPoint(contextMenu.pin!)}><Focus size={16}/>Focus place</button></>:<>{!readonly&&<button role="menuitem" onClick={()=>{onAdd(contextMenu.lng,contextMenu.lat);setContextMenu(null);}}><MapPinPlus size={16}/>Add place here</button>}{!readonly&&(canPastePin||pendingPaste)&&onPastePin&&<button role="menuitem" disabled={pendingPaste} aria-busy={pendingPaste} onClick={()=>void pasteFromMenu()}>{pendingPaste?<LoadingSpinner/>:<ClipboardPaste size={16}/>}Paste pin</button>}{lodging&&<button role="menuitem" onClick={()=>focusPoint(lodging)}><BedDouble size={16}/>Focus lodging</button>}{(liveLocation||onLocate)&&<button role="menuitem" disabled={locationStatus==='pending'} onClick={()=>{if(liveLocation)focusPoint(liveLocation);else{onLocate?.();setContextMenu(null);}}}>{locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={16}/>} {locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission blocked — try again':'Focus my location'}</button>}<button role="menuitem" onClick={()=>{map.current?.resetNorth();setContextMenu(null);}}><Compass size={16}/>Reset north</button></>}
+        {contextMenu.pin?<>{!readonly&&<button role="menuitem" onClick={()=>{onPin(contextMenu.pin!);setContextMenu(null);}}><Pencil size={16}/>Edit place</button>}{onCopyPin&&contextMenu.pin.id!=='trip-lodging'&&<button role="menuitem" onClick={()=>{onCopyPin(contextMenu.pin!);setContextMenu(null);}}><Copy size={16}/>Copy pin</button>}<button role="menuitem" onClick={()=>focusPoint(contextMenu.pin!)}><Focus size={16}/>Focus place</button></>:<>{!readonly&&<button role="menuitem" onClick={()=>{onAdd(contextMenu.lng,contextMenu.lat);setContextMenu(null);}}><MapPinPlus size={16}/>Add place here</button>}{!readonly&&(canPastePin||pendingPaste)&&onPastePin&&<button role="menuitem" disabled={pendingPaste} aria-busy={pendingPaste} onClick={()=>void pasteFromMenu()}>{pendingPaste?<LoadingSpinner/>:<ClipboardPaste size={16}/>}Paste pin</button>}{lodging&&<button role="menuitem" onClick={()=>focusPoint(lodging)}><BedDouble size={16}/>Focus lodging</button>}{(liveLocation||onLocate)&&<button role="menuitem" disabled={locationStatus==='pending'} onClick={()=>{if(liveLocation)focusPoint(liveLocation);else{onLocate?.();setContextMenu(null);}}}>{focusPreparing==='location'||locationStatus==='pending'?<LoadingSpinner/>:<LocateFixed size={16}/>} {locationStatus==='pending'?'Finding your location…':locationStatus==='denied'?'Location permission blocked — try again':'Focus my location'}</button>}<button role="menuitem" onClick={()=>{map.current?.resetNorth();setContextMenu(null);}}><Compass size={16}/>Reset north</button></>}
       </div></MotionSurface>,document.body)}
       {(mode||movingPinId)&&<div className="map-mode-note" role="status"><strong>{movingPinId?'Drag the selected pin to its new location':mode==='add'?'Click the map to add a pin':source?'Select the destination pin':'Select the starting pin'}</strong><button className="icon" aria-label="Cancel map action" onClick={()=>{setMode(null);setSource(null);onCancelMove?.();}}><X size={15}/></button></div>}
     </div>

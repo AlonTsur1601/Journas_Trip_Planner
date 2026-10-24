@@ -1431,7 +1431,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <Suspense
               fallback={<div className="loading">Loading your map…</div>}
             >
-              <MapPanel
+              <MapPanel
+                onFocusError={setMessage}
                 pins={mapPins}
                 connections={day.connections}
                 layout={layout}
@@ -2269,9 +2270,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {(modal === "settings" || modal === "account-settings") && (
         <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => {setModal(null);void saveSettings(settingsRef.current);}}>
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveSettings(settings);
+            onSubmit={async(e) => {
+              e.preventDefault();
+              if(await saveSettings(settings))setModal(current=>current==='settings'?null:current);
             }}
           >
             <div className="settings-account">

@@ -132,6 +132,7 @@ export default function MapPanel({
       attributionControl: { compact: true },
       trackResize: false,
       maxTileCacheZoomLevels:32,
+      maxTileCacheSize:512,
       cancelPendingTileRequestsWhileZooming:false,
       canvasContextAttributes: {preserveDrawingBuffer:true},
       transformConstrain:(center,zoom)=>{

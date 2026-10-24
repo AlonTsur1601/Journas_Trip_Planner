@@ -204,9 +204,15 @@ export default function MapPanel({
         rotation.bearing=m.getBearing(); rotation.angle=angle;
       }
     });
-    const endRotation = () => { if(rotation&&!dragged)m.resetNorth({duration:180}); rotation = null; setTimeout(()=>compass.parentElement?.classList.remove('compass-engaged'),300); };
+    const releaseRotation = (event:PointerEvent) => {
+      rotation = null;
+      compass.parentElement?.classList.remove('compass-engaged');
+      if(compass.hasPointerCapture(event.pointerId))compass.releasePointerCapture(event.pointerId);
+    };
+    const endRotation = (event:PointerEvent) => { if(rotation&&!dragged)m.resetNorth({duration:180}); releaseRotation(event); };
     compass.addEventListener("pointerup", endRotation);
-    compass.addEventListener("pointercancel", () => {rotation=null;compass.parentElement?.classList.remove('compass-engaged');});
+    compass.addEventListener("pointercancel", releaseRotation);
+    compass.addEventListener("lostpointercapture", releaseRotation);
     compass.addEventListener("click", (event) => {
       if (dragged) { event.preventDefault(); event.stopImmediatePropagation(); dragged = false; }
     }, true);

@@ -2624,9 +2624,11 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 [data-theme="dark"] .compass-light{display:none;}
 [data-theme="dark"] .compass-dark{display:block;}
 .compass-north path{fill:var(--accent);}
-.compass-inset{display:none;}
+.compass-inset,.compass-cutout{display:none;}
+.compass-north .compass-cutout{fill:var(--surface);}
 [data-neutral-accent="true"] .compass-solid{display:none;}
 [data-neutral-accent="true"] .compass-inset{display:block;}
+[data-neutral-accent="true"] .compass-cutout{display:block;}
 .map-toolbar{position:absolute;top:10px;left:10px;z-index:4;display:flex;gap:8px;}
 .map-toolbar>.map-tools{position:static;box-shadow:none;}
 .map-toolbar>.map-tools:empty,.map-list-tools:empty{display:none;}

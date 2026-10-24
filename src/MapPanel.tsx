@@ -153,7 +153,7 @@ export default function MapPanel({
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<img class="compass-face compass-light" src="/map-compass-light.svg" alt=""/><img class="compass-face compass-dark" src="/map-compass-dark.svg" alt=""/><svg class="compass-north" viewBox="0 0 32 32" aria-hidden="true"><path class="compass-solid" d="M16 5 11 16 21 16Z"/><path class="compass-inset" fill-rule="evenodd" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></svg>';
+    compass.querySelector("span")!.innerHTML = '<img class="compass-face compass-light" src="/map-compass-light.svg" alt=""/><img class="compass-face compass-dark" src="/map-compass-dark.svg" alt=""/><svg class="compass-north" viewBox="0 0 32 32" aria-hidden="true"><path class="compass-solid" d="M16 5 11 16 21 16Z"/><path class="compass-cutout" d="M16 8.63 12.65 16 19.35 16Z"/><path class="compass-inset" fill-rule="evenodd" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></svg>';
     let constraining = false;
     const containWorld = () => {
       if (constraining || visible.closest('[aria-hidden="true"]')) return;

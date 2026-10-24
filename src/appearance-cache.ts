@@ -6,4 +6,4 @@ export function readAppearance(userId:string,storage:Pick<Storage,'getItem'>=loc
 export function cacheAppearance(settings:Pick<Settings,'theme'|'accent'>,userId:string){try{localStorage.setItem(appearanceKey,JSON.stringify({userId,theme:settings.theme,accent:settings.accent}));}catch{/* Storage can be disabled. */}}
 
 export const isBlackAccent=(accent:string)=>['#292637','#000000','#000','#000000ff'].includes(accent.toLowerCase());
-export function applyAccent(accent:string,dark:boolean){const neutral=dark&&isBlackAccent(accent);document.documentElement.style.setProperty('--accent',neutral?'#ffffff':accent);document.documentElement.style.setProperty('--accent-ink',neutral?'#17151f':'#ffffff');}
+export function applyAccent(accent:string,dark:boolean){document.documentElement.dataset.neutralAccent=String(isBlackAccent(accent)||['#fff','#ffffff'].includes(accent.toLowerCase()));const neutral=dark&&isBlackAccent(accent);document.documentElement.style.setProperty('--accent',neutral?'#ffffff':accent);document.documentElement.style.setProperty('--accent-ink',neutral?'#17151f':'#ffffff');}

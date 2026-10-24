@@ -21,7 +21,7 @@ export const tourSteps:Step[]=[
  {title:'Add your first place',text:'Choose Add pin on map, then click an empty spot on the map to open the place editor. Places on the map are separate from the shortcuts pinned to your home page.',target:'.map-panel',done:c=>c.editKind==='pins'&&c.editId!=='trip-lodging'},
  {title:'Find and customize a place',text:'Search for a place, or choose its position on the map. Give it a name, note, color and symbol, then choose Create pin.',target:'.item-modal',done:c=>c.pins>=1&&!c.editKind},
  {title:'Plan a time block',text:'Choose Add time block to put an activity on your schedule.',target:'[aria-label="Add time block"]',done:c=>c.editKind==='blocks'},
- {title:'Link your schedule to a place',text:'Choose your saved place under Linked place or connection. Its details are inherited until you customize a field yourself. Give the activity a name and start and end times for this day. Use the white clock button for the time wheels; link the activity to a place or connection if useful. Choose Create time block.',target:'.item-modal',done:c=>c.blocks>=1&&!c.editKind},
+ {title:'Link your schedule to a place',text:'Choose your saved place under Linked place or connection. Its details are inherited until you customize a field yourself. Give the activity a name and start and end times for this day. Use the clock button for the time wheels; link the activity to a place or connection if useful. Choose Create time block.',target:'.item-modal',done:c=>c.blocks>=1&&!c.editKind},
  {title:'Open your checklist',text:'Turn on Tasks to keep a checklist alongside the map and schedule.',target:'[aria-label="Tasks"]',done:c=>c.checklist},
  {title:'Add a task',text:'Choose Add a task in your checklist.',target:'.todo-add',done:c=>c.editKind==='tasks'},
  {title:'Connect a task to the plan',text:'Write a task, such as Buy tickets. Optionally link it to a place or connection and a time block, then choose Create task. The task can then follow the activity in your itinerary.',target:'.task-modal',done:c=>c.tasks>=1&&!c.editKind},
@@ -78,7 +78,7 @@ const instructions:Record<string,Instruction[]>={
   {title:'Accent color',action:'.advanced-color-fields',actionEvents:['input','change','pointerup','keydown'],ready:()=>!document.querySelector('.advanced-color-fields:not([inert]):not([data-motion-exit])'),completeOn:'.settings-modal .color-picker .color-swatches button',target:'.settings-modal .color-picker',text:'Click an Accent color swatch. It colors site controls and your initial avatar; an uploaded profile photo stays unchanged. Advanced color selection offers a custom color.'},
   {title:'Map starting view',target:()=>document.querySelector('.dropdown-menu[aria-label="Starting map view"]')?'.dropdown-menu[aria-label="Starting map view"]':'.settings-modal [aria-label="Starting map view"]',text:'Open Starting map view. Trip lodging starts at the lodging of your trip for that day; My current location uses your location. World map starts zoomed out. Choose the view you want for newly opened dates.',completeOn:'.dropdown-menu[aria-label="Starting map view"] [role="option"]'},
   {title:'Clock and time zone',target:()=>document.querySelector('.dropdown-menu[aria-label="Clock"]')?'.dropdown-menu[aria-label="Clock"]':'.settings-modal [aria-label="Clock"]',text:'Open Clock and choose whether displayed time follows your trip lodging, your device or UTC. You can select the current option to keep it. The schedule also shows the time zone used for its activities.',completeOn:'.dropdown-menu[aria-label="Clock"] [role="option"]'},
-  {title:'Trip retention',action:'.settings-modal .checkbox-field input',actionEvents:['focusout'],completeOn:'.settings-modal .checkbox-field input, .dropdown-menu[aria-label="Remove from my account after the trip ends"] [role="option"]',target:'.settings-modal .checkbox-field',text:'Review Automatically remove old trips and leave the checkbox when finished, or choose a cleanup period below. You can keep the current values. Choose Never — keep trips indefinitely, or turn automatic removal off, to keep them without a time limit. Other travelers keep their copies.'},
+  {title:'Trip retention',action:'.settings-modal .checkbox-field input',actionEvents:['focusout'],completeOn:'.settings-modal .checkbox-field input, .dropdown-menu[aria-label="Remove from my account after the trip ends"] [role="option"]',target:'.settings-modal .checkbox-field',text:'Review Automatically remove old trips and leave the checkbox when finished, or choose a cleanup period below. You can keep the current values. Turn automatic removal off to keep trips without a time limit. Other travelers keep their copies.'},
   {title:'Profile and saving',target:'.settings-modal button.primary',text:'Your account name, photo and sign-in methods stay unchanged during the guided tutorial. Press Save preferences to finish. Later, use Guided tour at the bottom of Settings to restart this guide.',completeOn:'.settings-modal button.primary'},
  ],
 };
@@ -105,6 +105,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  useEffect(()=>{if(!card.current)return;const observer=new ResizeObserver(()=>setCardHeight(card.current?.getBoundingClientRect().height??250));observer.observe(card.current,{box:'border-box'});return()=>observer.disconnect();},[status,step,inModal]);
  const actionStage=useRef({step,status});actionStage.current={step,status};
  const initialized=useRef('');const current=tourSteps[step];const instruction=current.instructions?.[part];
+ const target=instruction?.target??current.target;const selector=typeof target==='function'?target(context):target;
+ const stageSelector=typeof current.target==='function'?current.target(context):current.target;
  useEffect(()=>{if(!ready||initialized.current===userId)return;if(practice){initialized.current=userId;setStatus('running');return;}if(seen(userId)){initialized.current=userId;if(seenBefore===false)remember(userId);return;}const apply=(acknowledged:boolean)=>{initialized.current=userId;if(acknowledged){try{localStorage.setItem(keyFor(userId),'seen');}catch{}setStatus('closed');}else{onHome();setStatus('welcome');}};if(seenBefore!==undefined){apply(seenBefore);return;}let live=true;void api<{seen:boolean}>('tour.status').then(result=>{if(live)apply(result.seen);}).catch(()=>{if(live)apply(false);});return()=>{live=false;};},[ready,userId,practice,seenBefore]);
  useEffect(()=>{const start=()=>{onHome();setStep(0);setPart(0);setSkipped([]);setActed([]);setStatus('welcome');};window.addEventListener('journas-start-tour',start);return()=>window.removeEventListener('journas-start-tour',start);},[onHome]);
  const close=()=>{remember(userId);setStatus('closed');if(practice)window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));};
@@ -116,14 +118,14 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  useEffect(()=>{if(status!=='running')return;
   const guard=(event:Event)=>{if(!(event.target instanceof Element)||closingFromGuide.current)return;
    if(event.type==='keydown'){const key=event as KeyboardEvent;if((key.ctrlKey||key.metaKey)&&key.key.toLowerCase()==='z'){event.preventDefault();event.stopImmediatePropagation();return;}if(!['Enter',' '].includes(key.key))return;}
-   const targetSelector=typeof current.target==='function'?current.target(context):current.target;const focus=findTourTarget(targetSelector);
+   const focus=findTourTarget(selector)??findTourTarget(stageSelector);
    const insideGuide=Boolean(event.target.closest('.guided-tour'));
-   const insideFocus=Boolean(focus?.contains(event.target)||event.target.closest('.bounded-popover:not([inert])'));
+   const insideFocus=Boolean(focus?.contains(event.target)||findTourTarget(stageSelector)?.contains(event.target)||event.target.closest('.bounded-popover:not([inert])'));
    if((!insideGuide&&!insideFocus)||!tourClickAllowed(current.title,event.target)){event.preventDefault();event.stopImmediatePropagation();}
   };
   for(const type of ['pointerdown','click','keydown','contextmenu'])document.addEventListener(type,guard,true);
   return()=>{for(const type of ['pointerdown','click','keydown','contextmenu'])document.removeEventListener(type,guard,true);};
- },[status,step,context,revision]);
+ },[status,step,part,context,revision,selector,stageSelector]);
  // DOM state is used only for explicitly named picker steps, never to choose an arbitrary popup.
  useEffect(()=>{if(status!=='running')return;let frame=0;const changed=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh(value=>value+1);});};const observer=new MutationObserver(changed);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["inert","aria-hidden"]});document.addEventListener('input',changed);document.addEventListener('change',changed);document.addEventListener('focusin',changed);document.addEventListener('focusout',changed);return()=>{observer.disconnect();document.removeEventListener('input',changed);document.removeEventListener('change',changed);document.removeEventListener('focusin',changed);document.removeEventListener('focusout',changed);cancelAnimationFrame(frame);};},[status]);
  // A form must stay open until its final instruction, even if Save is pressed early.
@@ -153,12 +155,11 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
  },[status,step]);
  const autoDelay=status==='running'&&instruction&&current.instructions?tourSubstepDelay(instruction,part,current.instructions.length,acted,context):null;
  useLayoutEffect(()=>{if(status!=='running')return;if(tourStageReviewed(current.instructions,acted,context)&&current.done?.(context))advanceStage();else if(instruction?.skipWhen?.(context)){setSkipped(previous=>[...previous,part]);next();}else if(instruction?.done?.(context)||((instruction?.completeOn||instruction?.done)&&acted.includes(part)&&(!instruction.ready||instruction.ready(context)))||autoDelay===0)next();},[status,step,part,context,revision,acted,autoDelay]);
- useLayoutEffect(()=>setBox(null),[step]);
- const target=current.target;const selector=typeof target==='function'?target(context):target;
+ useLayoutEffect(()=>setBox(null),[step,part]);
  useEffect(()=>{
   if(status!=='running'||!outline.current||!cutouts.current||!shield.current||!occluders.current)return;let scrolled:Element|null=null;
   const spotlight=tourSpotlight(outline.current,cutouts.current,shield.current,occluders.current);
-  const find=()=>findTourTarget(selector);
+  const find=()=>findTourTarget(selector)??findTourTarget(stageSelector);
   const place=(target:Element|null)=>{spotlight.place(target,mobile?siteHeight:viewport.height);setDomModal(Boolean(document.querySelector('.modal-shade:not([inert]),.home-pin-modal')));
    if(!target)return;
    const availableHeight=mobile?siteHeight:viewport.height;
@@ -169,7 +170,7 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
   };
   const stop=observeTourTarget(find,place);
   return()=>{stop();spotlight.stop();};
- },[status,selector,step,mobile,siteHeight,viewport.height]);
+ },[status,selector,stageSelector,step,part,mobile,siteHeight,viewport.height]);
  if(status==='closed')return null;
  const welcome=status==='welcome',complete=status==='complete',intro=welcome||complete;
  const obstacles=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};});

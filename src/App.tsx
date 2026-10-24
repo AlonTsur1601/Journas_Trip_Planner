@@ -70,6 +70,7 @@ import { observeClock, followCalendarDay } from "./day-clock";
 import { startingLayout, lodgingForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
+import {calendarTripColors} from "./calendar-colors";
 import { MonthCalendar, DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
 let mapPanelLoad:ReturnType<typeof importMapPanel>|undefined;
@@ -437,6 +438,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [googleSession,setGoogleSession]=useState(false);
   const activePhoto=accountPhoto(user,googleSession,settings.photoURL);
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
+  const calendarDark=settings.theme==='dark'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;
+  const tripDotColors=useMemo(()=>calendarTripColors(trips,settings.accent,calendarDark),[trips,settings.accent,calendarDark]);
   const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
   const placementSaves=useRef(Promise.resolve());
   const lodgingNameEdited=useRef(false);
@@ -1354,7 +1357,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
           <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
           <div className="save-control">
-          <span className={`save-indicator${manualSaving || pendingItems.length>0 || status.startsWith("Saving") ? " saving" : status.startsWith("All") ? " saved" : " pending"}`} role="status" title={manualSaving||pendingItems.length?"Saving…":status} aria-label={manualSaving||pendingItems.length?"Saving…":status} />
+          <span className={`save-indicator${manualSaving?" saving":" saved"}`} role="status" title={manualSaving?"Saving…":status} aria-label={manualSaving?"Saving…":status} />
           <AsyncButton className="icon" aria-label="Save planning" title="Save planning (Ctrl+S)" disabled={!user || manualSaving || saving} onClick={saveManually}>
             <Save size={18} />
           </AsyncButton>
@@ -1760,8 +1763,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={maxDate()}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
             dayTitle={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
-            dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id}/>)}/>
-          <div className="calendar-trips">
+            dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
+          <div className="calendar-trips" role="group" aria-label="Trips in this month" tabIndex={0}>
             {trips
               .filter(
                 (t) =>
@@ -1770,15 +1773,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               .map((t) => (
                 <AsyncButton
                   key={t.id}
-                  onClick={async () => {
-                    await saveLayout();
-                    setTrip(t);
-                    setShareTrip(false);
-                    switchDate(t.startDate);
-                  }}
+                  title={`Show ${t.name}'s starting month`}
+                  onClick={() => setMonth(t.startDate.slice(0,7))}
                 >
-                  <i />
-                  {t.name}
+                  <i style={{background:tripDotColors[t.id]}}/>
+                  <span>{t.name}</span>
                 </AsyncButton>
               ))}
           </div>
@@ -2359,13 +2358,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               />{" "}
               Automatically remove old trips from my account
             </label>
-            <Select
+            {settings.autoDelete&&<Select
               label="Remove from my account after the trip ends"
-              value={settings.autoDelete?settings.retentionDays:0}
+              value={settings.retentionDays}
               onChange={(e: any) =>
                 setSettings({
                   ...settings,
-                  autoDelete: Number(e.target.value)!==0,
+                  autoDelete: true,
                   retentionDays: Number(e.target.value)||settings.retentionDays,
                 })
               }
@@ -2373,8 +2372,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
               <option value={365}>One year</option>
-              <option value={0}>Never — keep trips indefinitely</option>
-            </Select>
+
+            </Select>}
             <p className="form-note">
               Automatic removal affects your account only. Other travelers keep
               their copy of the shared trip.

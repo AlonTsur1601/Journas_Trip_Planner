@@ -1,11 +1,13 @@
-import {useEffect,useId,useRef,useState} from 'react';
-const rowHeight=40;
+import {useLayoutEffect,useId,useRef,useState} from 'react';
+import {flushSync} from 'react-dom';
 function TimeWheel({label,count,value,onChange}:{label:string;count:number;value:number;onChange:(n:number)=>void}){
- const root=useRef<HTMLDivElement>(null);const id=useId();
- // Keep momentum intact when the selected value came from scrolling.
- useEffect(()=>{const element=root.current;if(element&&Math.round(element.scrollTop/rowHeight)!==value)element.scrollTop=value*rowHeight;},[value]);
- const choose=(n:number)=>{onChange(Math.max(0,Math.min(count-1,n)));};
- return <div className="time-wheel-column"><span>{label}</span><div ref={root} className="time-wheel" role="listbox" aria-label={label} aria-activedescendant={`${id}-${value}`} tabIndex={0} onScroll={event=>choose(Math.round(event.currentTarget.scrollTop/rowHeight))} onKeyDown={event=>{const move=event.key==='ArrowUp'?-1:event.key==='ArrowDown'?1:event.key==='PageUp'?-5:event.key==='PageDown'?5:0;if(move||event.key==='Home'||event.key==='End'){event.preventDefault();choose(event.key==='Home'?0:event.key==='End'?count-1:value+move);}}}>{Array.from({length:count},(_,n)=><button key={n} id={`${id}-${n}`} type="button" role="option" aria-selected={n===value} tabIndex={-1} className={n===value?'selected':''} onClick={()=>choose(n)}>{String(n).padStart(2,'0')}</button>)}</div></div>;
+ const root=useRef<HTMLDivElement>(null),selected=useRef(value),change=useRef(onChange);const id=useId();change.current=onChange;
+ const syncSelection=()=>{const element=root.current;if(!element)return;const bounds=element.getBoundingClientRect(),center=bounds.top+bounds.height/2;const options=[...element.querySelectorAll<HTMLButtonElement>('button')];let nearest=0,distance=Infinity;options.forEach((option,index)=>{const box=option.getBoundingClientRect(),next=Math.abs(box.top+box.height/2-center);if(next<distance){nearest=index;distance=next;}});if(nearest!==selected.current){selected.current=nearest;flushSync(()=>change.current(nearest));}};
+ // Track compositor scrolling every frame, including touch momentum and snapping.
+ // Selection never writes scrollTop back, so it cannot interrupt the gesture.
+ useLayoutEffect(()=>{const element=root.current!;const option=element.querySelectorAll<HTMLButtonElement>('button')[selected.current];element.scrollTop=option.offsetTop+option.offsetHeight/2-element.clientHeight/2;let frame=0,lastTop=element.scrollTop;const track=()=>{if(element.scrollTop!==lastTop){lastTop=element.scrollTop;syncSelection();}frame=requestAnimationFrame(track);};frame=requestAnimationFrame(track);return()=>cancelAnimationFrame(frame);},[]);
+ const choose=(n:number)=>{const element=root.current;if(!element)return;const next=Math.max(0,Math.min(count-1,n)),option=element.querySelectorAll<HTMLButtonElement>('button')[next];const box=option.getBoundingClientRect(),bounds=element.getBoundingClientRect();element.scrollTop+=(box.top+box.height/2-(bounds.top+bounds.height/2))*element.clientHeight/bounds.height;syncSelection();};
+ return <div className="time-wheel-column"><span>{label}</span><div ref={root} className="time-wheel" role="listbox" aria-label={label} aria-activedescendant={`${id}-${value}`} tabIndex={0} onScroll={syncSelection} onKeyDown={event=>{const move=event.key==='ArrowUp'?-1:event.key==='ArrowDown'?1:event.key==='PageUp'?-5:event.key==='PageDown'?5:0;if(move||event.key==='Home'||event.key==='End'){event.preventDefault();choose(event.key==='Home'?0:event.key==='End'?count-1:value+move);}}}>{Array.from({length:count},(_,n)=><button key={n} id={`${id}-${n}`} type="button" role="option" aria-selected={n===value} tabIndex={-1} className={n===value?'selected':''} onClick={()=>choose(n)}>{String(n).padStart(2,'0')}</button>)}</div></div>;
 }
 export default function TimePicker({value,onApply,onCancel}:{value:string;onApply:(time:string)=>void;onCancel:()=>void}){
  const initial=value.split(':').map(Number);const [hour,setHour]=useState(Math.min(23,Math.max(0,initial[0]||0))),[minute,setMinute]=useState(Math.min(59,Math.max(0,initial[1]||0)));

@@ -2601,3 +2601,43 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 .task-save-spinner{display:inline-flex;align-items:center;flex-shrink:0;margin-left:4px;}.task-save-spinner>.loading-spinner{width:13px;height:13px;border-width:2px;}
 .map-focus-tools .loading-spinner,.map-context-menu .loading-spinner{width:16px;height:16px;border-width:2px;}
+
+/* All map controls share the planner surface, including MapLibre image icons. */
+.maplibregl-ctrl-group,.compass-control{background:var(--surface)!important;border:1px solid var(--line);color:var(--ink);}
+.maplibregl-ctrl-group button,.compass-control .maplibregl-ctrl-compass{background:var(--surface)!important;color:var(--ink)!important;}
+.maplibregl-ctrl-group button+button{border-top-color:var(--line);}
+.maplibregl-ctrl-group button:not(:disabled):hover{background:var(--subtle)!important;}
+.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:none!important;position:relative;}
+.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before,.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon::before{content:'';position:absolute;inset:8px;background:currentColor;mask:linear-gradient(#000 0 0) center/100% 3px no-repeat;}
+.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before{mask:linear-gradient(#000 0 0) center/100% 3px no-repeat,linear-gradient(#000 0 0) center/3px 100% no-repeat;}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner{background-color:var(--surface);color:var(--ink);}
+[data-theme="dark"] .maplibregl-ctrl-attrib-button::before{filter:invert(1);}
+.compass-control .maplibregl-ctrl-icon>.compass-face,.compass-control .maplibregl-ctrl-icon>.compass-north{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:27px;height:27px;pointer-events:none;}
+.compass-dark{display:none;}
+[data-theme="dark"] .compass-light{display:none;}
+[data-theme="dark"] .compass-dark{display:block;}
+.compass-north path{fill:var(--accent);}
+.compass-inset{display:none;}
+[data-neutral-accent="true"] .compass-solid{display:none;}
+[data-neutral-accent="true"] .compass-inset{display:block;}
+.map-toolbar{position:absolute;top:10px;left:10px;z-index:4;display:flex;gap:8px;}
+.map-toolbar>.map-tools{position:static;box-shadow:none;}
+.map-toolbar>.map-tools:empty,.map-list-tools:empty{display:none;}
+.map-list-tools{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:5px;overflow:hidden;}
+.map-list-tools>.icon{border:0;border-radius:0;width:34px;height:34px;}
+.map-list-tools>.icon+.icon{border-left:1px solid var(--line);}
+.map-focus-tools{flex-direction:row;}
+.map-focus-tools>.icon+.icon{border-top:0;border-left:1px solid var(--line);}
+/* Scrollbar space is symmetric, so menu content keeps equal side insets. */
+.modal,.symbol-scroll,.dropdown-scroll-options,.calendar-trips{scrollbar-gutter:stable both-edges;}
+.calendar-trips{border:1px solid var(--line);border-radius:5px;padding:4px;margin-top:8px;}
+.calendar-trips>button{min-height:32px;gap:9px;width:100%;padding:8px 10px;border-radius:3px;font-size:12px;}
+.calendar-trips>button>span{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.calendar-trips>button:hover,.calendar-trips>button:focus-visible{background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);}
+.calendar-grid .selected i{background:var(--accent);}
+.calendar-popover{max-width:calc(100vw - 40px);}
+@media(max-width:700px){
+ .topbar>.trip-selector{grid-column:1/-1;width:calc(100% - 112px);margin:0;justify-self:start;}
+ .top-actions>.button[aria-label="Trip details"]{grid-column:1/-1;justify-self:end;width:108px;display:flex;gap:6px;padding:0 8px;white-space:nowrap;font-size:12px;}
+ .top-actions>.button[aria-label="Trip details"]>span{display:inline;}
+}

@@ -1,6 +1,6 @@
 import {focusLoadedMap} from "./map-focus";
 import {connectionTitle} from './connection-label';
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { MapPinPlus, MapPinned, LocateFixed, BedDouble, Copy, Pencil, Focus, Compass, ClipboardPaste, Route, Waypoints, X } from "lucide-react";
 import {createPortal} from 'react-dom';
 import {MotionSurface} from './MotionSurface';
@@ -62,6 +62,7 @@ export default function MapPanel({
   onLocate?:()=>void;
   locationStatus?:"idle"|"pending"|"active"|"denied"|"unavailable";
 }) {
+  const compassGradientId = `compass-${useId().replace(/:/g, "")}`;
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
   const [source,setSource]=useState<string|null>(null);
   const [pendingPaste,setPendingPaste]=useState(false);
@@ -153,7 +154,8 @@ export default function MapPanel({
     const compass = container.current.querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass")!;
     compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
-    compass.querySelector("span")!.innerHTML = '<img class="compass-face compass-light" src="/map-compass-light.svg" alt=""/><img class="compass-face compass-dark" src="/map-compass-dark.svg" alt=""/><svg class="compass-north" viewBox="0 0 32 32" aria-hidden="true"><path class="compass-solid" d="M16 5 11 16 21 16Z"/><path class="compass-cutout" d="M16 8.63 12.65 16 19.35 16Z"/><path class="compass-inset" fill-rule="evenodd" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></svg>';
+    // One diamond with a hard color stop keeps the shared edge free of seams or image-layer offsets.
+    compass.querySelector("span")!.innerHTML = `<svg class="compass-art" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="${compassGradientId}" x1="0" y1="0" x2="0" y2="1"><stop class="compass-accent-stop" offset="50%"/><stop class="compass-base-stop" offset="50%"/></linearGradient></defs><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 5 21 16 16 27 11 16Z" fill="url(#${compassGradientId})"/><path class="compass-inset" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></svg>`;
     let constraining = false;
     const containWorld = () => {
       if (constraining || visible.closest('[aria-hidden="true"]')) return;

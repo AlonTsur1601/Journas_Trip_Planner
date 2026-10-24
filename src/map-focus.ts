@@ -49,8 +49,8 @@ function waitForMap(map:MapLibreMap,signal:AbortSignal,settled=false){
  });
 }
 
-type Camera={center:[number,number];zoom:number};
-type FocusFrame={image:ImageBitmap;camera:Camera;markers:Array<[HTMLElement,string]>};
+export type Camera={center:[number,number];zoom:number};
+type FocusFrame={image:ImageBitmap;camera:Camera;markers:Array<[HTMLElement,string,string?]>};
 
 /** Playback does no WebGL rendering or network work; map pixels and markers use the same frame. */
 export function playFocusFrames(count:number,draw:(index:number)=>void,signal:AbortSignal){
@@ -70,16 +70,19 @@ export function playFocusFrames(count:number,draw:(index:number)=>void,signal:Ab
  });
 }
 
-/** Render every animation frame before revealing motion. Release frame memory on completion/cancel. */
-export async function focusLoadedMap(map:MapLibreMap,surface:HTMLElement,viewport:HTMLElement,point:{lng:number;lat:number},signal:AbortSignal,onPrepared:()=>void){
+export type FocusScene={map:MapLibreMap;surface:HTMLElement;viewport:HTMLElement};
+export type PreparedFocus={cover:HTMLElement;origin:Camera;target:Camera;count:number;bytes:number;draw:(index:number)=>Camera;dispose:()=>void};
+
+/** Prepare offscreen, without changing the interactive map. */
+export async function prepareFocusMap(map:MapLibreMap,surface:HTMLElement,viewport:HTMLElement,point:{lng:number;lat:number},signal:AbortSignal):Promise<PreparedFocus>{
  const camera=():Camera=>{const c=map.getCenter();return{center:[c.lng,c.lat],zoom:map.getZoom()};};
  const origin=camera(),target={center:[point.lng,point.lat] as [number,number],zoom:Math.max(origin.zoom,15),essential:true};
- if(Math.abs(origin.center[0]-point.lng)<1e-8&&Math.abs(origin.center[1]-point.lat)<1e-8&&origin.zoom===target.zoom){onPrepared();return;}
- let warming=true,disposed=false,cover:HTMLElement|null=null,shown=origin;
+
+ let disposed=false,cover:HTMLElement|null=null,result:PreparedFocus|undefined;
  const frames:FocusFrame[]=[];
  const cancel=()=>{
   if(signal.reason!=='dispose')map.stop();
-  if(signal.reason!=='navigation'&&signal.reason!=='dispose')map.jumpTo(warming?origin:shown);
+
   cover?.remove();
  };
  signal.addEventListener('abort',cancel,{once:true});
@@ -101,17 +104,17 @@ export async function focusLoadedMap(map:MapLibreMap,surface:HTMLElement,viewpor
   const context=staging.getContext('2d')!;
   const capture=async()=>{
    context.drawImage(canvas,(view.left-source.left)*ratio,(view.top-source.top)*ratio,view.width*ratio,view.height*ratio,0,0,staging.width,staging.height);
-   const state=camera(),markers:Array<[HTMLElement,string]>=[];
+   const state=camera(),markers:Array<[HTMLElement,string,string?]>=[];
    surface.querySelectorAll<HTMLElement>('.maplibregl-marker').forEach(marker=>{
     let copy=markerCopies.get(marker);
     if(!copy){copy=marker.cloneNode(true) as HTMLElement;copy.style.visibility='hidden';cover!.querySelector('.maplibregl-canvas-container')!.append(copy);markerCopies.set(marker,copy);}
-    markers.push([copy,marker.style.cssText]);
+    markers.push([copy,marker.style.cssText,marker.classList.contains('route-arrow')?marker.innerHTML:undefined]);
    });
    const image=await createImageBitmap(staging);
    if(disposed||signal.aborted){image.close();throw aborted();}
    frames.push({image,camera:state,markers});
   };
-  viewport.append(cover);surface.dataset.focusPhase='preparing';
+  surface.dataset.focusPhase='preparing';
   await loadedFlight(map,target,signal,true,focusPreloadSteps.near,capture);
   await waitForMap(map,signal,true);signal.throwIfAborted();
   frames.pop()?.image.close();await capture();
@@ -119,22 +122,43 @@ export async function focusLoadedMap(map:MapLibreMap,surface:HTMLElement,viewpor
   display.width=staging.width;display.height=staging.height;
   Object.assign(display.style,{position:'absolute',left:`${view.left-source.left}px`,top:`${view.top-source.top}px`,width:`${view.width}px`,height:`${view.height}px`});
   const draw=(index:number)=>{
-   const frame=frames[index];output.drawImage(frame.image,0,0);shown=frame.camera;
+   const frame=frames[index];output.drawImage(frame.image,0,0);
    markerCopies.forEach(copy=>copy.style.visibility='hidden');
-   frame.markers.forEach(([copy,style])=>copy.style.cssText=style);
-   cover!.dataset.focusFrame=String(index);
+   frame.markers.forEach(([copy,style,content])=>{copy.style.cssText=style;if(content!==undefined)copy.innerHTML=content;});
+   cover!.dataset.focusFrame=String(index);return frame.camera;
   };
   // Upload replay textures while the initial view is still held. The readback
   // drains this queue before the visible animation, rather than on its first frame.
   frames.forEach(frame=>output.drawImage(frame.image,0,0));
   output.getImageData(0,0,1,1);
-  draw(0);signal.throwIfAborted();warming=false;surface.dataset.focusPhase='moving';onPrepared();
-  await playFocusFrames(frames.length,draw,signal);
- }catch(error){
-  if(!signal.aborted){map.stop();map.jumpTo(origin);await waitForMap(map,signal).catch(()=>{});}
-  throw error;
+  draw(0);signal.throwIfAborted();
+  const dispose=()=>{disposed=true;cover?.remove();frames.forEach(frame=>frame.image.close());frames.length=0;};
+  result={cover,origin,target,count:frames.length,bytes:staging.width*staging.height*4*frames.length,draw,dispose};
+  return result;
  }finally{
-  disposed=true;
-  signal.removeEventListener('abort',cancel);cover?.remove();frames.forEach(frame=>frame.image.close());delete surface.dataset.focusPhase;
+  signal.removeEventListener('abort',cancel);delete surface.dataset.focusPhase;
+  if(!result){disposed=true;cover?.remove();frames.forEach(frame=>frame.image.close());}
+ }
+}
+
+/** Cached replay starts immediately. The live renderer catches up behind its last frame. */
+export async function focusLoadedMap(map:MapLibreMap,surface:HTMLElement,viewport:HTMLElement,point:{lng:number;lat:number},signal:AbortSignal,onPrepared:()=>void,getPrepared:(signal:AbortSignal)=>Promise<PreparedFocus>){
+ const c=map.getCenter(),origin:Camera={center:[c.lng,c.lat],zoom:map.getZoom()};
+ if(Math.abs(c.lng-point.lng)<1e-8&&Math.abs(c.lat-point.lat)<1e-8&&origin.zoom>=15){onPrepared();return;}
+ let prepared:PreparedFocus|undefined,shown=origin,moving=false;
+ const cancel=()=>{
+  if(signal.reason!=='dispose')map.stop();
+  if(moving&&signal.reason!=='navigation'&&signal.reason!=='dispose')map.jumpTo(shown);
+ };
+ signal.addEventListener('abort',cancel,{once:true});
+ try{
+  prepared=await getPrepared(signal);signal.throwIfAborted();
+  viewport.append(prepared.cover);surface.dataset.focusPhase='moving';moving=true;
+  shown=prepared.draw(0);onPrepared();
+  await playFocusFrames(prepared.count,index=>{shown=prepared!.draw(index);},signal);
+  signal.throwIfAborted();surface.dataset.focusPhase='settling';
+  map.jumpTo(prepared.target);await waitForMap(map,signal,true);
+ }finally{
+  signal.removeEventListener('abort',cancel);prepared?.dispose();delete surface.dataset.focusPhase;
  }
 }

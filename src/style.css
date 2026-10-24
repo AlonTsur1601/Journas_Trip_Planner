@@ -2649,6 +2649,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 }
 
 .map-focus-cover{z-index:3;pointer-events:none!important;}
+.workspace.focus-preload-host{position:fixed;left:-100000px;top:0;display:block;opacity:0;pointer-events:none;overflow:hidden;min-height:0;max-height:none;margin:0;padding:0;border:0;}
 .map-focus-cover *{pointer-events:none!important;}
 .map-canvas[data-focus-phase]:not(.map-focus-cover){opacity:0;pointer-events:none;}
 

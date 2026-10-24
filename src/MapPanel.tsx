@@ -69,7 +69,7 @@ export default function MapPanel({
   const liveMarker=useRef<maplibregl.Marker|null>(null);
   const liveLocationRef=useRef(liveLocation);liveLocationRef.current=liveLocation;
   const updateLiveMarker=useRef<()=>void>(()=>{});
-  const focusPoint=(point:{lng:number;lat:number})=>{map.current?.flyTo({center:[point.lng,point.lat],zoom:Math.max(map.current.getZoom(),15),duration:700,maxDuration:900,essential:true});setContextMenu(null);};
+  const focusPoint=(point:{lng:number;lat:number})=>{map.current?.flyTo({center:[point.lng,point.lat],zoom:Math.max(map.current.getZoom(),15),duration:1200,maxDuration:1400,easing:t=>.8*t+.2*t*t*(3-2*t),essential:true});setContextMenu(null);};
   useEffect(()=>{setContextMenu(null);setMode(null);setSource(null);},[contextKey]);
   useEffect(()=>{if(contextMenuDisabled)setContextMenu(null);},[contextMenuDisabled]);
   useLayoutEffect(()=>{

@@ -2619,7 +2619,8 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .maplibregl-ctrl-attrib-button::before{content:'';position:absolute;inset:0;background:currentColor;mask:url('/map-attribution.svg') center/24px 24px no-repeat;}
 [data-theme="dark"] .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button{color:#fff;}
 [data-theme="dark"] .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner,[data-theme="dark"] .maplibregl-ctrl-attrib-inner a{color:#fff;}
-.compass-control .maplibregl-ctrl-icon>.compass-art{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;pointer-events:none;}
+.compass-control .maplibregl-ctrl-icon{transform:none!important;}
+.compass-control .maplibregl-ctrl-icon>.compass-art{position:static;display:block;width:100%;height:100%;padding:2px;box-sizing:border-box;transform:none;pointer-events:none;}
 .compass-accent-stop{stop-color:var(--accent);}
 .compass-base-stop{stop-color:currentColor;}
 .compass-inset{display:none;fill:var(--accent);}

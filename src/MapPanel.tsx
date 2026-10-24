@@ -155,7 +155,11 @@ export default function MapPanel({
     compass.title = "Drag around the compass to rotate; click to reset north";
     compass.parentElement!.classList.add("compass-control");
     // One diamond with a hard color stop keeps the shared edge free of seams or image-layer offsets.
-    compass.querySelector("span")!.innerHTML = `<svg class="compass-art" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="${compassGradientId}" x1="0" y1="0" x2="0" y2="1"><stop class="compass-accent-stop" offset="50%"/><stop class="compass-base-stop" offset="50%"/></linearGradient></defs><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 5 21 16 16 27 11 16Z" fill="url(#${compassGradientId})"/><path class="compass-inset" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></svg>`;
+    compass.querySelector("span")!.innerHTML = `<svg class="compass-art" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="${compassGradientId}" x1="0" y1="0" x2="0" y2="1"><stop class="compass-accent-stop" offset="50%"/><stop class="compass-base-stop" offset="50%"/></linearGradient></defs><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><g class="compass-needle"><path d="M16 5 21 16 16 27 11 16Z" fill="url(#${compassGradientId})"/><path class="compass-inset" d="M16 5 11 16 12.65 16 16 8.63 19.35 16 21 16Z"/></g></svg>`;
+    const needle = compass.querySelector<SVGGElement>(".compass-needle")!;
+    const rotateNeedle = () => needle.setAttribute("transform", `rotate(${-m.getBearing()} 16 16)`);
+    m.on("rotate", rotateNeedle);
+    rotateNeedle();
     let constraining = false;
     const containWorld = () => {
       if (constraining || visible.closest('[aria-hidden="true"]')) return;

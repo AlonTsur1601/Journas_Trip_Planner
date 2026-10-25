@@ -473,6 +473,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const screenReady=useRef(false);
   useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings,user.uid);},[ready,user?.uid,practice,settings.theme,settings.accent]);
   const settingsRef=useRef(settings);settingsRef.current=settings;
+  const savedSettings=useRef(settings);
+  const discardSettings=()=>{settingsRef.current=savedSettings.current;setSettings(savedSettings.current);setModal(null);};
   const savedAccountName=useRef<string|undefined>(undefined);
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
@@ -661,6 +663,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${hasSaved?saved.date:today()}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,mapStart:(r.settings.mapStart==="custom"||r.settings.mapStart==="current"&&!r.settings.mapStartConfigured)?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
+        savedSettings.current=preferences;
         if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
         screenReady.current=true;
         setSettings(preferences);
@@ -1227,7 +1230,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   async function savePlacementPreference(key:'pinPlacementOnMap'|'connectionArrow',value:boolean){
     const previous=settings[key]??true;
     setSettings(current=>({...current,[key]:value}));
-    try{const pending=placementSaves.current.then(()=>api('settings.save',{settings:{[key]:value}}));placementSaves.current=pending.then(()=>{},()=>{});await pending;}catch(e:any){setSettings(current=>({...current,[key]:previous}));setMessage(e.message);}
+    try{const pending=placementSaves.current.then(()=>api('settings.save',{settings:{[key]:value}}));placementSaves.current=pending.then(()=>{},()=>{});await pending;savedSettings.current={...savedSettings.current,[key]:value};}catch(e:any){setSettings(current=>({...current,[key]:previous}));setMessage(e.message);}
   }
   const [accountNameValid,setAccountNameValid]=useState(true);
   const [settingsSaving,setSettingsSaving]=useState(false);
@@ -1236,6 +1239,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     setSettingsSaving(true);
     try {
       await api("settings.save", { settings: next });
+      savedSettings.current={...next};
       savedAccountName.current=(next.displayName??"").trim();
       setSavedProfile({displayName:next.displayName,photoURL:next.photoURL});
 
@@ -1284,7 +1288,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
   if(user&&(verified===null||verified===true&&!ready))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
-  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
+  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
@@ -2271,7 +2275,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} onClose={() => {setModal(null);void saveSettings(settingsRef.current);}}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} locked={settingsSaving} onClose={discardSettings}>
           <form
             onSubmit={async(e) => {
               e.preventDefault();
@@ -2386,7 +2390,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Save preferences
             </AsyncButton>
             <div className="settings-footer">
-              <AsyncButton type="button" className="button settings-tour-button" onClick={()=>{void saveSettings(settingsRef.current);window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</AsyncButton>
+              <AsyncButton type="button" className="button settings-tour-button" onClick={()=>{discardSettings();window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</AsyncButton>
               <small>
                 Journas · Version 1.0.0
               </small>

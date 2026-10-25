@@ -16,7 +16,8 @@ export function tourShieldPath(width:number,height:number,openings:TourRect[]){
  return path;
 }
 
-export function tourNeedsNext(stage:{done?:unknown;instructions?:unknown[]},instruction:{done?:unknown;completeOn?:string;closeOnNext?:string}|undefined,index:number){
+export function tourNeedsNext(stage:{done?:unknown;instructions?:unknown[];informational?:boolean},instruction:{done?:unknown;completeOn?:string;closeOnNext?:string;informational?:boolean}|undefined,index:number){
+ if(stage.informational||instruction?.informational)return true;
  if(stage.instructions&&index<stage.instructions.length-1)return false;
  return Boolean(instruction?.closeOnNext||(!instruction?.done&&!instruction?.completeOn&&(!stage.done||Boolean(stage.instructions&&index<stage.instructions.length-1))));
 }
@@ -25,13 +26,14 @@ export function tourInstructionComplete<T>(instruction:{ready?:(context:T)=>bool
 }
 
 /** Valid defaults and elapsed time never count as a user's action. */
-export function tourSubstepDelay<T>(instruction:{text:string;ready?:(context:T)=>boolean;action?:string;done?:unknown;completeOn?:string;closeOnNext?:string},index:number,count:number,acted:number[],context:T){
+export function tourSubstepDelay<T>(instruction:{text:string;ready?:(context:T)=>boolean;action?:string;done?:unknown;completeOn?:string;closeOnNext?:string;informational?:boolean},index:number,count:number,acted:number[],context:T){
+ if(instruction.informational)return null;
  if(index>=count-1||instruction.done||instruction.completeOn||instruction.closeOnNext)return null;
  return Boolean(instruction.action)&&acted.includes(index)&&instruction.ready?.(context)!==false?0:null;
 }
 
 
 /** The final save/close is its own action; preceding fields only need a manual review. */
-export function tourStageReviewed<T>(instructions:{action?:string;completeOn?:string;skipWhen?:(context:T)=>boolean}[]|undefined,acted:number[],context:T){
- return !instructions||instructions.slice(0,-1).every((item,index)=>item.skipWhen?.(context)||acted.includes(index));
+export function tourStageReviewed<T>(instructions:{action?:string;completeOn?:string;skipWhen?:(context:T)=>boolean;informational?:boolean}[]|undefined,acted:number[],context:T){
+ return !instructions||instructions.slice(0,-1).every((item,index)=>item.informational||item.skipWhen?.(context)||acted.includes(index));
 }

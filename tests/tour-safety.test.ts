@@ -26,3 +26,12 @@ it('opens the new list stages without allowing edits to derail the guide',()=>{
  expect(tourClickAllowed('Browse your connections',target(['.connections-list button']))).toBe(false);
  expect(tourClickAllowed('Add another place',target(['[aria-label="Close tasks"]']))).toBe(true);
 });
+it('blocks every part of home and all-trip cards in every guide stage',()=>{
+ for(const stage of ['Find your plans again','Pin a shortcut','Choose your preferences','Add your first place']){
+  for(const selector of ['.home-tile','.all-trips-list','.home-resume-card','.home-tile-main','.home-tile-menu','.home-context-menu'])expect(tourClickAllowed(stage,target([selector])),`${stage}: ${selector}`).toBe(false);
+ }
+});
+it('keeps the map and schedule present while explaining workspace controls',()=>{
+ expect(tourClickAllowed('Arrange your workspace',target(['[aria-label="Map"]']))).toBe(false);
+ expect(tourClickAllowed('Arrange your workspace',target(['[aria-label="Schedule"]']))).toBe(false);
+});

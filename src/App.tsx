@@ -1283,7 +1283,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
-      {home&&!shareTrip&&user&&<HomePage trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1440,7 +1440,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onArrowPreferenceChange={value=>void savePlacementPreference("connectionArrow",value)}
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
-                onConnection={connection=>setEdit({kind:"connections",item:connection})}
+                onConnection={connection=>{if(!practice)setEdit({kind:"connections",item:connection});}}
                 onConnections={trip?()=>setModal("connections"):undefined}
                 onPlaces={trip?()=>setModal("places"):undefined}
                 liveLocation={liveLocation.position??undefined}
@@ -1452,7 +1452,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
                 onView={(center, zoom) => changeLayout({ center, zoom })}
-                onPin={(pin) => setEdit({kind:"pins",item:pin})}
+                onPin={(pin) => {if(!practice)setEdit({kind:"pins",item:pin});}}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
             </Suspense>

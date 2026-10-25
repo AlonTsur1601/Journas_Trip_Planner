@@ -15,7 +15,7 @@ export function tourSpotlight(outline:HTMLElement,cutouts:SVGGElement,shield:SVG
  const bounds=(element:Element)=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};
  return{
   place(target:Element|null,availableHeight:number){
-   const surfaces=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert])')].filter(el=>!el.closest('[inert],[data-motion-exit]')&&el.getBoundingClientRect().width>0);
+   const surfaces=[...document.querySelectorAll('.modal:not([inert]),.bounded-popover:not([inert]),.calendar-popover:not([inert])')].filter(el=>!el.closest('[inert],[data-motion-exit]')&&el.getBoundingClientRect().width>0);
    if(target!==focused){
     stopExit?.();stopExit=null;focusMotion?.stop();focused=target;outline.hidden=loading||!target;
     if(target){focusMotion=mirrorSurfaceMotion(target,outline);stopExit=watchSurfaceExit(target,(copy,fade,lift)=>{

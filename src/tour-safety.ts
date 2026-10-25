@@ -9,7 +9,7 @@ export function tourClickAllowed(stage:string,target:Element){
  if(within('[aria-label="Undo"], [aria-label="Redo"]'))return false;
  if(within('.trip-selector [aria-label="Choose trip"]')&&stage!=='Choose a trip')return false;
  if(within('.dropdown-menu[aria-label="Choose trip"] [role="option"][aria-selected="false"]'))return false;
- if(within('.home-continue, .home-tile-main, .home-tile-menu, .home-context-menu'))return false;
+ if(within('.home-continue, .home-resume-card, .home-tile, .home-tile-main, .home-tile-menu, .home-context-menu, .all-trips-list'))return false;
  if(within('.topbar .brand')&&stage!=='Return home')return false;
  if(within('button[aria-label="Trip details"]')&&stage!=='View the trip details')return false;
  if(within('[aria-label="Close tasks"]')&&!['Arrange your workspace','Add another place'].includes(stage))return false;
@@ -25,6 +25,7 @@ export function tourClickAllowed(stage:string,target:Element){
  if(within('.map-panel [aria-label="Places"]')&&stage!=='Browse your places')return false;
  if(stage==='Browse your places'&&within('.places-modal button[aria-label^="Edit place"]'))return false;
  if(stage==='Browse your connections'&&within('.connections-list button'))return false;
+ if(stage==='Arrange your workspace'&&within('[aria-label="Map"], [aria-label="Schedule"]'))return false;
  if(within('.map-panel .map-pin')){
   if(stage!=='Connect your places')return false;
   if(!target.closest('.map-panel')?.querySelector('[aria-label="Connect pins on map"].active'))return false;

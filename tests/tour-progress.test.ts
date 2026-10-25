@@ -37,17 +37,25 @@ describe('stable focus interaction openings',()=>{
 describe('required guide actions',()=>{
  const stage=(title:string)=>tourSteps.find(s=>s.title===title)!;
  it('never offers Next for a substep or stage completed by its site action',()=>{
-  for(const step of tourSteps){if(!step.instructions&&step.done)expect(tourNeedsNext(step,undefined,0)).toBe(false);for(const [index,part]of (step.instructions??[]).entries()){if(part.done||part.completeOn)expect(tourNeedsNext(step,part,index)).toBe(false);if(step.done&&index===step.instructions!.length-1&&!part.closeOnNext)expect(tourNeedsNext(step,part,index)).toBe(false);}}
+  for(const step of tourSteps){if(!step.informational&&!step.instructions&&step.done)expect(tourNeedsNext(step,undefined,0)).toBe(false);for(const [index,part]of (step.instructions??[]).entries()){if(!step.informational&&!part.informational&&(part.done||part.completeOn))expect(tourNeedsNext(step,part,index)).toBe(false);if(!step.informational&&step.done&&index===step.instructions!.length-1&&!part.closeOnNext)expect(tourNeedsNext(step,part,index)).toBe(false);}}
  });
  it('makes introductory controls optional and immediately offers Next',()=>{for(const title of ['Choose a trip','Navigate the trip dates','Arrange your workspace','Undo, redo and save','Share and collaborate','Find your plans again']){const step=stage(title);expect(step.informational).toBe(true);expect(step.instructions).toBeUndefined();expect(tourNeedsNext(step,undefined,0)).toBe(true);}});
  it('accepts lodging selected early without requiring a custom name or appearance',()=>{const steps=stage('Make the trip yours').instructions!,index=steps.findIndex(p=>p.title==='Choose lodging'),part=steps[index];expect(tourInstructionComplete(part,index,0,[index],{lodgingChosen:true}as any)).toBe(true);expect(tourInstructionComplete(part,index,0,[],{lodgingChosen:false}as any)).toBe(false);});
  it('lets valid schedule defaults stay unchanged',()=>{const steps=stage('Link your schedule to a place').instructions!;for(const title of ['Set the time']){const index=steps.findIndex(p=>p.title===title);expect(tourInstructionComplete(steps[index],index,index,[index],{date:'2026-10-23',draft:{start:'09:00',end:'10:00'}}as any)).toBe(true);}});
  it('does not complete untouched trip dates just because they are valid',()=>{const part={ready:()=>true,action:'.date-field'};expect(tourInstructionComplete(part,1,1,[],{})).toBe(false);expect(tourInstructionComplete(part,1,1,[1],{})).toBe(true);});
 });
+it('lets every introductory screen and every preference advance without an interaction',()=>{
+ for(const title of ['Choose a trip','Browse your places','Browse your connections','Navigate the trip dates','Arrange your workspace','Undo, redo and save','View the trip details','Share and collaborate','Return home','Find your plans again','Personalize Journas','Choose your preferences']){
+  const step=tourSteps.find(s=>s.title===title)!;
+  expect(step.informational,title).toBe(true);
+  for(const [index,item] of (step.instructions??[undefined]).entries())expect(tourNeedsNext(step,item,index),title).toBe(true);
+ }
+ expect(tourStageReviewed([{informational:true,action:'.optional'},{action:'.required'},{completeOn:'.save'}],[1],{})).toBe(true);
+});
 
 describe('automatic substeps',()=>{
  it('combines opening the symbol picker and choosing its value',()=>{const parts=tourSteps.find(s=>s.title==='Make the trip yours')!.instructions!;const symbols=parts.filter(p=>/symbol/i.test(p.title));expect(symbols).toHaveLength(1);expect(symbols[0].completeOn).toBeTruthy();expect(symbols[0].done).toBeUndefined();});
- it('never shows Next between substeps anywhere in the catalog',()=>{for(const step of tourSteps)for(let index=0;index<(step.instructions?.length??0)-1;index++)expect(tourNeedsNext(step,step.instructions![index],index)).toBe(false);});
+ it('offers Next for every explanation while keeping required exercises action driven',()=>{for(const step of tourSteps)for(let index=0;index<(step.instructions?.length??0)-1;index++)expect(tourNeedsNext(step,step.instructions![index],index)).toBe(Boolean(step.informational||step.instructions![index].informational));});
  it('waits for required valid input and an explicit trip date choice',()=>{const p={text:'Dates',ready:(c:{valid:boolean})=>c.valid,action:'.date-field'};expect(tourSubstepDelay(p,0,2,[],{valid:true})).toBeNull();expect(tourSubstepDelay(p,0,2,[0],{valid:false})).toBeNull();expect(tourSubstepDelay(p,0,2,[0],{valid:true})).toBe(0);});
  it('never replaces a user action with elapsed reading time',()=>{const p={text:'Read the optional appearance settings.'};expect(tourSubstepDelay(p,0,2,[],{})).toBeNull();expect(tourSubstepDelay(p,1,2,[],{})).toBeNull();});
 });

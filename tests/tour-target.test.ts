@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
-import {findTourTarget,observeTourTarget} from '../src/tour-target';
+import {findTourTarget,findTourStepTarget,findTourAction,observeTourTarget} from '../src/tour-target';
 import {registerSurfaceMotion,mirrorSurfaceMotion,restingSurfaceRect,watchSurfaceExit,notifySurfaceExit,mirrorExitAnimation} from '../src/surface-motion';
 let frames:Map<number,FrameRequestCallback>,nextFrame:number;
 const tick=()=>{const queued=[...frames.values()];frames.clear();queued.forEach(frame=>frame(0));};
@@ -10,6 +10,18 @@ beforeEach(()=>{
 });
 afterEach(()=>vi.unstubAllGlobals());
 describe('guide target tracking',()=>{
+ it('resolves a newly opened calendar every frame without waiting for a guide render',()=>{
+  const button={getBoundingClientRect:()=>({width:100,height:40}),closest:()=>null},calendar={getBoundingClientRect:()=>({width:320,height:300}),closest:()=>null};
+  let opened=false;
+  vi.stubGlobal('document',{querySelectorAll:(selector:string)=>selector==='.calendar'?opened?[calendar]:[]:[button]});
+  const dynamic=()=>opened?'.calendar':'.date-button',found:unknown[]=[];
+  const stop=observeTourTarget(()=>findTourStepTarget(dynamic,'.date-button',{}),target=>found.push(target));
+  tick();opened=true;tick();opened=false;tick();stop();expect(found).toEqual([button,calendar,button]);
+ });
+ it('closes only the visible modal, even when the original planner is mounted but hidden',()=>{
+  const click=vi.fn(),hidden={closest:()=>({getBoundingClientRect:()=>({width:0,height:0})})},visible={click,closest:(selector:string)=>selector==='.modal'?{getBoundingClientRect:()=>({width:400,height:500})}:null};
+  vi.stubGlobal('document',{querySelectorAll:()=>[hidden,visible]});findTourAction('.close')?.click();expect(click).toHaveBeenCalledOnce();
+ });
  it('follows every animation frame through its final position',()=>{
   const target={} as Element;let y=8;const positions:number[]=[];
   const stop=observeTourTarget(()=>target,()=>positions.push(y));

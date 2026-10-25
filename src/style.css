@@ -310,6 +310,7 @@ textarea {
 }
 .map-wrapper {
   position: relative;
+  isolation: isolate;
   flex: 1;
   min-height: 150px;
 }

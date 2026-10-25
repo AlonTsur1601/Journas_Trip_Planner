@@ -3,12 +3,12 @@ import {userErrorMessage} from "./user-error";
 import {isBlackAccent} from './appearance-cache';
 import {createPortal} from 'react-dom';
 import { Children, isValidElement, useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
 import {Popover} from "./Popover";
 
-export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, scrollable=false, ...props }: any) {
+export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, scrollable: _scrollable, ...props }: any) {
   const [open, setOpen] = useState(false);
-  const [search,setSearch]=useState("");const [page,setPage]=useState(0);
+  const [search,setSearch]=useState("");
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
   const options = Children.toArray(children).filter(isValidElement).map((element: any) => ({
@@ -17,9 +17,8 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
     disabled: element.props.disabled,
   }));
   const filtered=options.filter(option=>String(option.label).toLowerCase().includes(search.toLowerCase()));
-  const pages=Math.max(1,Math.ceil(filtered.length/6));const current=Math.min(page,pages-1);
-  const toggle=()=>{setOpen(!open);setSearch('');setPage(0);};
-  const optionButtons=(scrollable?filtered:filtered.slice(current*6,current*6+6)).map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
+  const toggle=()=>{setOpen(!open);setSearch('');};
+  const optionButtons=filtered.map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
         onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
       }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button>);
   return <div ref={root} className="dropdown" onKeyDown={(event) => {
@@ -38,9 +37,8 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
       <span>{options.find((option) => option.value === String(value))?.label ?? placeholder}</span><ChevronDown size={15} />
     </button>
     {open && <Popover anchor={root} width={Math.max(220,root.current?.getBoundingClientRect().width??220)} height={searchable?294:256} onClose={()=>setOpen(false)} id={id} role="listbox" aria-label={props["aria-label"]} className="dropdown-menu">
-      {searchable&&<SearchInput aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onValueChange={value=>{setSearch(value);setPage(0);}}/>}
-      {scrollable?<div className="dropdown-scroll-options">{optionButtons}</div>:optionButtons}
-      {!scrollable&&pages>1&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous options page" disabled={!current} onClick={()=>setPage(current-1)}><ChevronLeft size={15}/></button><span>{current+1} / {pages}</span><button type="button" className="icon" aria-label="Next options page" disabled={current===pages-1} onClick={()=>setPage(current+1)}><ChevronRight size={15}/></button></div>}
+      {searchable&&<SearchInput aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onValueChange={setSearch}/>}
+      <div className="dropdown-scroll-options">{optionButtons}</div>
       {!filtered.length&&<p>No matching options</p>}
     </Popover>}
   </div>;

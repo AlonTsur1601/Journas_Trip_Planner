@@ -31,6 +31,7 @@ export default function MapPanel({
   onCancelMove,
   onConnections,
   placementMode = false,
+  placementPinId,
   arrowPreference = true,
   onArrowPreferenceChange,
   onStartPinSearch,
@@ -52,6 +53,7 @@ export default function MapPanel({
   onCancelMove?: () => void;
   onConnections?: () => void;
   placementMode?: boolean;
+  placementPinId?: string;
   arrowPreference?: boolean;
   onArrowPreferenceChange?: (checked:boolean)=>void;
   onStartPinSearch?: ()=>void;
@@ -400,7 +402,7 @@ export default function MapPanel({
       const marker=new maplibregl.Marker({ element: el, draggable: false })
         .setLngLat([pin.lng, pin.lat])
         .addTo(m);
-      if(!readonly && (movingPinId===pin.id || placementMode)){
+      if(!readonly && (movingPinId===pin.id || placementMode&&(!placementPinId||placementPinId===pin.id))){
         el.classList.add('drag-edit');
         let drag: {x:number;y:number;pixel:maplibregl.PointLike;original:[number,number];moved:boolean}|null=null;
         el.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();m.stop();const point=m.project(marker.getLngLat());const original=marker.getLngLat();drag={x:e.clientX,y:e.clientY,pixel:[point.x,point.y],original:[original.lng,original.lat],moved:false};el.setPointerCapture(e.pointerId);});
@@ -538,7 +540,7 @@ export default function MapPanel({
       m.off("style.load", draw);
       m.off("move", updateArrows);
     };
-  }, [pins, connections, movingPinId, placementMode, readonly,activePinIds,contextMenuDisabled]);
+  }, [pins, connections, movingPinId, placementMode, placementPinId, readonly,activePinIds,contextMenuDisabled]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;

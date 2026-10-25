@@ -1,3 +1,4 @@
+import {visibleConnections,type PendingConnection} from './connection-preview';
 import {SearchableList} from './SearchableList';
 import {AsyncButton} from './AsyncButton';
 import type {MapPanelHandle} from './MapPanel';
@@ -62,7 +63,7 @@ import type {HomeState,HomeTarget,TripAppearance} from "./types";
 import {PasswordField} from "./PasswordField";
 import {AccountCredentials} from "./AccountCredentials";
 import {AccountName} from "./AccountName";
-import {lodgingName} from "./lodging-name";
+import {lodgingName,isManualLodgingName} from "./lodging-name";
 import {accountPhoto,accountName} from "./account-profile";
 import { api as profileApi, auth, configured, observeAuthSession } from "./firebase";
 import {verificationReturnClient,listenForVerificationSession} from './email-verification-return';
@@ -445,7 +446,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const calendarDark=settings.theme==='dark'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;
   const tripDotColors=useMemo(()=>calendarTripColors(trips,settings.accent,calendarDark),[trips,settings.accent,calendarDark]);
-  const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
+  const [pendingConnections,setPendingConnections]=useState<PendingConnection[]>([]);
+  const visibleDayConnections=useMemo(()=>visibleConnections(day.connections,pendingConnections,trip?.id,date),[day.connections,pendingConnections,trip?.id,date]);
+  const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,nameSource:trip.lodging.nameSource,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
   const placementSaves=useRef(Promise.resolve());
   const lodgingNameEdited=useRef(false);
   const [lodgingDraft,setLodgingDraft]=useState<Trip["lodging"]>(undefined);
@@ -460,7 +463,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [pendingDayNavigation,setPendingDayNavigation]=useState<{tripId:string;date:string;direction:'next'|'previous'}|null>(null);
   const finishDayNavigation=(tripId:string,loadedDate:string)=>setPendingDayNavigation(previous=>previous?.tripId===tripId&&previous.date===loadedDate?null:previous);
   useEffect(()=>{if(home||!trip||(!user&&!shareTrip)||date<trip.startDate||date>trip.endDate)setPendingDayNavigation(null);},[home,trip?.id,trip?.startDate,trip?.endDate,date,user?.uid,shareTrip]);
-  const [taskPage,setTaskPage]=useState(0);
   const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:57);
   const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
   const [historyBusy,setHistoryBusy]=useState(false);
@@ -522,7 +524,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const linkDay=date;
   useEffect(()=>{setBlockLinkSources(null);if(edit?.kind!=='blocks'||linkDay===date||!trip?.id||!/^\d{4}-\d{2}-\d{2}$/.test(linkDay))return;const controller=new AbortController();void api<{day:Day}>('trip.get',{tripId:trip.id,date:linkDay},controller.signal,true).then(result=>{if(!controller.signal.aborted)setBlockLinkSources({date:linkDay,pins:result.day.pins,connections:result.day.connections});}).catch(error=>{if(!controller.signal.aborted)setMessage(error.message);});return()=>controller.abort();},[edit?.kind,linkDay,date,trip?.id]);
   const blockLinkPins=linkDay===date?day.pins:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.pins:[];
-  const blockLinkConnections=linkDay===date?day.connections:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.connections:[];
+  const blockLinkConnections=linkDay===date?visibleDayConnections:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.connections:[];
   function setEdit(value: Edit | null) {
     if(value?.kind==="connections")value={...value,item:{...value.item,title:value.item.title??connectionTitle(value.item as any,mapPins),detail:value.item.detail??"",symbol:value.item.symbol??""}};
     if (value && !value.base)
@@ -618,7 +620,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     showPlanner(selected,nextDate);
   }
   function createTrip(){lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
-  function editTrip(selected:Trip){lodgingNameEdited.current=Boolean(selected.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(selected.lodging.name));setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
+  function editTrip(selected:Trip){lodgingNameEdited.current=isManualLodgingName(selected.lodging);setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
     if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
     try{await api('trip.remove',{tripId:selected.id});const remaining=await refresh();if(!remaining.length)setHome(true);const next=availableHome(homeRef.current,remaining);setHomeState(next);homeRef.current=next;await api('home.save',{home:next});setHistoryState({undo:null,redo:null});if(trip?.id===selected.id){setTrip(remaining[0]??null);setDate(remaining[0]?.startDate??today());setDay(emptyDay());}if(lastTarget?.tripId===selected.id)setLastTarget(remaining[0]?{tripId:remaining[0].id,date:remaining[0].startDate}:null);setModal(null);}catch(e:any){setMessage(e.message);}
@@ -1040,6 +1042,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         }).format(epoch)
       : fallback;
   }
+  async function createMapConnection(from:string,to:string,arrow:boolean){
+    if(!trip)return;
+    const connection={id:crypto.randomUUID(),versions:{},from,to,arrow};
+    setPendingConnections(previous=>[...previous,{tripId:trip.id,date,connection}]);
+    try{await mutate('connections',connection,false,undefined,true);}
+    finally{setPendingConnections(previous=>previous.filter(item=>item.connection.id!==connection.id));}
+  }
   async function mutate(
     kind: string,
     item: Record<string, any>,
@@ -1059,7 +1068,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       try {
         const r = await api<{trip:Trip}>("trip.update", {
           tripId:trip.id, name:trip.name, startDate:trip.startDate, endDate:trip.endDate,
-          lodging:{...trip.lodging,name:item.title,lng:item.lng,lat:item.lat,note:item.note,color:item.color,symbol:item.symbol},
+          lodging:{...trip.lodging,name:item.title,nameSource:item.nameSource??trip.lodging?.nameSource,lng:item.lng,lat:item.lat,note:item.note,color:item.color,symbol:item.symbol},
         },undefined,background);
         if(tripRef.current?.id===r.trip.id)setTrip(r.trip);
         void refresh().catch(e=>setMessage(e.message));
@@ -1106,7 +1115,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const drafts = JSON.parse(localStorage.getItem(draftKey) ?? "{}");
     localStorage.setItem(draftKey, JSON.stringify({ ...drafts, [id]: draft }));
     try {
-      await api("item.patch", {
+      const result=await api<{item?:Day['connections'][number]}>("item.patch", {
         tripId: trip.id,
         date,
         kind,
@@ -1114,6 +1123,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         patch,
         baseVersions: base,
       },undefined,background);
+      if(kind==='connections'&&result.item&&tripRef.current?.id===trip.id&&dateRef.current===date){const saved=result.item;setDay(current=>({...current,connections:[...current.connections.filter(connection=>connection.id!==saved.id),saved]}));}
       const pending = JSON.parse(localStorage.getItem(draftKey) ?? "{}");
       if(JSON.stringify(pending[id])===JSON.stringify(draft))delete pending[id];
       if (Object.keys(pending).length)
@@ -1273,9 +1283,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       setMessage('Place pasted into this day.');
     }catch(error:any){setMessage(error.message);}finally{pinPasteBusy.current=false;setPastingPin(false);finish();}
   }
-  const taskPageSize=Math.max(1,Math.floor(((innerWidth<=700?innerHeight-90:layout.todoHeight)-112)/52));
-  const taskPages=Math.max(1,Math.ceil(day.tasks.length/taskPageSize));const currentTaskPage=Math.min(taskPage,taskPages-1);
-  const visibleTasks=[...displayTasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a))).slice(currentTaskPage*taskPageSize,(currentTaskPage+1)*taskPageSize);
+  const visibleTasks=[...displayTasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a)));
   if (!ready && !user && !hasOpenedWorkspace())
     return (
       <LoadingScreen startup text="Getting Journas ready…"/>
@@ -1442,10 +1450,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               <MapPanel ref={mapFocus} onFocusComplete={()=>void saveLayout(true)}
                 onFocusError={setMessage}
                 pins={mapPins}
-                connections={day.connections}
+                connections={visibleDayConnections}
                 layout={layout}
                 readonly={readonly}
-                onConnect={async(from,to,arrow)=>{await mutate("connections",{id:crypto.randomUUID(),versions:{},from,to,arrow});}}
+                onConnect={createMapConnection}
                 arrowPreference={settings.connectionArrow??true}
                 onArrowPreferenceChange={value=>void savePlacementPreference("connectionArrow",value)}
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
@@ -1550,7 +1558,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 {day.blocks.map((b) => {
                   const segment=blockRange(b,date);
                   const pin = day.pins.find((p) => p.id === b.pinId);
-                  const connection=day.connections.find(connection=>connection.id===b.connectionId);
+                  const connection=visibleDayConnections.find(connection=>connection.id===b.connectionId);
                   const inherited=pin?{title:pin.title,detail:pin.note,color:pin.color,symbol:pin.symbol}:connection?{title:connectionTitle(connection,mapPins),detail:connection.detail??'',symbol:connection.symbol??''}:null;
                   const field=(key:string)=>inherited&&key in inherited&&!b.overrides.includes(key)?(inherited as any)[key]:(b as any)[key];
                   const minutes = (value: string) => {
@@ -1698,7 +1706,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     <small>
                       {[
                         day.pins.find((p) => p.id === t.pinId)?.title,
-                        day.connections.filter(connection=>connection.id===t.connectionId).map(connection=>connectionTitle(connection,mapPins))[0],
+                        visibleDayConnections.filter(connection=>connection.id===t.connectionId).map(connection=>connectionTitle(connection,mapPins))[0],
                         day.blocks.find((b) => b.id === t.blockId)?.title,
                       ]
                         .filter(Boolean)
@@ -1714,7 +1722,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 </div>
               )}
             </div>
-            {taskPages>1&&<div className="picker-pages task-pages"><AsyncButton className="icon" aria-label="Previous tasks page" disabled={!currentTaskPage} onClick={()=>setTaskPage(currentTaskPage-1)}><ChevronLeft size={16}/></AsyncButton><span>{currentTaskPage+1} / {taskPages}</span><AsyncButton className="icon" aria-label="Next tasks page" disabled={currentTaskPage===taskPages-1} onClick={()=>setTaskPage(currentTaskPage+1)}><ChevronRight size={16}/></AsyncButton></div>}
             {!readonly && (
               <AsyncButton className="todo-add" onClick={() => newItem("tasks")}>
                 <Plus size={17} /> Add a task
@@ -1834,11 +1841,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={maxDate()}/>
             <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><AsyncButton type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</AsyncButton><AsyncButton type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</AsyncButton></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><AsyncButton type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</AsyncButton></div>}</div></div></div>
             </div><div className="trip-location-column"><span className="lodging-label">Lodging location</span>
-            <LocationPicker value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
-              setLodgingDraft(previous=>({...previous,lng:place.lng,lat:place.lat,name:lodgingName(previous?.name,place.name,lodgingNameEdited.current),timezone:tzlookup(place.lat,place.lng)}));
+            <LocationPicker contextPins={modal==='edit-trip'?mapPins:undefined} contextConnections={modal==='edit-trip'?visibleDayConnections:undefined} editingPinId={modal==='edit-trip'?'trip-lodging':undefined} value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
+              setLodgingDraft(previous=>{if(source==='reverse'&&!previous?.nameSource&&previous?.lng===place.lng&&previous?.lat===place.lat&&previous?.name.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())lodgingNameEdited.current=false;return {...previous,lng:place.lng,lat:place.lat,name:lodgingName(previous?.name,place.name,lodgingNameEdited.current),nameSource:lodgingNameEdited.current?'custom':'location',timezone:tzlookup(place.lat,place.lng)};});
             }}/>
 
-            {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=true;setLodgingDraft({...lodgingDraft!,name:e.target.value});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
+            {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=Boolean(e.target.value.trim());setLodgingDraft({...lodgingDraft!,name:e.target.value,nameSource:e.target.value.trim()?'custom':'location'});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
             </div><AsyncButton
               className="button primary full"
               pending={tripSaving} disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
@@ -1878,7 +1885,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       ...edit,
                       item: {
                         ...edit.item,
-                        title: e.target.value,
+                        title: e.target.value,
+                        ...(edit.item.id==='trip-lodging'?{nameSource:e.target.value.trim()?'custom':'location'}:{}),
                         ...(edit.kind === "blocks"
                           ? {
                               overrides: [
@@ -1891,7 +1899,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   }
                 />
               )}
-              {edit.kind === "pins" && <LocationPicker key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>current?.kind==='pins'&&current.item.id===edit.item.id?{...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title}}:current)}/>}
+              {edit.kind === "pins" && <LocationPicker contextPins={mapPins} contextConnections={visibleDayConnections} editingPinId={edit.item.id} key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>{if(current?.kind!=='pins'||current.item.id!==edit.item.id)return current;const lodging=current.item.id==='trip-lodging';let manual=isManualLodgingName({name:current.item.title,nameSource:current.item.nameSource});if(lodging&&source==='reverse'&&!current.item.nameSource&&current.item.lng===place.lng&&current.item.lat===place.lat&&current.item.title.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())manual=false;return {...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,...(lodging?{title:lodgingName(current.item.title,place.name,manual),nameSource:manual?'custom':'location'}:{title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title})}};})}/>}
 
               {edit.kind === "blocks" && (
                 <>
@@ -2057,7 +2065,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               )}
               {edit.kind === "tasks" && (
                 <>
-                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={day.pins} connections={day.connections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
+                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={day.pins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
                   <Select
                     label="Linked time"
                     value={edit.item.blockId ?? ""}
@@ -2157,7 +2165,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </div>}/>
       </Modal>}
       {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
-        <SearchableList items={day.connections} label="Search connections" searchText={connection=>[connectionTitle(connection,mapPins),connection.detail,...mapPins.filter(pin=>pin.id===connection.from||pin.id===connection.to).map(pin=>pin.title)].join(' ')} className="connections-list" emptyText="No connections for this day." renderItem={connection=><div className="connection-row" key={connection.id}>
+        <SearchableList items={visibleDayConnections} label="Search connections" searchText={connection=>[connectionTitle(connection,mapPins),connection.detail,...mapPins.filter(pin=>pin.id===connection.from||pin.id===connection.to).map(pin=>pin.title)].join(' ')} className="connections-list" emptyText="No connections for this day." renderItem={connection=><div className="connection-row" key={connection.id}>
           <span className="connection-list-title">{connection.symbol&&<SymbolIcon value={connection.symbol}/>}<span>{connectionTitle(connection,mapPins)}{connection.detail&&<small>{connection.detail}</small>}</span></span>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</AsyncButton>}
         </div>}/>
@@ -2167,7 +2175,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
           <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
-          {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=Boolean(trip.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(trip.lodging.name));setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
+          {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
               <p>
@@ -2500,7 +2508,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);}}/></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><AsyncButton className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</AsyncButton><AsyncButton className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</AsyncButton></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:day.connections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:visibleDayConnections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}

@@ -2683,3 +2683,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .dropdown-menu>.search-input input{margin-bottom:0;}
 .place-search-input .search-input input{padding-left:38px;}
 .place-search-input>svg{z-index:1;}
+/* Selection color is immediate; only the wheel's size change is animated. */
+.time-wheel>button{transform:scale(.88);transition:transform 110ms ease-out;}
+.time-wheel>button.selected{transform:scale(1.02);}
+@media(prefers-reduced-motion:reduce){.time-wheel>button{transition:none;}}

@@ -62,7 +62,7 @@ export type Trip = {
   ownerId: string;
   memberIds: string[];
   appearance?: TripAppearance;
-  lodging?: {name: string; lng: number; lat: number; timezone: string; color?:string; symbol?:string; note?:string};
+  lodging?: {name: string; nameSource?:'location'|'custom'; lng: number; lat: number; timezone: string; color?:string; symbol?:string; note?:string};
 };
 export type TripAppearance = {color:string;symbol:string;mode:'symbol'|'image';image:string};
 export type HomeTarget = {tripId:string|null;date:string|null};

@@ -40,7 +40,7 @@ function lodging(value: unknown) {
     if(!name||!finite(place.lng,-180,180)||!finite(place.lat,-85,85))fail(400,'INVALID_LODGING','Select a lodging location and enter its name.');
     const color=place.color??'#7c5ce7',symbol=place.symbol??'icon:stay',note=place.note??'';
     if(!isColor(color))fail(400,'INVALID_COLOR','Choose a valid lodging pin color');
-    return {name,lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng)),color,symbol:text(symbol,40),note:text(note,4000)};
+    return {name,...(place.nameSource==='location'||place.nameSource==='custom'?{nameSource:place.nameSource}:{}),lng:Number(place.lng),lat:Number(place.lat),timezone:tzlookup(Number(place.lat),Number(place.lng)),color,symbol:text(symbol,40),note:text(note,4000)};
 }
 function appearance(value:unknown) {
  const data=object(value),color=data.color,symbol=text(data.symbol,40),mode=data.mode,image=text(data.image??'',70000);

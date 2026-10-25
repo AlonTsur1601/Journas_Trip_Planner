@@ -2610,8 +2610,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .maplibregl-ctrl-group{border-radius:5px;overflow:hidden;box-shadow:none!important;}
 .maplibregl-ctrl-group button,.compass-control .maplibregl-ctrl-compass{width:34px;height:34px;border-radius:0;}
 .maplibregl-ctrl-group button.maplibregl-ctrl-zoom-in,.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out{position:relative;padding:0;}
-.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out{border-top:0;}
-.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--line);}
+.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out{border-top:0;box-shadow:inset 0 1px 0 var(--line);}
 .maplibregl-ctrl-group button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:none!important;position:absolute;inset:0;display:grid;place-items:center;width:100%;height:100%;}
 .maplibregl-ctrl-zoom-in svg,.maplibregl-ctrl-zoom-out svg{width:19px;height:19px;}
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner{background-color:var(--surface);color:var(--ink);}

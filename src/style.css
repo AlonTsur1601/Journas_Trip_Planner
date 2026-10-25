@@ -2586,7 +2586,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .planning-history-actions{display:flex;align-items:center;gap:0;}
 @media(max-width:700px){.planning-history-actions{grid-row:3;grid-column:2/5;justify-self:stretch;}.planning-history-actions>.save-control{flex:1;}.planning-history-actions>.icon{flex-shrink:0;}}
 
-.map-live-location{z-index:4;width:17px;height:17px;border:3px solid white;border-radius:50%;background:#2582ee;box-shadow:0 0 0 7px #2582ee33,0 2px 7px #0004;pointer-events:none!important;}
+.map-live-location{z-index:4;width:17px;height:17px;border:3px solid white;border-radius:50%;background:var(--accent);box-shadow:0 0 0 7px color-mix(in srgb,var(--accent) 20%,transparent),0 2px 7px #0004;pointer-events:none!important;}
 .map-pin.is-active{box-shadow:0 0 0 4px var(--surface),0 0 0 7px var(--accent),0 3px 12px #0005;}
 .map-focus-tools{position:absolute;top:10px;right:10px;z-index:4;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:5px;background:var(--surface);overflow:hidden;}
 .map-focus-tools>.icon{border:0;border-radius:0;width:34px;height:34px;}.map-focus-tools>.icon+.icon{border-top:1px solid var(--line);}
@@ -2648,10 +2648,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
  .top-actions>.button[aria-label="Trip details"]>span{display:inline;}
 }
 
-.map-focus-cover{z-index:3;pointer-events:none!important;}
-.workspace.focus-preload-host{position:fixed;left:-100000px;top:0;display:block;opacity:0;pointer-events:none;overflow:hidden;min-height:0;max-height:none;margin:0;padding:0;border:0;}
-.map-focus-cover *{pointer-events:none!important;}
-.map-canvas[data-focus-phase]:not(.map-focus-cover){opacity:0;pointer-events:none;}
+.focus-tile-probe.maplibregl-map{position:fixed;left:-100000px;top:0;opacity:0;pointer-events:none;}
 
 /* Hover/press feedback follows the outside corners of each joined control. */
 .topbar .trip-selector,.date-picker,.top-actions,.planning-history-actions,.view-controls,.map-tools{overflow:clip;}

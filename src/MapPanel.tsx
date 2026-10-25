@@ -1,6 +1,5 @@
-import {focusLoadedMap,prepareFocusMap,type FocusScene,type PreparedFocus} from "./map-focus";
-import {FocusPreloadQueue} from './focus-preload';
-import {createRoot} from 'react-dom/client';
+import {focusLoadedMap} from "./map-focus";
+import {preloadFocusTiles} from "./map-tile-preload";
 import {connectionTitle} from './connection-label';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { MapPinPlus, MapPinned, LocateFixed, BedDouble, Copy, Pencil, Focus, Compass, ClipboardPaste, Route, Waypoints, X } from "lucide-react";
@@ -12,7 +11,6 @@ import * as maplibregl from "maplibre-gl";
 import workerURL from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 maplibregl.setWorkerUrl(workerURL);
 const noActivePins:string[]=[];
-const ignoreFocusChange=()=>{};
 import { worldViewportLimits } from "./map-viewport";
 import type { Connection, Layout, Pin } from "./types";
 export default function MapPanel({
@@ -33,7 +31,7 @@ export default function MapPanel({
   arrowPreference = true,
   onArrowPreferenceChange,
   onStartPinSearch,
-  onPlaces,liveLocation,lodging,onFocusError,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",focusRendererOnly=false,onFocusSceneReady,
+  onPlaces,liveLocation,lodging,onFocusError,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",
 }: {
   pins: Pin[];
   connections: Connection[];
@@ -64,8 +62,6 @@ export default function MapPanel({
   contextMenuDisabled?:boolean;
   onLocate?:()=>void;
   locationStatus?:"idle"|"pending"|"active"|"denied"|"unavailable";
-  focusRendererOnly?:boolean;
-  onFocusSceneReady?:(scene:FocusScene)=>void;
 }) {
   const compassGradientId = `compass-${useId().replace(/:/g, "")}`;
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
@@ -78,22 +74,18 @@ export default function MapPanel({
   const liveLocationRef=useRef(liveLocation);liveLocationRef.current=liveLocation;
   const updateLiveMarker=useRef<()=>void>(()=>{});
   const focusAbort=useRef<AbortController|null>(null),focusTask=useRef(Promise.resolve()),focusVersion=useRef(0);
-  const preloadRequest=useRef<((point:{lng:number;lat:number},signal:AbortSignal)=>Promise<PreparedFocus>)|null>(null);
-  const refreshPreload=useRef<()=>void>(()=>{});
+  const prioritizeFocus=useRef<((point:{lng:number;lat:number})=>void)|null>(null);
   const [focusPreparing,setFocusPreparing]=useState<'location'|'lodging'|'place'|null>(null);
   const focusPoint=(point:{lng:number;lat:number})=>{
     const version=++focusVersion.current,previous=focusTask.current;focusAbort.current?.abort('replacement');setContextMenu(null);
     focusTask.current=(async()=>{
       await previous;if(version!==focusVersion.current||!map.current||!container.current||!viewport.current)return;
-      const controller=new AbortController();focusAbort.current=controller;setFocusPreparing(point===lodging?'lodging':point===liveLocation?'location':'place');
+      const controller=new AbortController();focusAbort.current=controller;
       const interrupt=()=>controller.abort('interaction'),resize=()=>controller.abort('navigation');
       const element=viewport.current;element.addEventListener('pointerdown',interrupt,true);element.addEventListener('keydown',interrupt,true);element.addEventListener('wheel',interrupt,{capture:true,passive:true});window.addEventListener('resize',resize);
-      try{await focusLoadedMap(map.current,container.current,element,point,controller.signal,()=>{if(version===focusVersion.current)setFocusPreparing(null);},signal=>{
-        if(!preloadRequest.current)throw new Error('The map is still getting ready. Please try focusing again.');
-        return preloadRequest.current(point,signal);
-      });}
+      try{const flight=focusLoadedMap(map.current,point,controller.signal);prioritizeFocus.current?.(point);await flight;}
       catch(error){if(!controller.signal.aborted)onFocusError?.((error as Error).message);}
-      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){focusAbort.current=null;setFocusPreparing(null);if(!controller.signal.aborted&&map.current){const c=map.current.getCenter();callbacks.current.onView([c.lng,c.lat],map.current.getZoom());}refreshPreload.current();}}
+      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){focusAbort.current=null;setFocusPreparing(null);if(!controller.signal.aborted&&map.current){const c=map.current.getCenter();callbacks.current.onView([c.lng,c.lat],map.current.getZoom());}}}
     })();
   };
   useEffect(()=>{++focusVersion.current;focusAbort.current?.abort('navigation');setFocusPreparing(null);},[contextKey]);
@@ -141,10 +133,9 @@ export default function MapPanel({
       zoom: layout.zoom,
       attributionControl: { compact: true },
       trackResize: false,
-      maxTileCacheZoomLevels:32,
-      maxTileCacheSize:512,
+      maxTileCacheZoomLevels:256,
+      maxTileCacheSize:2048,
       cancelPendingTileRequestsWhileZooming:false,
-      canvasContextAttributes: {preserveDrawingBuffer:true},
       transformConstrain:(center,zoom)=>{
         const workspace=visible.closest('.workspace')??visible;
         const bounds=workspace.getBoundingClientRect();
@@ -273,7 +264,7 @@ export default function MapPanel({
         if (link.textContent === "OpenStreetMap") link.textContent = "©OpenStreetMap";
       }
     });
-    m.on('load',()=>{
+    m.on('style.load',()=>{
       for(const layer of m.getStyle().layers??[]) if(layer.type==='symbol'&&JSON.stringify(layer.layout?.['text-field']??'').includes('name'))
         m.setLayoutProperty(layer.id,'text-field',['coalesce',['get','name:en'],['get','name_en'],'']);
     });
@@ -482,8 +473,10 @@ export default function MapPanel({
             const tipX = 40 - ux * 20, tipY = 40 - uy * 20;
             const baseX = tipX - ux * 13, baseY = tipY - uy * 13;
             // End inside the arrowhead, so the round line cap cannot protrude past its tip.
-            const end=m.unproject([target.x-ux*29,target.y-uy*29]);
-            (m.getSource(id) as maplibregl.GeoJSONSource)?.setData({type:'Feature',properties:{connectionId:connection.id},geometry:{type:'LineString',coordinates:[[a.lng,a.lat],[end.lng,end.lat]]}});
+            const endFraction=Math.max(.001,1-29/distance);
+            // Clip in paint, not GeoJSON. Replacing the source on every move
+            // discarded its prepared tiles and reparsed the route each frame.
+            m.setPaintProperty(id,'line-gradient',['step',['line-progress'],['interpolate',['linear'],['line-progress'],0,a.color,endFraction,b.color],endFraction,'rgba(0,0,0,0)']);
             head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
             gradient.setAttribute("x1", String(40 - dx));
             gradient.setAttribute("y1", String(40 - dy));
@@ -553,59 +546,13 @@ export default function MapPanel({
     return()=>{updateLiveMarker.current=()=>{};observer.disconnect();liveMarker.current?.remove();liveMarker.current=null;};
   },[]);
   useEffect(()=>updateLiveMarker.current(),[liveLocation?.lng,liveLocation?.lat]);
-  useEffect(()=>{if(map.current&&container.current&&viewport.current)onFocusSceneReady?.({map:map.current,surface:container.current,viewport:viewport.current});},[onFocusSceneReady]);
-  const preloadContentKey=JSON.stringify([focusRendererOnly,placementMode,pins,connections,activePinIds,liveLocation?.lng,liveLocation?.lat,lodging?.lng,lodging?.lat,contextKey]);
+  const preloadContentKey=JSON.stringify([placementMode,pins.map(pin=>[pin.lng,pin.lat]),connections.map(connection=>[connection.id,connection.from,connection.to,connection.arrow]),liveLocation?.lng,liveLocation?.lat,lodging?.lng,lodging?.lat,contextKey]);
   useEffect(()=>{
-    const m=map.current,surface=container.current,windowElement=viewport.current;
-    if(focusRendererOnly||placementMode||!m||!surface||!windowElement||(!pins.length&&!lodging&&!liveLocation))return;
-    const host=document.createElement('div');host.className='workspace focus-preload-host';host.setAttribute('aria-hidden','true');host.inert=true;
-    const pane=document.createElement('div');pane.style.position='absolute';pane.style.inset='0 auto auto 0';host.append(pane);document.body.append(host);
-    const size=()=>{host.style.width=`${surface.clientWidth}px`;host.style.height=`${surface.clientHeight}px`;pane.style.width=`${windowElement.clientWidth}px`;pane.style.height=`${windowElement.clientHeight}px`;};size();
-    const root=createRoot(pane),c=m.getCenter();
-    const sceneReady=new Promise<FocusScene>(resolve=>root.render(<MapPanel focusRendererOnly onFocusSceneReady={resolve} pins={pins} connections={connections} activePinIds={activePinIds} liveLocation={liveLocation} layout={{...layout,center:[c.lng,c.lat],zoom:m.getZoom()}} onView={ignoreFocusChange} onPin={ignoreFocusChange} onAdd={ignoreFocusChange} readonly/>));
-    type Point={lng:number;lat:number};
-    const queue=new FocusPreloadQueue<Point,PreparedFocus>((windowElement.clientWidth<700?192:384)*1024*1024,count=>surface.dataset.focusReadyRoutes=String(count));
-    const pointKey=(point:Point)=>`${point.lng},${point.lat}`;
-    const targets=[...(lodging?[lodging]:[]),...(liveLocation?[liveLocation]:[]),...pins];
-    let timer:ReturnType<typeof setTimeout>|undefined,originKey='',disposed=false;
-    const refresh=(force=false)=>{
-      if(disposed||(!force&&focusAbort.current)||m.isMoving()||!windowElement.clientWidth||!windowElement.clientHeight)return;
-      const center=m.getCenter(),camera={center:[center.lng,center.lat] as [number,number],zoom:m.getZoom(),bearing:m.getBearing(),pitch:m.getPitch(),roll:m.getRoll(),padding:m.getPadding()};
-      const key=JSON.stringify([camera,windowElement.clientWidth,windowElement.clientHeight,surface.clientWidth,surface.clientHeight,devicePixelRatio]);
-      if(originKey===key)return;originKey=key;size();
-      const points=targets.filter(point=>camera.zoom<15||Math.abs(point.lng-center.lng)>1e-8||Math.abs(point.lat-center.lat)>1e-8);
-      queue.reset(points.map(point=>[pointKey(point),point]),async(point,signal)=>{
-        const scene=await new Promise<FocusScene>((resolve,reject)=>{
-          const cancel=()=>reject(new DOMException('Focus preparation cancelled','AbortError'));
-          signal.addEventListener('abort',cancel,{once:true});
-          void sceneReady.then(scene=>{signal.removeEventListener('abort',cancel);resolve(scene);});
-          if(signal.aborted)cancel();
-        });
-        signal.throwIfAborted();
-        const width=surface.clientWidth,height=surface.clientHeight,x=(width-windowElement.clientWidth)/2,y=(height-windowElement.clientHeight)/2;
-        Object.assign(scene.surface.style,{width:`${width}px`,height:`${height}px`,left:`${-x}px`,top:`${-y}px`});
-        scene.surface.style.setProperty('--map-inset-x',`${x}px`);scene.surface.style.setProperty('--map-inset-y',`${y}px`);
-        scene.map.resize();scene.map.jumpTo(camera);
-        const prepared=await prepareFocusMap(scene.map,scene.surface,scene.viewport,point,signal);
-        if(signal.aborted){prepared.dispose();signal.throwIfAborted();}
-        return prepared;
-      });
-    };
-    const schedule=()=>{clearTimeout(timer);timer=setTimeout(()=>refresh(),150);};
-    const invalidate=()=>{clearTimeout(timer);originKey='';queue.clear();};
-    const request=async(point:Point,signal:AbortSignal)=>{if(m.isMoving())m.stop();refresh(true);return queue.take(pointKey(point),point,signal);};
-    preloadRequest.current=request;refreshPreload.current=()=>{if(queue.isPaused)originKey='';schedule();};
-    m.on('movestart',invalidate);m.on('moveend',schedule);
-    const dimensions=()=>JSON.stringify([windowElement.clientWidth,windowElement.clientHeight,surface.clientWidth,surface.clientHeight]);
-    let lastDimensions=dimensions();
-    const observer=new ResizeObserver(()=>{const next=dimensions();if(next===lastDimensions)return;lastDimensions=next;focusAbort.current?.abort('navigation');invalidate();schedule();});observer.observe(windowElement);observer.observe(surface);
-    schedule();
-    return()=>{
-      disposed=true;clearTimeout(timer);queue.clear();observer.disconnect();m.off('movestart',invalidate);m.off('moveend',schedule);
-      if(preloadRequest.current===request){preloadRequest.current=null;refreshPreload.current=()=>{};}
-      delete surface.dataset.focusReadyRoutes;
-      queueMicrotask(()=>{root.unmount();host.remove();});
-    };
+    const m=map.current,surface=container.current;
+    if(placementMode||!m||!surface)return;
+    const preload=preloadFocusTiles(m,surface,[...(lodging?[lodging]:[]),...(liveLocation?[liveLocation]:[]),...pins]);
+    prioritizeFocus.current=preload.prioritize;
+    return()=>{if(prioritizeFocus.current===preload.prioritize)prioritizeFocus.current=null;preload.dispose();};
   },[preloadContentKey]);
   return (
     <div className={`map-wrapper${mode==='add'||placementMode?' placing-pin':''}`} onContextMenu={event=>{if(contextMenuDisabled){event.preventDefault();return;}if(placementMode||movingPinId||(event.target as HTMLElement).closest('button,.map-tools,.map-focus-tools,.map-list-tools,.map-live-location'))return;const m=map.current;if(!m)return;event.preventDefault();const rect=m.getCanvas().getBoundingClientRect(),point=m.unproject([event.clientX-rect.left,event.clientY-rect.top]);setContextMenu({x:event.clientX,y:event.clientY,lng:point.lng,lat:point.lat});}}>

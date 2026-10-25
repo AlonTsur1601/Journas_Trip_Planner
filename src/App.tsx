@@ -1,4 +1,5 @@
 import {AsyncButton} from './AsyncButton';
+import type {MapPanelHandle} from './MapPanel';
 import {optimisticTaskList} from './optimistic-tasks';
 import {LoadingSpinner} from './LoadingScreen';
 import {useLiveLocation} from './live-location';
@@ -474,6 +475,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
 
   const token = new URLSearchParams(location.search).get("share");
+  const mapFocus=useRef<MapPanelHandle|null>(null);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const tripRef = useRef(trip);
@@ -861,9 +863,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     return () => clearInterval(id);
   }, [token, date, shareTrip, shareReady, joinedToken]);
-  async function saveLayout() {
+  async function saveLayout(force=false) {
     setTime(new Date());
-    if (!dirty.current || !tripRef.current) return;
+    if ((!force&&!dirty.current) || !tripRef.current) return;
     if (shareTrip) {
       localStorage.setItem(
         `journas-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
@@ -1229,12 +1231,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if(!practice&&(next.displayName??"").trim()!==savedAccountName.current&&!accountNameValid){setMessage("Choose an available account name before saving.");return false;}
     setSettingsSaving(true);
     try {
-      const savedTrip=tripRef.current?.id,savedDate=dateRef.current,savedView=layoutRef.current;
       await api("settings.save", { settings: next });
       savedAccountName.current=(next.displayName??"").trim();
-
-      const view=await startingLayout(next,lodgingForDate(trip,date));
-      if(settingsRef.current===next&&tripRef.current?.id===savedTrip&&dateRef.current===savedDate&&layoutRef.current===savedView)changeLayout({center:view.center,zoom:view.zoom});
 
       return true;
     } catch (e: any) {
@@ -1431,7 +1429,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <Suspense
               fallback={<div className="loading">Loading your map…</div>}
             >
-              <MapPanel
+              <MapPanel ref={mapFocus} onFocusComplete={()=>void saveLayout(true)}
                 onFocusError={setMessage}
                 pins={mapPins}
                 connections={day.connections}
@@ -2144,7 +2142,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal === "places" && <Modal title="Places" onClose={()=>setModal(null)}>
         <div className="connections-list places-list">{mapPins.length?mapPins.map(pin=><div className="connection-row" key={pin.id}>
           <span className="connection-list-title"><SymbolIcon value={pin.symbol}/><span>{pin.title}{pin.id==='trip-lodging'&&<small>Trip lodging</small>}{pin.note&&<small>{pin.note}</small>}</span></span>
-          <span className="place-list-actions"><AsyncButton className="button subtle" aria-label={`Focus ${pin.title}`} onClick={()=>{changeLayout({center:[pin.lng,pin.lat],zoom:15});setModal(null);}}>Focus</AsyncButton>
+          <span className="place-list-actions"><AsyncButton className="button subtle" aria-label={`Focus ${pin.title}`} onClick={()=>{mapFocus.current?.focus(pin);setModal(null);}}>Focus</AsyncButton>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit place ${pin.title}`} onClick={()=>{setModal(null);setEdit({kind:'pins',item:pin});}}>Edit</AsyncButton>}</span>
         </div>):<p>No places for this day.</p>}</div>
       </Modal>}

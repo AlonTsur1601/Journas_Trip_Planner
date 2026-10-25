@@ -6,6 +6,7 @@ export const focusEasing=(t:number)=>t+.2*Math.sin(2*Math.PI*t)/(2*Math.PI);
 export const focusDuration=1800;
 export type Camera={center:[number,number];zoom:number};
 export type FocusPoint={lng:number;lat:number};
+export const sameCamera=(a:Camera,b:Camera)=>Math.abs(a.center[0]-b.center[0])<.00001&&Math.abs(a.center[1]-b.center[1])<.00001&&Math.abs(a.zoom-b.zoom)<.00001;
 
 /** The same van Wijk flight used by MapLibre, sampled without moving the live map. */
 export function focusRoute(origin:Camera,point:FocusPoint,span:number,count=48):Camera[]{
@@ -30,7 +31,7 @@ export function focusRoute(origin:Camera,point:FocusPoint,span:number,count=48):
 }
 
 /** Start synchronously; background tile preparation never gates the camera clock. */
-export function focusLoadedMap(map:Pick<MapLibreMap,'getCenter'|'getZoom'|'on'|'off'|'flyTo'|'stop'>,point:FocusPoint,signal:AbortSignal){
+export function focusLoadedMap(map:Pick<MapLibreMap,'getCenter'|'getZoom'|'on'|'off'|'flyTo'|'stop'>,point:FocusPoint,signal:AbortSignal,onDestination?:(camera:Camera)=>void){
  return new Promise<void>((resolve,reject)=>{
   const clean=()=>{clearTimeout(timeout);map.off('moveend',ended);signal.removeEventListener('abort',cancel);};
   const ended=()=>{clean();resolve();};
@@ -40,8 +41,12 @@ export function focusLoadedMap(map:Pick<MapLibreMap,'getCenter'|'getZoom'|'on'|'
   // End an interrupted zoom/drag before listening for this flight's moveend.
   map.stop();
   const center=map.getCenter();
-  if(Math.abs(center.lng-point.lng)<1e-8&&Math.abs(center.lat-point.lat)<1e-8&&map.getZoom()>=15){ended();return;}
+  const target:Camera={center:[point.lng,point.lat],zoom:Math.max(map.getZoom(),15)};
+  if(Math.abs(center.lng-point.lng)<1e-8&&Math.abs(center.lat-point.lat)<1e-8&&map.getZoom()>=15){onDestination?.(target);ended();return;}
   map.on('moveend',ended);signal.addEventListener('abort',cancel,{once:true});
-  map.flyTo({center:[point.lng,point.lat],zoom:Math.max(map.getZoom(),15),duration:focusDuration,easing:focusEasing,essential:true});
+  map.flyTo({...target,duration:focusDuration,easing:focusEasing,essential:true});
+  // Saves and delayed layout loads must see the destination immediately,
+  // while the renderer continues its independent camera animation.
+  onDestination?.(target);
  });
 }

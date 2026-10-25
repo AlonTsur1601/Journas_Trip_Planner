@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-import {focusLoadedMap,focusEasing,focusDuration,focusRoute} from '../src/map-focus';
+import {focusLoadedMap,focusEasing,focusDuration,focusRoute,sameCamera} from '../src/map-focus';
 class MapStub{
  listeners=new Map<string,Set<()=>void>>();options:any;stops=0;active=false;
  getCenter(){return{lng:120,lat:-30};}getZoom(){return 2;}
@@ -16,6 +16,18 @@ it('starts synchronously without waiting for a route, tile, image, or promise',a
  const task=focusLoadedMap(map as any,{lng:2,lat:49},controller.signal);
  expect(map.options.center).toEqual([2,49]);expect(map.options.duration).toBe(focusDuration);
  map.emit('moveend');await task;expect(vi.getTimerCount()).toBe(0);
+});
+it('publishes the destination synchronously so an immediate save uses the new view',async()=>{
+ const map=new MapStub(),saved=vi.fn();let completed=false;
+ const task=focusLoadedMap(map as any,{lng:2,lat:49},new AbortController().signal,saved).then(()=>completed=true);
+ expect(saved).toHaveBeenCalledExactlyOnceWith({center:[2,49],zoom:15});
+ expect(completed).toBe(false);expect(map.options.duration).toBe(focusDuration);
+ map.emit('moveend');await task;
+});
+it('recognizes the parent echo of the focused destination without treating another view as an echo',()=>{
+ const target={center:[2,49] as [number,number],zoom:15};
+ expect(sameCamera(target,{center:[2+1e-12,49],zoom:15})).toBe(true);
+ expect(sameCamera(target,{center:[120,-30],zoom:2})).toBe(false);
 });
 it('removes callbacks and stops an interrupted flight',async()=>{
  const map=new MapStub(),controller=new AbortController();

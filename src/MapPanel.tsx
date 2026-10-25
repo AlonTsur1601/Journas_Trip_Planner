@@ -1,7 +1,8 @@
-import {focusLoadedMap} from "./map-focus";
+import {focusLoadedMap,sameCamera,type Camera} from "./map-focus";
 import {preloadFocusTiles} from "./map-tile-preload";
+import {mapStyleUrl,keepTripMapLayers} from './map-theme';
 import {connectionTitle} from './connection-label';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState,type Ref } from "react";
 import { MapPinPlus, MapPinned, LocateFixed, BedDouble, Copy, Pencil, Focus, Compass, ClipboardPaste, Route, Waypoints, X } from "lucide-react";
 import {createPortal} from 'react-dom';
 import {MotionSurface} from './MotionSurface';
@@ -13,7 +14,9 @@ maplibregl.setWorkerUrl(workerURL);
 const noActivePins:string[]=[];
 import { worldViewportLimits } from "./map-viewport";
 import type { Connection, Layout, Pin } from "./types";
+export type MapPanelHandle={focus:(point:{lng:number;lat:number})=>void};
 export default function MapPanel({
+  ref:focusRef,onFocusComplete,
   pins,
   connections,
   layout,
@@ -33,6 +36,8 @@ export default function MapPanel({
   onStartPinSearch,
   onPlaces,liveLocation,lodging,onFocusError,activePinIds=noActivePins,onCopyPin,onPastePin,canPastePin=false,contextKey,contextMenuDisabled=false,onLocate,locationStatus="idle",
 }: {
+  ref?:Ref<MapPanelHandle>;
+  onFocusComplete?:()=>void;
   pins: Pin[];
   connections: Connection[];
   layout: Layout;
@@ -64,6 +69,14 @@ export default function MapPanel({
   locationStatus?:"idle"|"pending"|"active"|"denied"|"unavailable";
 }) {
   const compassGradientId = `compass-${useId().replace(/:/g, "")}`;
+  const [darkMap,setDarkMap]=useState(()=>document.documentElement.dataset.theme==='dark');
+  const [mapStyleRevision,setMapStyleRevision]=useState(0);
+  const mapStyle=useRef(mapStyleUrl(darkMap)),mapStylePending=useRef(true);
+  useEffect(()=>{
+    const root=document.documentElement,update=()=>setDarkMap(root.dataset.theme==='dark');
+    const observer=new MutationObserver(update);observer.observe(root,{attributes:true,attributeFilter:['data-theme']});update();
+    return()=>observer.disconnect();
+  },[]);
   const [mode,setMode]=useState<'add'|'connect'|null>(null);
   const [source,setSource]=useState<string|null>(null);
   const [pendingPaste,setPendingPaste]=useState(false);
@@ -74,6 +87,7 @@ export default function MapPanel({
   const liveLocationRef=useRef(liveLocation);liveLocationRef.current=liveLocation;
   const updateLiveMarker=useRef<()=>void>(()=>{});
   const focusAbort=useRef<AbortController|null>(null),focusTask=useRef(Promise.resolve()),focusVersion=useRef(0);
+  const focusTarget=useRef<Camera|null>(null);
   const prioritizeFocus=useRef<((point:{lng:number;lat:number})=>void)|null>(null);
   const [focusPreparing,setFocusPreparing]=useState<'location'|'lodging'|'place'|null>(null);
   const focusPoint=(point:{lng:number;lat:number})=>{
@@ -81,13 +95,14 @@ export default function MapPanel({
     focusTask.current=(async()=>{
       await previous;if(version!==focusVersion.current||!map.current||!container.current||!viewport.current)return;
       const controller=new AbortController();focusAbort.current=controller;
-      const interrupt=()=>controller.abort('interaction'),resize=()=>controller.abort('navigation');
+      const interrupt=()=>controller.abort('interaction'),resize=()=>controller.abort('resize');
       const element=viewport.current;element.addEventListener('pointerdown',interrupt,true);element.addEventListener('keydown',interrupt,true);element.addEventListener('wheel',interrupt,{capture:true,passive:true});window.addEventListener('resize',resize);
-      try{const flight=focusLoadedMap(map.current,point,controller.signal);prioritizeFocus.current?.(point);await flight;}
+      try{const flight=focusLoadedMap(map.current,point,controller.signal,camera=>{focusTarget.current=camera;callbacks.current.onView(camera.center,camera.zoom);});prioritizeFocus.current?.(point);await flight;}
       catch(error){if(!controller.signal.aborted)onFocusError?.((error as Error).message);}
-      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){focusAbort.current=null;setFocusPreparing(null);if(!controller.signal.aborted&&map.current){const c=map.current.getCenter();callbacks.current.onView([c.lng,c.lat],map.current.getZoom());}}}
+      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){const target=focusTarget.current;focusAbort.current=null;focusTarget.current=null;setFocusPreparing(null);if((!controller.signal.aborted||['interaction','resize','theme'].includes(controller.signal.reason))&&map.current){const c=map.current.getCenter(),camera:Camera={center:[c.lng,c.lat],zoom:map.current.getZoom()};callbacks.current.onView(camera.center,camera.zoom);if(!controller.signal.aborted&&target&&sameCamera(camera,target))callbacks.current.onFocusComplete?.();}}}
     })();
   };
+  useImperativeHandle(focusRef,()=>({focus:focusPoint}));
   useEffect(()=>{++focusVersion.current;focusAbort.current?.abort('navigation');setFocusPreparing(null);},[contextKey]);
   useEffect(()=>{setContextMenu(null);setMode(null);setSource(null);},[contextKey]);
   useEffect(()=>{if(contextMenuDisabled)setContextMenu(null);},[contextMenuDisabled]);
@@ -104,9 +119,9 @@ export default function MapPanel({
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
-  const callbacks = useRef({ onView, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId });
+  const callbacks = useRef({ onView,onFocusComplete, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId });
   const restoringView = useRef(false);
-  callbacks.current = { onView, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId };
+  callbacks.current = { onView,onFocusComplete, onPin, onAdd, readonly, onConnect, onMovePin,onConnection,connections,movingPinId };
   useEffect(() => {
     if (!container.current || !viewport.current) return;
     const visible = viewport.current;
@@ -128,7 +143,7 @@ export default function MapPanel({
     restoringView.current = false;
     const m = new maplibregl.Map({
       container: container.current,
-      style: "https://tiles.openfreemap.org/styles/liberty",
+      style: mapStyle.current,
       center: layout.center,
       zoom: layout.zoom,
       attributionControl: { compact: true },
@@ -267,6 +282,7 @@ export default function MapPanel({
     m.on('style.load',()=>{
       for(const layer of m.getStyle().layers??[]) if(layer.type==='symbol'&&JSON.stringify(layer.layout?.['text-field']??'').includes('name'))
         m.setLayoutProperty(layer.id,'text-field',['coalesce',['get','name:en'],['get','name_en'],'']);
+      mapStylePending.current=false;setMapStyleRevision(version=>version+1);
     });
     m.on("moveend", () => {
       if (restoringView.current || focusAbort.current || visible.closest('[aria-hidden="true"]')) return;
@@ -346,6 +362,13 @@ export default function MapPanel({
       map.current = null;
     };
   }, []);
+  useEffect(()=>{
+    const m=map.current,url=mapStyleUrl(darkMap);
+    if(!m||mapStyle.current===url)return;
+    focusAbort.current?.abort('theme');
+    mapStylePending.current=true;mapStyle.current=url;
+    m.setStyle(url,{diff:false,transformStyle:keepTripMapLayers});
+  },[darkMap]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -476,7 +499,7 @@ export default function MapPanel({
             const endFraction=Math.max(.001,1-29/distance);
             // Clip in paint, not GeoJSON. Replacing the source on every move
             // discarded its prepared tiles and reparsed the route each frame.
-            m.setPaintProperty(id,'line-gradient',['step',['line-progress'],['interpolate',['linear'],['line-progress'],0,a.color,endFraction,b.color],endFraction,'rgba(0,0,0,0)']);
+            if(m.getLayer(id))m.setPaintProperty(id,'line-gradient',['step',['line-progress'],['interpolate',['linear'],['line-progress'],0,a.color,endFraction,b.color],endFraction,'rgba(0,0,0,0)']);
             head.setAttribute("points", `${tipX},${tipY} ${baseX - uy * 7},${baseY + ux * 7} ${baseX + uy * 7},${baseY - ux * 7}`);
             gradient.setAttribute("x1", String(40 - dx));
             gradient.setAttribute("y1", String(40 - dy));
@@ -520,6 +543,9 @@ export default function MapPanel({
     const m = map.current;
     if (!m) return;
     const c = m.getCenter();
+    // This is the destination just published by our own focus animation,
+    // not a new external command to jump the camera before it finishes.
+    if(focusAbort.current&&!focusAbort.current.signal.aborted&&focusTarget.current&&sameCamera({center:layout.center,zoom:layout.zoom},focusTarget.current))return;
     if (
       Math.abs(c.lng - layout.center[0]) > 0.00001 ||
       Math.abs(c.lat - layout.center[1]) > 0.00001 ||
@@ -546,10 +572,10 @@ export default function MapPanel({
     return()=>{updateLiveMarker.current=()=>{};observer.disconnect();liveMarker.current?.remove();liveMarker.current=null;};
   },[]);
   useEffect(()=>updateLiveMarker.current(),[liveLocation?.lng,liveLocation?.lat]);
-  const preloadContentKey=JSON.stringify([placementMode,pins.map(pin=>[pin.lng,pin.lat]),connections.map(connection=>[connection.id,connection.from,connection.to,connection.arrow]),liveLocation?.lng,liveLocation?.lat,lodging?.lng,lodging?.lat,contextKey]);
+  const preloadContentKey=JSON.stringify([darkMap,mapStyleRevision,placementMode,pins.map(pin=>[pin.lng,pin.lat]),connections.map(connection=>[connection.id,connection.from,connection.to,connection.arrow]),liveLocation?.lng,liveLocation?.lat,lodging?.lng,lodging?.lat,contextKey]);
   useEffect(()=>{
     const m=map.current,surface=container.current;
-    if(placementMode||!m||!surface)return;
+    if(placementMode||mapStylePending.current||!m||!surface)return;
     const preload=preloadFocusTiles(m,surface,[...(lodging?[lodging]:[]),...(liveLocation?[liveLocation]:[]),...pins]);
     prioritizeFocus.current=preload.prioritize;
     return()=>{if(prioritizeFocus.current===preload.prioritize)prioritizeFocus.current=null;preload.dispose();};

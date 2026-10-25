@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type {Trip as ClientTrip} from '../src/types';
 import { JournasService } from "../server/service.js";
 import {
   defaultSettings,
@@ -512,10 +513,10 @@ describe("lodging and trip date editing",()=>{
  it('keeps the lodging name origin when creating, editing and reopening a trip',async()=>{
   const {service}=await setup();
   const created=await service.execute('alice',{action:'trip.create',name:'Name origin',startDate:day,endDate:day,lodging:{name:'Paris',nameSource:'location',lng:2.3,lat:48.8}});
-  const trip=created.trip as Trip;expect(trip.lodging?.nameSource).toBe('location');
+  const trip=created.trip as ClientTrip;expect(trip.lodging?.nameSource).toBe('location');
   const updated=await service.execute('alice',{action:'trip.update',tripId:trip.id,name:trip.name,startDate:day,endDate:day,lodging:{...trip.lodging,name:'Our stay',nameSource:'custom'}});
-  expect((updated.trip as Trip).lodging?.nameSource).toBe('custom');
-  const reopened=await service.execute('alice',{action:'trip.get',tripId:trip.id,date:day});expect((reopened.trip as Trip).lodging).toMatchObject({name:'Our stay',nameSource:'custom'});
+  expect((updated.trip as ClientTrip).lodging?.nameSource).toBe('custom');
+  const reopened=await service.execute('alice',{action:'trip.get',tripId:trip.id,date:day});expect((reopened.trip as ClientTrip).lodging).toMatchObject({name:'Our stay',nameSource:'custom'});
  });
  it("requires lodging and derives its timezone on the server",async()=>{const {service}=await setup();await expect(service.execute("alice",{action:"trip.create",name:"New trip",startDate:day,endDate:day})).rejects.toMatchObject({status:400});const result=await service.execute("alice",{action:"trip.create",name:"New trip",startDate:day,endDate:day,lodging:{name:"Guesthouse",lng:-74,lat:40.7,timezone:"UTC"}});expect((result.trip as Trip).lodging).toMatchObject({timezone:"America/New_York"});});
  it("updates member retention dates without deleting the existing plan",async()=>{const {service,id,store,patch}=await setup();await join(service,id);await patch("pins","museum",pin);const before=store.docs.get(`users/bob/trips/${id}`)!.cleanupAt;await service.execute("alice",{action:"trip.update",tripId:id,name:"Extended trip",startDate:day,endDate:"2026-10-05",lodging:{name:"Guesthouse",lng:2.3,lat:48.8}});expect(store.docs.get(`users/bob/trips/${id}`)).toMatchObject({endDate:"2026-10-05"});expect(Number(store.docs.get(`users/bob/trips/${id}`)!.cleanupAt)).toBeGreaterThan(Number(before));expect((await service.execute("bob",{action:"trip.get",tripId:id,date:day})).day).toMatchObject({pins:[expect.objectContaining({title:"Museum"})]});await expect(service.execute("eve",{action:"trip.update",tripId:id,name:"Bad",startDate:day,endDate:day,lodging:{name:"Guesthouse",lng:2.3,lat:48.8}})).rejects.toMatchObject({status:403});});

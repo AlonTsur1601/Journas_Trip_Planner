@@ -7,7 +7,7 @@ import {restingSurfaceRect} from './surface-motion';
 import {tourStorageKey,tourInvitationSeen} from './tour-state';
 import {MotionSurface} from './MotionSurface';
 import {api} from './firebase';
-import {tourClickAllowed} from './tour-safety';
+import {tourClickAllowed,tourGuardEvents} from './tour-safety';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Compass} from 'lucide-react';
@@ -126,8 +126,8 @@ export default function GuidedTour({userId,ready,context,onHome,practice,seenBef
    const insideFocus=status==='running'&&Boolean(focus?.contains(event.target)||findTourStepTarget(current.target,current.target,context)?.contains(event.target)||event.target.closest('.bounded-popover:not([inert])'));
    if((!insideGuide&&!insideFocus)||!tourClickAllowed(current.title,event.target)){event.preventDefault();event.stopImmediatePropagation();}
   };
-  for(const type of ['pointerdown','pointerup','click','dblclick','keydown','contextmenu'])document.addEventListener(type,guard,true);
-  return()=>{for(const type of ['pointerdown','click','keydown','contextmenu'])document.removeEventListener(type,guard,true);};
+  for(const type of tourGuardEvents)document.addEventListener(type,guard,true);
+  return()=>{for(const type of tourGuardEvents)document.removeEventListener(type,guard,true);};
  },[status,step,part,context,revision,selector,stageSelector]);
  // DOM state is used only for explicitly named picker steps, never to choose an arbitrary popup.
  useEffect(()=>{if(status!=='running')return;let frame=0;const changed=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh(value=>value+1);});};const observer=new MutationObserver(changed);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["inert","aria-hidden"]});document.addEventListener('input',changed);document.addEventListener('change',changed);document.addEventListener('focusin',changed);document.addEventListener('focusout',changed);return()=>{observer.disconnect();document.removeEventListener('input',changed);document.removeEventListener('change',changed);document.removeEventListener('focusin',changed);document.removeEventListener('focusout',changed);cancelAnimationFrame(frame);};},[status]);

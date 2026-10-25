@@ -1,4 +1,5 @@
 /** Keep tutorial exploration inside the intended, recoverable sandbox flow. */
+export const tourGuardEvents=['pointerdown','pointerup','click','dblclick','keydown','contextmenu'] as const;
 export function tourClickAllowed(stage:string,target:Element){
  const within=(selector:string)=>Boolean(target.closest(selector));
  if(within('.guided-tour'))return true;

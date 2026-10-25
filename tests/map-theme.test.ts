@@ -2,7 +2,7 @@ import {expect,it} from 'vitest';
 import {mapStyleUrl,keepTripMapLayers} from '../src/map-theme';
 import type {StyleSpecification} from 'maplibre-gl';
 it('chooses a real dark style and preserves Liberty for light mode',()=>{
- expect(mapStyleUrl(true)).toBe('https://tiles.openfreemap.org/styles/dark');
+ expect(mapStyleUrl(true)).toBe('https://tiles.openfreemap.org/styles/fiord');
  expect(mapStyleUrl(false)).toBe('https://tiles.openfreemap.org/styles/liberty');
 });
 it('keeps trip connections while replacing the base map without changing either input',()=>{

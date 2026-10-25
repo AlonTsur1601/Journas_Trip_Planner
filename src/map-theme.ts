@@ -1,6 +1,6 @@
 import type {StyleSpecification} from 'maplibre-gl';
 
-export const mapStyleUrl=(dark:boolean)=>`https://tiles.openfreemap.org/styles/${dark?'dark':'liberty'}`;
+export const mapStyleUrl=(dark:boolean)=>`https://tiles.openfreemap.org/styles/${dark?'fiord':'liberty'}`;
 
 /** Switching the base map must keep the trip's connection layers and sources. */
 export function keepTripMapLayers(previous:StyleSpecification|undefined,next:StyleSpecification):StyleSpecification{

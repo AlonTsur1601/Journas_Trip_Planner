@@ -2231,7 +2231,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 .motion-surface{display:contents;}
 [data-motion-exit],[data-motion-exit] *{pointer-events:none!important;}
 [data-motion-surface].home-context-menu{animation:none;}
-.todo-panel{transition:left 100ms ease-out,top 100ms ease-out,width 100ms ease-out,height 100ms ease-out;}
+.todo-panel{transition:none;}
 .modal-shade{transition:background-color 180ms ease-out;}
 .inactive-modal .modal{transition:filter 180ms ease-out;}
 @media(prefers-reduced-motion:reduce){.todo-panel,.modal-shade,.inactive-modal .modal{transition:none;}}
@@ -2687,3 +2687,9 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .time-wheel>button{transform:scale(.88);transition:transform 110ms ease-out;}
 .time-wheel>button.selected{transform:scale(1.02);}
 @media(prefers-reduced-motion:reduce){.time-wheel>button{transition:none;}}
+
+.dropdown-category{padding:8px 10px 5px;font-size:12px;font-weight:700;color:var(--muted);}
+.dropdown-option-row{display:contents;}
+.photo-remove{justify-self:start;}
+.task-list>.search-input{margin-bottom:10px;}
+.field:has(.dropdown-trigger:disabled){opacity:.55;}

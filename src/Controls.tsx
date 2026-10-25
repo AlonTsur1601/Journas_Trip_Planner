@@ -11,16 +11,14 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
   const [search,setSearch]=useState("");
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
-  const options = Children.toArray(children).filter(isValidElement).map((element: any) => ({
-    value: String(element.props.value ?? element.props.children),
-    label: element.props.children,
-    disabled: element.props.disabled,
-  }));
+  type Option={value:string;label:any;disabled?:boolean;group?:string};
+  const readOptions=(nodes:any,group?:string):Option[]=>Children.toArray(nodes).filter(isValidElement).flatMap((element:any)=>element.type==='optgroup'?readOptions(element.props.children,element.props.label):[{value:String(element.props.value??element.props.children),label:element.props.children,disabled:element.props.disabled,group}]);
+  const options=readOptions(children);
   const filtered=options.filter(option=>String(option.label).toLowerCase().includes(search.toLowerCase()));
   const toggle=()=>{setOpen(!open);setSearch('');};
-  const optionButtons=filtered.map((option) => <button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
+  const optionButtons=filtered.map((option,index) => <div className="dropdown-option-row" key={option.value}>{option.group&&option.group!==filtered[index-1]?.group&&<div className="dropdown-category" role="presentation">{option.group}</div>}<button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
         onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
-      }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button>);
+      }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button></div>);
   return <div ref={root} className="dropdown" onKeyDown={(event) => {
     if (event.key === "Escape") { event.stopPropagation(); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {

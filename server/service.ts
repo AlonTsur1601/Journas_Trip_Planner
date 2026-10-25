@@ -1,4 +1,4 @@
-import {connectionTitle} from '../src/connection-label.js';
+import {connectionTitle,connectionTitleSource} from '../src/connection-label.js';
 import {accountNameAvailable,claimAccountName} from './account-names.js';
 import {hasAcknowledgedTour} from '../src/tour-state.js';
 import {historyTransaction} from './history.js';
@@ -7,7 +7,7 @@ import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store,
 import { resolveWallTime } from './time.js';
 import tzlookup from 'tz-lookup';
 const kinds: Kind[] = ['pins', 'blocks', 'tasks', 'connections'];
-const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'title', 'detail', 'color', 'symbol', 'pinId', 'connectionId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId', 'connectionId'], connections: ['from', 'to', 'arrow', 'title', 'detail', 'symbol'] };
+const fields: Record<Kind, string[]> = { pins: ['title', 'note', 'color', 'symbol', 'lng', 'lat'], blocks: ['start', 'end', 'title', 'detail', 'color', 'symbol', 'pinId', 'connectionId', 'overrides', 'timezone', 'disambiguation'], tasks: ['title', 'checked', 'pinId', 'blockId', 'connectionId'], connections: ['from', 'to', 'arrow', 'title', 'detail', 'symbol', 'titleSource'] };
 function fail(status: number, code: string, message: string, details?: unknown): never { throw new ApiError(status, code, message, details); }
 const identifier = (value: unknown): string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value) ? value : fail(400, 'INVALID_ID', 'Invalid identifier');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.length <= max ? value : fail(400, 'INVALID_TEXT', `Text must contain at most ${max} characters`);
@@ -110,7 +110,7 @@ function validateSettings(value: Data) {
 }
 function validateItem(kind: Kind, item: Data) {
     for (const key of fields[kind])
-        if (!(key in item)&&key!=='connectionId'&&!(kind==='connections'&&['title','detail','symbol'].includes(key)))
+        if (!(key in item)&&key!=='connectionId'&&!(kind==='connections'&&['title','detail','symbol','titleSource'].includes(key)))
             fail(400, 'MISSING_FIELD', `Missing ${key}`);
     if ('title' in item && !text(item.title, 200).trim())
         fail(400, 'INVALID_ITEM', 'A title is required');
@@ -142,6 +142,7 @@ function validateItem(kind: Kind, item: Data) {
     if (kind === 'tasks' && typeof item.checked !== 'boolean')
         fail(400, 'INVALID_ITEM', 'Invalid checkbox');
     if (kind === 'connections') {
+        if(item.titleSource!==undefined&&!['linked','custom'].includes(String(item.titleSource)))fail(400,'INVALID_ITEM','Invalid connection name source');
         identifier(item.from);
         identifier(item.to);
         if (item.from === item.to || typeof item.arrow !== 'boolean')
@@ -149,7 +150,7 @@ function validateItem(kind: Kind, item: Data) {
     }
 }
 function validateLayout(layout: Data) {
-    const allowed = ['map', 'timeline', 'todo', 'split', 'todoX', 'todoY', 'todoWidth', 'todoHeight', 'center', 'zoom', 'scroll'];
+    const allowed = ['map', 'timeline', 'todo', 'split', 'todoX', 'todoY', 'todoWidth', 'todoHeight', 'center', 'zoom', 'bearing', 'scroll'];
     for (const key of Object.keys(layout))
         if (!allowed.includes(key))
             fail(400, 'INVALID_LAYOUT', 'Unknown layout field');
@@ -157,6 +158,7 @@ function validateLayout(layout: Data) {
         fail(400, 'INVALID_LAYOUT', 'Select at least one window');
     if (!finite(layout.split, 10, 90) || !finite(layout.zoom, 0, 22) || !finite(layout.scroll, 0, 100000))
         fail(400, 'INVALID_LAYOUT', 'Invalid window position');
+    if(layout.bearing!==undefined&&!finite(layout.bearing,-180,180))fail(400,'INVALID_LAYOUT','Invalid map direction');
     for (const key of ['todoX', 'todoY'])
         if (!finite(layout[key], 0, 20000))
             fail(400, 'INVALID_LAYOUT', 'Invalid task position');
@@ -305,6 +307,13 @@ export class JournasService {
                 const memberships=await Promise.all(trip.memberIds.map(async uid=>({uid,ref:await tx.get(membershipPath(uid,id)),user:await tx.get(userPath(uid))})));
                 tx.set(tripPath(id),updated);
                 for(const member of memberships) if(member.ref) tx.set(membershipPath(member.uid,id),{...member.ref,endDate,cleanupAt:this.cleanupAt(endDate,member.user?.settings as any)});
+                if(JSON.stringify(trip.lodging)!==JSON.stringify(updated.lodging)){
+                    const oldPlace=this.lodgingPin(trip.lodging as Data|undefined),newPlace=this.lodgingPin(updated.lodging);
+                    for(const storedDay of await tx.list(`trips/${id}/days`)){
+                        const day=date(storedDay.date),items=(await tx.list(itemsPath(id,day))) as Item[];
+                        await this.refreshDependencies(tx,id,day,[...items,...(oldPlace?[oldPlace]:[])],[...items,newPlace!]);
+                    }
+                }
                 return {trip:updated};
             }
             if (action === 'trip.remove') {
@@ -439,7 +448,8 @@ export class JournasService {
                         item = bump(item, { [key]: defaults[key] });
             }
             if(kind==='connections'){
-                if(!('title' in item))item=bump(item,{title:connectionTitle(item as any,all as any)});
+                const source=patch.titleSource??('title' in patch?'custom':connectionTitleSource((current??item) as any,all as any));
+                item=bump(item,{titleSource:source,...(source==='linked'?{title:connectionTitle({...item,titleSource:'linked'} as any,all as any)}:{})});
                 if(!('detail' in item))item=bump(item,{detail:''});
                 if(!('symbol' in item))item=bump(item,{symbol:''});
             }
@@ -480,23 +490,35 @@ export class JournasService {
             if(kind==='blocks')await this.syncBlock(tx,id,item,current,day);
             else {tx.set(path, item);
             tx.set(`trips/${id}/days/${day}`, { date: day, updatedAt: this.now() });}
-            if (kind === 'pins')
-                for (const block of all.filter(x => x.kind === 'blocks' && x.pinId === itemId)) {
-                    const inherited: Data = {};
-                    const values: Data = { title: item.title, detail: item.note, color: item.color, symbol: item.symbol };
-                    for (const key of Object.keys(values))
-                        if (!(block.overrides as string[]).includes(key) && block[key] !== values[key])
-                            inherited[key] = values[key];
-                    if (Object.keys(inherited).length)
-                        await this.syncBlock(tx,id,bump(block, inherited),block,day);
-                }
-            if(kind==='connections')for(const block of all.filter(source=>source.kind==='blocks'&&source.connectionId===itemId)){
-                const values:Data={title:connectionTitle(item as any,all as any),detail:item.detail??'',symbol:item.symbol??''},inherited:Data={};
-                for(const[key,value]of Object.entries(values))if(!(block.overrides as string[]).includes(key)&&block[key]!==value)inherited[key]=value;
-                if(Object.keys(inherited).length)await this.syncBlock(tx,id,bump(block,inherited),block,day);
-            }
+            if(kind==='pins'||kind==='connections')await this.refreshDependencies(tx,id,day,all,all.map(source=>source.id===itemId?item:source));
             return { item };
         });
+    }
+    private lodgingPin(place:Data|undefined):Item|undefined{
+        return place?{id:'trip-lodging',kind:'pins',title:place.name,note:place.note??'',color:place.color??'#7c5ce7',symbol:place.symbol??'icon:stay',lng:place.lng,lat:place.lat,versions:{}}:undefined;
+    }
+    /** Refresh the whole dependency chain using the original names to identify legacy defaults. */
+    private async refreshDependencies(tx:Transaction,id:string,day:string,previous:Item[],next:Item[]){
+        const updated=[...next];
+        for(let index=0;index<updated.length;index++){
+            const connection=updated[index];if(connection.kind!=='connections')continue;
+            const old=previous.find(item=>item.id===connection.id)??connection;
+            const source=connection.titleSource??connectionTitleSource(old as any,previous as any);
+            if(source!=='linked')continue;
+            const title=connectionTitle({...connection,titleSource:'linked'} as any,updated as any);
+            if(connection.title!==title||connection.titleSource!=='linked'){
+                updated[index]=bump(connection,{title,titleSource:'linked'});
+                tx.set(`${itemsPath(id,day)}/${connection.id}`,updated[index]);
+                tx.set(`trips/${id}/days/${day}`,{date:day,updatedAt:this.now()});
+            }
+        }
+        for(const block of updated.filter(item=>item.kind==='blocks')){
+            const pin=updated.find(item=>item.kind==='pins'&&item.id===block.pinId),connection=updated.find(item=>item.kind==='connections'&&item.id===block.connectionId);
+            const values:Data|undefined=pin?{title:pin.title,detail:pin.note,color:pin.color,symbol:pin.symbol}:connection?{title:connectionTitle(connection as any,updated as any),detail:connection.detail??'',symbol:connection.symbol??''}:undefined;
+            if(!values)continue;const inherited:Data={};
+            for(const[key,value]of Object.entries(values))if(!(block.overrides as string[]??[]).includes(key)&&block[key]!==value)inherited[key]=value;
+            if(Object.keys(inherited).length)await this.syncBlock(tx,id,bump(block,inherited),block,day);
+        }
     }
     private async syncBlock(tx:Transaction,id:string,item:Item,_previous:Item|undefined,day:string){
         tx.set(`${itemsPath(id,day)}/${item.id}`,dayBlock(item,day));

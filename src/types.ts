@@ -44,6 +44,7 @@ export type Connection = {
   to: string;
   arrow: boolean;
   title?: string;
+  titleSource?: "linked" | "custom";
   detail?: string;
   symbol?: string;
   versions: Record<string, number>;
@@ -95,6 +96,7 @@ export type Layout = {
   todoHeight: number;
   center: [number, number];
   zoom: number;
+  bearing?: number;
   scroll: number;
 };
 export const emptyDay = (): Day => ({
@@ -114,6 +116,7 @@ export const defaultLayout = (): Layout => ({
   todoHeight: 380,
   center: [0, 0],
   zoom: 0,
+  bearing: 0,
   scroll: 400,
 });
 export const defaultSettings: Settings = {

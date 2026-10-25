@@ -42,7 +42,7 @@ export default function MapPanel({
   pins: Pin[];
   connections: Connection[];
   layout: Layout;
-  onView: (center: [number, number], zoom: number) => void;
+  onView: (center: [number, number], zoom: number, bearing:number) => void;
   onPin: (pin: Pin) => void;
   onConnection?: (connection:Connection) => void;
   onAdd: (lng: number, lat: number) => void;
@@ -99,9 +99,9 @@ export default function MapPanel({
       const controller=new AbortController();focusAbort.current=controller;
       const interrupt=()=>controller.abort('interaction'),resize=()=>controller.abort('resize');
       const element=viewport.current;element.addEventListener('pointerdown',interrupt,true);element.addEventListener('keydown',interrupt,true);element.addEventListener('wheel',interrupt,{capture:true,passive:true});window.addEventListener('resize',resize);
-      try{const flight=focusLoadedMap(map.current,point,controller.signal,camera=>{focusTarget.current=camera;callbacks.current.onView(camera.center,camera.zoom);});prioritizeFocus.current?.(point);await flight;}
+      try{const flight=focusLoadedMap(map.current,point,controller.signal,camera=>{focusTarget.current=camera;callbacks.current.onView(camera.center,camera.zoom,map.current?.getBearing()??0);});prioritizeFocus.current?.(point);await flight;}
       catch(error){if(!controller.signal.aborted)onFocusError?.((error as Error).message);}
-      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){const target=focusTarget.current;focusAbort.current=null;focusTarget.current=null;setFocusPreparing(null);if((!controller.signal.aborted||['interaction','resize','theme'].includes(controller.signal.reason))&&map.current){const c=map.current.getCenter(),camera:Camera={center:[c.lng,c.lat],zoom:map.current.getZoom()};callbacks.current.onView(camera.center,camera.zoom);if(!controller.signal.aborted&&target&&sameCamera(camera,target))callbacks.current.onFocusComplete?.();}}}
+      finally{element.removeEventListener('pointerdown',interrupt,true);element.removeEventListener('keydown',interrupt,true);element.removeEventListener('wheel',interrupt,true);window.removeEventListener('resize',resize);if(focusAbort.current===controller){const target=focusTarget.current;focusAbort.current=null;focusTarget.current=null;setFocusPreparing(null);if((!controller.signal.aborted||['interaction','resize','theme'].includes(controller.signal.reason))&&map.current){const c=map.current.getCenter(),camera:Camera={center:[c.lng,c.lat],zoom:map.current.getZoom()};callbacks.current.onView(camera.center,camera.zoom,map.current?.getBearing()??0);if(!controller.signal.aborted&&target&&sameCamera(camera,target))callbacks.current.onFocusComplete?.();}}}
     })();
   };
   useImperativeHandle(focusRef,()=>({focus:focusPoint}));
@@ -148,6 +148,7 @@ export default function MapPanel({
       style: mapStyle.current,
       center: layout.center,
       zoom: layout.zoom,
+      bearing:layout.bearing??0,
       attributionControl: { compact: true },
       trackResize: false,
       maxTileCacheZoomLevels:256,
@@ -289,7 +290,7 @@ export default function MapPanel({
     m.on("moveend", () => {
       if (restoringView.current || focusAbort.current || visible.closest('[aria-hidden="true"]')) return;
       const c = m.getCenter();
-      callbacks.current.onView([c.lng, c.lat], m.getZoom());
+      callbacks.current.onView([c.lng, c.lat], m.getZoom(),m.getBearing());
     });
     let gestureDragged=false;
     m.on('mousedown',()=>{gestureDragged=false;});
@@ -551,14 +552,15 @@ export default function MapPanel({
     if (
       Math.abs(c.lng - layout.center[0]) > 0.00001 ||
       Math.abs(c.lat - layout.center[1]) > 0.00001 ||
-      Math.abs(m.getZoom() - layout.zoom) > 0.00001
+      Math.abs(m.getZoom() - layout.zoom) > 0.00001 ||
+      Math.abs(m.getBearing()-(layout.bearing??0))>0.00001
     ) {
       ++focusVersion.current;focusAbort.current?.abort('navigation');
       restoringView.current = true;
-      m.jumpTo({ center: layout.center, zoom: layout.zoom });
+      m.jumpTo({ center: layout.center, zoom: layout.zoom,bearing:layout.bearing??0 });
       restoringView.current = false;
     }
-  }, [layout.center[0], layout.center[1], layout.zoom]);
+  }, [layout.center[0], layout.center[1], layout.zoom,layout.bearing]);
   useEffect(()=>{
     const m=map.current,element=viewport.current;if(!m||!element)return;
     const panel=element.closest('.map-panel');

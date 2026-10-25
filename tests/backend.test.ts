@@ -681,3 +681,41 @@ it('copies across editable trips, keeps original provenance and checks both trip
  await service.execute('alice',{action:'history.undo',tripId:trip.id});expect(((await service.execute('alice',{action:'trip.get',tripId:trip.id,date:'2026-10-03'})).day as Data).pins).toEqual([]);
  await service.execute('alice',{action:'history.redo',tripId:trip.id});expect(((await service.execute('alice',{action:'trip.get',tripId:trip.id,date:'2026-10-03'})).day as Data).pins).toHaveLength(1);
 });
+
+
+describe('linked names, lodging and saved direction',()=>{
+ it('renames automatic connections and their blocks through the full chain, preserving manual titles',async()=>{
+  const ctx=await setup();const source=(await ctx.patch('pins','pin',pin)).item as any;
+  await ctx.patch('connections','route',{from:'trip-lodging',to:'pin',arrow:true});
+  await ctx.patch('connections','custom',{from:'trip-lodging',to:'pin',arrow:false,title:'My route'});
+  await ctx.patch('blocks','ride',{...block,pinId:null,connectionId:'route'});
+  await ctx.patch('blocks','stay',{...block,pinId:'trip-lodging'});
+  const manual=(await ctx.patch('blocks','manual',{...block,pinId:'pin',overrides:['title'],title:'My activity'})).item as any;
+  await ctx.patch('pins','pin',{title:'Gallery'},source.versions);
+  let data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;
+  expect(data.connections.find((c:any)=>c.id==='route').title).toBe('Test lodging → Gallery');
+  expect(data.connections.find((c:any)=>c.id==='custom').title).toBe('My route');
+  expect(data.blocks.find((b:any)=>b.id==='ride').title).toBe('Test lodging → Gallery');
+  expect(data.blocks.find((b:any)=>b.id==='manual').title).toBe(manual.title);
+  await ctx.service.execute('alice',{action:'trip.update',tripId:ctx.id,name:'Paris',startDate:day,endDate:day,lodging:{name:'Hotel',lng:2.3,lat:48.8}});
+  data=(await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).day as any;
+  expect(data.connections.find((c:any)=>c.id==='route').title).toBe('Hotel → Gallery');
+  expect(data.blocks.find((b:any)=>b.id==='ride').title).toBe('Hotel → Gallery');
+  expect(data.blocks.find((b:any)=>b.id==='stay').title).toBe('Hotel');
+ });
+ it('recognizes legacy generated connection names before an endpoint is renamed',async()=>{
+  const ctx=await setup();const source=(await ctx.patch('pins','pin',pin)).item as any;
+  ctx.store.docs.set(`trips/${ctx.id}/days/${day}/items/legacy`,{id:'legacy',kind:'connections',from:'trip-lodging',to:'pin',arrow:true,title:'Test lodging → Museum',versions:{}});
+  await ctx.patch('pins','pin',{title:'Gallery'},source.versions);
+  expect(ctx.store.docs.get(`trips/${ctx.id}/days/${day}/items/legacy`)).toMatchObject({title:'Test lodging → Gallery',titleSource:'linked'});
+ });
+ it('links tasks and activities to lodging and persists map bearing with backwards-compatible layouts',async()=>{
+  const ctx=await setup();await ctx.patch('tasks','stay-task',{...task,pinId:'trip-lodging',blockId:null});
+  await ctx.patch('blocks','stay',{...block,pinId:'trip-lodging'});
+  for(const value of [layout,{...layout,bearing:73.5}]){
+   await ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:value});
+   expect((await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).layout).toEqual(value);
+  }
+  await expect(ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:{...layout,bearing:Infinity}})).rejects.toMatchObject({code:'INVALID_LAYOUT'});
+ });
+});

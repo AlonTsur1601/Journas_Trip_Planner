@@ -1,4 +1,6 @@
 import {visibleConnections,type PendingConnection} from './connection-preview';
+import {SearchInput} from './SearchInput';
+import {taskLinkLabels} from './plan-labels';
 import {SearchableList} from './SearchableList';
 import {AsyncButton} from './AsyncButton';
 import type {MapPanelHandle} from './MapPanel';
@@ -12,7 +14,7 @@ import type {Connection} from "./types";
 import type {CSSProperties} from "react";
 import {ConnectionDetails} from "./ConnectionDetails";
 import {PlanLinkField} from "./PlanLinkField";
-import {connectionTitle} from "./connection-label";
+import {connectionTitle,connectionTitleSource} from "./connection-label";
 import {AccountNameField} from "./AccountNameField";
 import {readAppearance,cacheAppearance,applyAccent,isBlackAccent} from "./appearance-cache";
 import WorkspaceMotion from "./WorkspaceMotion";
@@ -385,7 +387,7 @@ export default function App(){
  const verification=useSessionVerification();
  const cachedIdentity=useRef(verification.accountId);
  useEffect(()=>{if(cachedIdentity.current!==verification.accountId){cachedIdentity.current=verification.accountId;if(practice){setPractice(false);setPracticeMode(false);}}},[verification.accountId,practice]);
- useEffect(()=>{const change=(event:Event)=>{const detail=(event as CustomEvent).detail;const value=typeof detail==="boolean"?detail:Boolean(detail?.active);setPractice(value,auth?.currentUser?.uid,detail?.profile?.accent??readAppearance(auth?.currentUser?.uid??"" ).accent,{displayName:auth?.currentUser?.displayName??undefined,photoURL:auth?.currentUser?.photoURL??undefined,...detail?.profile});setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
+ useEffect(()=>{const change=(event:Event)=>{const detail=(event as CustomEvent).detail;const value=typeof detail==="boolean"?detail:Boolean(detail?.active);setPractice(value,auth?.currentUser?.uid,detail?.profile?.accent??readAppearance(auth?.currentUser?.uid??"" ).accent,{...detail?.profile});setPracticeMode(value);};window.addEventListener('journas-practice',change);return()=>window.removeEventListener('journas-practice',change);},[]);
  return <><Activity mode={practice?'hidden':'visible'}><PlannerApp key={verification.accountId??"signed-out"} practice={false} verified={verification.verified} onVerified={verification.confirm}/></Activity>{practice&&<PlannerApp practice verified={verification.verified} onVerified={verification.confirm}/>}</>;
 }
 function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:boolean|null;onVerified:()=>void}) {
@@ -523,10 +525,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [blockLinkSources,setBlockLinkSources]=useState<{date:string;pins:Pin[];connections:Connection[]}|null>(null);
   const linkDay=date;
   useEffect(()=>{setBlockLinkSources(null);if(edit?.kind!=='blocks'||linkDay===date||!trip?.id||!/^\d{4}-\d{2}-\d{2}$/.test(linkDay))return;const controller=new AbortController();void api<{day:Day}>('trip.get',{tripId:trip.id,date:linkDay},controller.signal,true).then(result=>{if(!controller.signal.aborted)setBlockLinkSources({date:linkDay,pins:result.day.pins,connections:result.day.connections});}).catch(error=>{if(!controller.signal.aborted)setMessage(error.message);});return()=>controller.abort();},[edit?.kind,linkDay,date,trip?.id]);
-  const blockLinkPins=linkDay===date?day.pins:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.pins:[];
+  const blockLinkPins=linkDay===date?mapPins:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.pins:[];
   const blockLinkConnections=linkDay===date?visibleDayConnections:blockLinkSources&&blockLinkSources.date===linkDay?blockLinkSources.connections:[];
   function setEdit(value: Edit | null) {
-    if(value?.kind==="connections")value={...value,item:{...value.item,title:value.item.title??connectionTitle(value.item as any,mapPins),detail:value.item.detail??"",symbol:value.item.symbol??""}};
+    if(value?.kind==="connections")value={...value,item:{...value.item,title:connectionTitle(value.item as any,mapPins),titleSource:connectionTitleSource(value.item as any,mapPins),detail:value.item.detail??"",symbol:value.item.symbol??""}};
     if (value && !value.base)
       value = {
         ...value,
@@ -1228,8 +1230,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           : kind === "tasks"
             ? { title: "", checked: false, pinId: null, blockId: null }
             : {
-                from: day.pins[0]?.id ?? "",
-                to: day.pins[1]?.id ?? "",
+                from: mapPins[0]?.id ?? "",
+                to: mapPins[1]?.id ?? "",
                 arrow: true,
               };
     setEdit({
@@ -1283,7 +1285,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       setMessage('Place pasted into this day.');
     }catch(error:any){setMessage(error.message);}finally{pinPasteBusy.current=false;setPastingPin(false);finish();}
   }
-  const visibleTasks=[...displayTasks].sort((a,b)=>Number(taskIsCurrent(b))-Number(taskIsCurrent(a)));
+  const [taskSearch,setTaskSearch]=useState("");
+  const visibleTasks=[...displayTasks].filter(task=>[task.title,...taskLinkLabels(task,day.blocks,mapPins,visibleDayConnections)].join(" ").toLocaleLowerCase().includes(taskSearch.toLocaleLowerCase())).sort((a,b)=>a.title.localeCompare(b.title));
   if (!ready && !user && !hasOpenedWorkspace())
     return (
       <LoadingScreen startup text="Getting Journas ready…"/>
@@ -1310,7 +1313,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </a>
         <div className="trip-selector">
           {trips.length || (shareTrip && trip) ? <Dropdown
-            aria-label="Choose trip"
+            searchable aria-label="Choose trip"
             placeholder="Choose a trip"
             value={trip?.id ?? ""}
             onChange={(e:any)=>{const chosen=trips.find(t=>t.id===e.target.value)??null;const chosenDate=chosen&&(date<chosen.startDate||date>chosen.endDate)?chosen.startDate:date;history.replaceState({},"",location.pathname);showPlanner(chosen,chosenDate);}}
@@ -1318,7 +1321,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             {shareTrip && trip && (
               <option value={trip.id}>{trip.name}</option>
             )}
-            {trips.map((t) => (
+            {[...trips].sort((a,b)=>a.name.localeCompare(b.name)).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
@@ -1469,7 +1472,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onPastePin={!readonly&&!practice?pastePin:undefined} canPastePin={canPastePin}
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
-                onView={(center, zoom) => changeLayout({ center, zoom })}
+                onView={(center, zoom, bearing) => changeLayout({ center, zoom, bearing })}
                 onPin={(pin) => {if(!practice)setEdit({kind:"pins",item:pin});}}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
@@ -1557,7 +1560,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 ))}
                 {day.blocks.map((b) => {
                   const segment=blockRange(b,date);
-                  const pin = day.pins.find((p) => p.id === b.pinId);
+                  const pin = mapPins.find((p) => p.id === b.pinId);
                   const connection=visibleDayConnections.find(connection=>connection.id===b.connectionId);
                   const inherited=pin?{title:pin.title,detail:pin.note,color:pin.color,symbol:pin.symbol}:connection?{title:connectionTitle(connection,mapPins),detail:connection.detail??'',symbol:connection.symbol??''}:null;
                   const field=(key:string)=>inherited&&key in inherited&&!b.overrides.includes(key)?(inherited as any)[key]:(b as any)[key];
@@ -1688,6 +1691,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               </AsyncButton>
             </div>
             <div className="task-list">
+              <SearchInput aria-label="Search tasks" placeholder="Search tasks…" value={taskSearch} onValueChange={setTaskSearch}/>
               {visibleTasks.map((t) => (
                 <div className={`task-row${taskIsCurrent(t)?" due-now":""}${nearbyTodo.taskIds.includes(t.id)?" nearby-now":""}`} key={t.id}>
                   <input
@@ -1704,13 +1708,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     </span>
                     {nearbyTodo.taskIds.includes(t.id)?<span className="nearby-activity-label">You’re here</span>:taskIsCurrent(t)&&<span className="task-now">Now</span>}
                     <small>
-                      {[
-                        day.pins.find((p) => p.id === t.pinId)?.title,
-                        visibleDayConnections.filter(connection=>connection.id===t.connectionId).map(connection=>connectionTitle(connection,mapPins))[0],
-                        day.blocks.find((b) => b.id === t.blockId)?.title,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      {taskLinkLabels(t,day.blocks,mapPins,visibleDayConnections).join(" · ")}
                     </small>
                   </AsyncButton>
                 </div>
@@ -2065,9 +2063,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               )}
               {edit.kind === "tasks" && (
                 <>
-                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={day.pins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
+                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={mapPins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
                   <Select
-                    label="Linked time"
+                    label="Linked time" searchable
                     value={edit.item.blockId ?? ""}
                     onChange={(e: any) =>
                       setEdit({
@@ -2077,7 +2075,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     }
                   >
                     <option value="">No time block</option>
-                    {day.blocks.map((b) => (
+                    {[...day.blocks].sort((a,b)=>a.title.localeCompare(b.title)).map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.start} · {b.title}
                       </option>
@@ -2087,9 +2085,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               )}
               {edit.kind === "connections" && (
                 <>
-                  <ConnectionDetails value={edit.item} onChange={patch=>setEdit({...edit,item:{...edit.item,...patch}})}/>
+                  <ConnectionDetails value={edit.item} onChange={patch=>setEdit({...edit,item:{...edit.item,...patch,...(patch.title!==undefined?{titleSource:"custom"}:{})}})}/>
                   <Select
-                    label="From"
+                    label="From" searchable
                     value={edit.item.from}
                     onChange={(e: any) =>
                       setEdit({
@@ -2098,14 +2096,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       })
                     }
                   >
-                    {mapPins.map((p) => (
+                    {[...mapPins].sort((a,b)=>a.title.localeCompare(b.title)).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title}
                       </option>
                     ))}
                   </Select>
                   <Select
-                    label="To"
+                    label="To" searchable
                     value={edit.item.to}
                     onChange={(e: any) =>
                       setEdit({
@@ -2114,7 +2112,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       })
                     }
                   >
-                    {mapPins.map((p) => (
+                    {[...mapPins].sort((a,b)=>a.title.localeCompare(b.title)).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title}
                       </option>
@@ -2158,14 +2156,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {modal === "places" && <Modal title="Places" onClose={()=>setModal(null)}>
-        <SearchableList items={mapPins} label="Search places" searchText={pin=>[pin.title,pin.note,pin.id==='trip-lodging'?'Trip lodging':''].join(' ')} className="connections-list places-list" emptyText="No places for this day." renderItem={pin=><div className="connection-row" key={pin.id}>
+        <SearchableList items={[...mapPins].sort((a,b)=>a.title.localeCompare(b.title))} label="Search places" searchText={pin=>[pin.title,pin.note,pin.id==='trip-lodging'?'Trip lodging':''].join(' ')} className="connections-list places-list" emptyText="No places for this day." renderItem={pin=><div className="connection-row" key={pin.id}>
           <span className="connection-list-title"><SymbolIcon value={pin.symbol}/><span>{pin.title}{pin.id==='trip-lodging'&&<small>Trip lodging</small>}{pin.note&&<small>{pin.note}</small>}</span></span>
           <span className="place-list-actions"><AsyncButton className="button subtle" aria-label={`Focus ${pin.title}`} onClick={()=>{mapFocus.current?.focus(pin);setModal(null);}}>Focus</AsyncButton>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit place ${pin.title}`} onClick={()=>{setModal(null);setEdit({kind:'pins',item:pin});}}>Edit</AsyncButton>}</span>
         </div>}/>
       </Modal>}
       {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
-        <SearchableList items={visibleDayConnections} label="Search connections" searchText={connection=>[connectionTitle(connection,mapPins),connection.detail,...mapPins.filter(pin=>pin.id===connection.from||pin.id===connection.to).map(pin=>pin.title)].join(' ')} className="connections-list" emptyText="No connections for this day." renderItem={connection=><div className="connection-row" key={connection.id}>
+        <SearchableList items={[...visibleDayConnections].sort((a,b)=>connectionTitle(a,mapPins).localeCompare(connectionTitle(b,mapPins)))} label="Search connections" searchText={connection=>[connectionTitle(connection,mapPins),connection.detail,...mapPins.filter(pin=>pin.id===connection.from||pin.id===connection.to).map(pin=>pin.title)].join(' ')} className="connections-list" emptyText="No connections for this day." renderItem={connection=><div className="connection-row" key={connection.id}>
           <span className="connection-list-title">{connection.symbol&&<SymbolIcon value={connection.symbol}/>}<span>{connectionTitle(connection,mapPins)}{connection.detail&&<small>{connection.detail}</small>}</span></span>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</AsyncButton>}
         </div>}/>
@@ -2318,7 +2316,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 }}
               />
               <AsyncButton type="button" className="button photo-picker-button" onClick={() => profilePhoto.current?.click()}>{settings.photoURL ? "Change photo" : "Choose image"}</AsyncButton>
-              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{googleSession&&!settings.photoURL&&<small>Using your Google profile photo</small>}
+              <span className="photo-file-note">JPG, PNG or WebP, up to 10 MB</span>{settings.photoURL&&<button type="button" className="text-button photo-remove" onClick={()=>setSettings(previous=>({...previous,photoURL:""}))}>Remove photo</button>}
             </div>
             </div>
             <div className="form-row">
@@ -2375,7 +2373,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               />{" "}
               Automatically remove old trips from my account
             </label>
-            {settings.autoDelete&&<Select
+            <Select disabled={!settings.autoDelete}
               label="Remove from my account after the trip ends"
               value={settings.retentionDays}
               onChange={(e: any) =>
@@ -2390,7 +2388,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               <option value={90}>90 days</option>
               <option value={365}>One year</option>
 
-            </Select>}
+            </Select>
             <p className="form-note">
               Automatic removal affects your account only. Other travelers keep
               their copy of the shared trip.

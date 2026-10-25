@@ -12,7 +12,7 @@ export function tourClickAllowed(stage:string,target:Element){
  if(within('.home-continue, .home-tile-main, .home-tile-menu, .home-context-menu'))return false;
  if(within('.topbar .brand')&&stage!=='Return home')return false;
  if(within('button[aria-label="Trip details"]')&&stage!=='View the trip details')return false;
- if(within('[aria-label="Close tasks"]')&&stage!=='Arrange your workspace')return false;
+ if(within('[aria-label="Close tasks"]')&&!['Arrange your workspace','Add another place'].includes(stage))return false;
  if(within('.home-create')&&stage!=='Start a simple trip')return false;
  if(within('.home-browse-trips')&&stage!=='Find your plans again')return false;
  if(within('.home-pin-create')&&stage!=='Pin a shortcut')return false;
@@ -21,8 +21,10 @@ export function tourClickAllowed(stage:string,target:Element){
  if(stage==='Share and collaborate'&&within('.share-modal > .button:not(.primary)'))return false;
  if(within('.map-panel [aria-label="Add pin on map"]')&&!['Add your first place','Add another place'].includes(stage))return false;
  if(within('.map-panel [aria-label="Connect pins on map"]')&&stage!=='Connect your places')return false;
- if(within('.map-panel [aria-label="Connections"]'))return false;
- if(within('.map-panel [aria-label="Places"]'))return false;
+ if(within('.map-panel [aria-label="Connections"]')&&stage!=='Browse your connections')return false;
+ if(within('.map-panel [aria-label="Places"]')&&stage!=='Browse your places')return false;
+ if(stage==='Browse your places'&&within('.places-modal button[aria-label^="Edit place"]'))return false;
+ if(stage==='Browse your connections'&&within('.connections-list button'))return false;
  if(within('.map-panel .map-pin')){
   if(stage!=='Connect your places')return false;
   if(!target.closest('.map-panel')?.querySelector('[aria-label="Connect pins on map"].active'))return false;

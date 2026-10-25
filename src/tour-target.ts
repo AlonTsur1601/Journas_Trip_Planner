@@ -1,6 +1,6 @@
 /** Resolve only the requested target; unrelated nested portals never steal focus. */
 export function findTourTarget(selector:string,root:Pick<Document,'querySelectorAll'>=document){
- return [...root.querySelectorAll(selector)].find(element=>{const rect=element.getBoundingClientRect();return rect.width>0&&rect.height>0&&!element.closest('[inert],[aria-hidden="true"]');})??null;
+ return [...root.querySelectorAll(selector)].find(element=>{const rect=element.getBoundingClientRect();return rect.width>0&&rect.height>0&&!element.closest('[inert],[aria-hidden="true"],[data-motion-exit]');})??null;
 }
 /** Read every rendered frame while the guide is open. Web Animations can start
  * after the initial measurement and do not dispatch CSS animation events. */

@@ -18,3 +18,11 @@ it('keeps account identity and task editors outside the tutorial flow',()=>{
  expect(tourClickAllowed('Check it off',target(['.task-row button']))).toBe(false);
  expect(tourClickAllowed('Check it off',target(['.task-row input']))).toBe(true);
 });
+it('opens the new list stages without allowing edits to derail the guide',()=>{
+ expect(tourClickAllowed('Browse your places',target(['.map-panel [aria-label="Places"]']))).toBe(true);
+ expect(tourClickAllowed('Browse your connections',target(['.map-panel [aria-label="Connections"]']))).toBe(true);
+ expect(tourClickAllowed('Add your first place',target(['.map-panel [aria-label="Places"]']))).toBe(false);
+ expect(tourClickAllowed('Browse your places',target(['.places-modal button[aria-label^="Edit place"]']))).toBe(false);
+ expect(tourClickAllowed('Browse your connections',target(['.connections-list button']))).toBe(false);
+ expect(tourClickAllowed('Add another place',target(['[aria-label="Close tasks"]']))).toBe(true);
+});

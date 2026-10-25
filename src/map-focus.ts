@@ -37,6 +37,8 @@ export function focusLoadedMap(map:Pick<MapLibreMap,'getCenter'|'getZoom'|'on'|'
   const cancel=()=>{clean();if(signal.reason!=='dispose')map.stop();reject(new DOMException('Focus cancelled','AbortError'));};
   const timeout=setTimeout(()=>{clean();map.stop();resolve();},focusDuration+500);
   if(signal.aborted){cancel();return;}
+  // End an interrupted zoom/drag before listening for this flight's moveend.
+  map.stop();
   const center=map.getCenter();
   if(Math.abs(center.lng-point.lng)<1e-8&&Math.abs(center.lat-point.lat)<1e-8&&map.getZoom()>=15){ended();return;}
   map.on('moveend',ended);signal.addEventListener('abort',cancel,{once:true});

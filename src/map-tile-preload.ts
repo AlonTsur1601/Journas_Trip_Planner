@@ -80,8 +80,9 @@ export class FocusTileCache{
   const {manager,tile}=entry;
   try{
    const result=await manager.getSource().loadTile(tile);
-   if(tile.aborted||this.disposed)return;
+   if(tile.aborted)return;
    if(entry.claimed){manager._tileLoaded(tile,tile.tileID.key,'loading',false,result as Parameters<Manager['_tileLoaded']>[4]);return;}
+   if(this.disposed)return;
    manager._tileLoaded(tile,id.key,'loading',false,result as Parameters<Manager['_tileLoaded']>[4]);
    // Symbol buffers are sized by the first placement pass. Uploading them
    // before placement allocates empty buffers and breaks later text drawing.

@@ -1,12 +1,12 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {focusLoadedMap,focusEasing,focusDuration,focusRoute} from '../src/map-focus';
 class MapStub{
- listeners=new Map<string,Set<()=>void>>();options:any;stops=0;
+ listeners=new Map<string,Set<()=>void>>();options:any;stops=0;active=false;
  getCenter(){return{lng:120,lat:-30};}getZoom(){return 2;}
  on(name:string,callback:()=>void){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name)!.add(callback);}
  off(name:string,callback:()=>void){this.listeners.get(name)?.delete(callback);}
- flyTo(options:any){this.options=options;}
- stop(){this.stops++;}
+ flyTo(options:any){if(this.active)this.stop();this.options=options;this.active=true;}
+ stop(){this.stops++;if(this.active){this.active=false;this.emit('moveend');}}
  emit(name:string){for(const callback of [...this.listeners.get(name)??[]])callback();}
 }
 beforeEach(()=>vi.useFakeTimers());
@@ -21,11 +21,17 @@ it('removes callbacks and stops an interrupted flight',async()=>{
  const map=new MapStub(),controller=new AbortController();
  const task=focusLoadedMap(map as any,{lng:2,lat:49},controller.signal);
  controller.abort();await expect(task).rejects.toMatchObject({name:'AbortError'});
- expect(map.stops).toBe(1);expect([...map.listeners.values()].every(set=>set.size===0)).toBe(true);
+ expect(map.stops).toBe(2);expect([...map.listeners.values()].every(set=>set.size===0)).toBe(true);
 });
 it('bounds the camera task even if a renderer fails to emit moveend',async()=>{
  const map=new MapStub(),task=focusLoadedMap(map as any,{lng:2,lat:49},new AbortController().signal);
- vi.advanceTimersByTime(focusDuration+501);await task;expect(map.stops).toBe(1);expect(vi.getTimerCount()).toBe(0);
+ vi.advanceTimersByTime(focusDuration+501);await task;expect(map.stops).toBe(2);expect(vi.getTimerCount()).toBe(0);
+});
+it('does not mistake the interrupted zoom moveend for the end of the new flight',async()=>{
+ const map=new MapStub();map.active=true;let finished=false;
+ const task=focusLoadedMap(map as any,{lng:2,lat:49},new AbortController().signal).then(()=>finished=true);
+ await Promise.resolve();expect(finished).toBe(false);expect(map.options.center).toEqual([2,49]);
+ map.emit('moveend');await task;
 });
 it('slows through the middle and returns smoothly to its starting speed',()=>{
  expect(focusEasing(0)).toBe(0);expect(focusEasing(1)).toBe(1);

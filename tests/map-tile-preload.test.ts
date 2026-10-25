@@ -50,6 +50,12 @@ it('restores the library method and aborts only unclaimed work on teardown',asyn
  expect(f.manager._addTile).toBe(original);expect(f.manager._abortTile).toHaveBeenCalledTimes(1);
  f.finish();await Promise.resolve();expect(f.cached.size).toBe(0);
 });
+it('finishes adopted live tiles even when a location update replaces the preloader',async()=>{
+ const f=fixture();f.cache.enqueue([{manager:f.manager as any,id:id('destination'),priority:0}]);
+ f.manager._addTile(id('destination'));f.cache.dispose();
+ expect(f.manager._abortTile).not.toHaveBeenCalled();f.finish();
+ await vi.waitFor(()=>expect(f.manager._tileLoaded).toHaveBeenCalledTimes(1));
+});
 it('prepares separate instances when two world copies need the same canonical tile',async()=>{
  const f=fixture();f.cache.enqueue(['east','west'].map(wrap=>({manager:f.manager as any,id:id(wrap,'destination'),priority:0})));
  expect(f.load).toHaveBeenCalledTimes(2);f.finish();

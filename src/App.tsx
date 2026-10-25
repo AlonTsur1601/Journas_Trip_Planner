@@ -1,3 +1,4 @@
+import {SearchableList} from './SearchableList';
 import {AsyncButton} from './AsyncButton';
 import type {MapPanelHandle} from './MapPanel';
 import {optimisticTaskList} from './optimistic-tasks';
@@ -2149,17 +2150,17 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {modal === "places" && <Modal title="Places" onClose={()=>setModal(null)}>
-        <div className="connections-list places-list">{mapPins.length?mapPins.map(pin=><div className="connection-row" key={pin.id}>
+        <SearchableList items={mapPins} label="Search places" searchText={pin=>[pin.title,pin.note,pin.id==='trip-lodging'?'Trip lodging':''].join(' ')} className="connections-list places-list" emptyText="No places for this day." renderItem={pin=><div className="connection-row" key={pin.id}>
           <span className="connection-list-title"><SymbolIcon value={pin.symbol}/><span>{pin.title}{pin.id==='trip-lodging'&&<small>Trip lodging</small>}{pin.note&&<small>{pin.note}</small>}</span></span>
           <span className="place-list-actions"><AsyncButton className="button subtle" aria-label={`Focus ${pin.title}`} onClick={()=>{mapFocus.current?.focus(pin);setModal(null);}}>Focus</AsyncButton>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit place ${pin.title}`} onClick={()=>{setModal(null);setEdit({kind:'pins',item:pin});}}>Edit</AsyncButton>}</span>
-        </div>):<p>No places for this day.</p>}</div>
+        </div>}/>
       </Modal>}
       {modal === "connections" && <Modal title="Connections" onClose={()=>setModal(null)}>
-        <div className="connections-list">{day.connections.length?day.connections.map(connection=><div className="connection-row" key={connection.id}>
+        <SearchableList items={day.connections} label="Search connections" searchText={connection=>[connectionTitle(connection,mapPins),connection.detail,...mapPins.filter(pin=>pin.id===connection.from||pin.id===connection.to).map(pin=>pin.title)].join(' ')} className="connections-list" emptyText="No connections for this day." renderItem={connection=><div className="connection-row" key={connection.id}>
           <span className="connection-list-title">{connection.symbol&&<SymbolIcon value={connection.symbol}/>}<span>{connectionTitle(connection,mapPins)}{connection.detail&&<small>{connection.detail}</small>}</span></span>
           {!readonly&&<AsyncButton className="button subtle" aria-label={`Edit connection from ${mapPins.find(pin=>pin.id===connection.from)?.title??"place"} to ${mapPins.find(pin=>pin.id===connection.to)?.title??"place"}`} onClick={()=>{setModal(null);setEdit({kind:"connections",item:connection});}}>Edit</AsyncButton>}
-        </div>):<p>No connections for this day.</p>}</div>
+        </div>}/>
       </Modal>}
       {modal === "trip" && trip && (
         <Modal title="Trip details" onClose={() => setModal(null)}>

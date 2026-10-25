@@ -1,3 +1,4 @@
+import {SearchInput} from './SearchInput';
 import {userErrorMessage} from "./user-error";
 import {isBlackAccent} from './appearance-cache';
 import {createPortal} from 'react-dom';
@@ -31,13 +32,13 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
       const index = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
       items[index]?.focus();
     }
-    if (event.key === "Tab") setOpen(false);
+    if (event.key === "Tab" && !(event.target as Element).closest('.search-input')) setOpen(false);
   }}>
     <button type="button" role="combobox" aria-label={props["aria-label"]} aria-expanded={open} aria-controls={id} aria-haspopup="listbox" className="dropdown-trigger" disabled={disabled} onClick={toggle}>
       <span>{options.find((option) => option.value === String(value))?.label ?? placeholder}</span><ChevronDown size={15} />
     </button>
     {open && <Popover anchor={root} width={Math.max(220,root.current?.getBoundingClientRect().width??220)} height={searchable?294:256} onClose={()=>setOpen(false)} id={id} role="listbox" aria-label={props["aria-label"]} className="dropdown-menu">
-      {searchable&&<input aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/>}
+      {searchable&&<SearchInput aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onValueChange={value=>{setSearch(value);setPage(0);}}/>}
       {scrollable?<div className="dropdown-scroll-options">{optionButtons}</div>:optionButtons}
       {!scrollable&&pages>1&&<div className="picker-pages"><button type="button" className="icon" aria-label="Previous options page" disabled={!current} onClick={()=>setPage(current-1)}><ChevronLeft size={15}/></button><span>{current+1} / {pages}</span><button type="button" className="icon" aria-label="Next options page" disabled={current===pages-1} onClick={()=>setPage(current+1)}><ChevronRight size={15}/></button></div>}
       {!filtered.length&&<p>No matching options</p>}

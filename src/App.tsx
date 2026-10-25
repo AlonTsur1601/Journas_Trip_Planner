@@ -437,7 +437,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [tripCrop,setTripCrop]=useState<File|null>(null);
   const tripPhoto=useRef<HTMLInputElement>(null);
   const [googleSession,setGoogleSession]=useState(false);
-  const activePhoto=accountPhoto(user,googleSession,settings.photoURL);
+  const [savedProfile,setSavedProfile]=useState(()=>({displayName:settings.displayName,photoURL:settings.photoURL}));
+  const activePhoto=accountPhoto(user,googleSession,savedProfile.photoURL);
+  const draftPhoto=accountPhoto(user,googleSession,settings.photoURL);
+
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const calendarDark=settings.theme==='dark'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;
   const tripDotColors=useMemo(()=>calendarTripColors(trips,settings.accent,calendarDark),[trips,settings.accent,calendarDark]);
@@ -568,7 +571,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if(!trip||shareTrip||!user){setTravelers([]);return;}
     let live=true;
     const participating=trip.ownerId===user.uid||trip.memberIds.includes(user.uid);
-    setTravelers(participating?[{id:user.uid,displayName:accountName(settingsRef.current.displayName,'Traveler'),photoURL:activePhoto,owner:trip.ownerId===user.uid,permission:trip.ownerId===user.uid?'Owner':'Editor'}]:[]);
+    setTravelers(participating?[{id:user.uid,displayName:accountName(savedProfile.displayName,'Traveler'),photoURL:activePhoto,owner:trip.ownerId===user.uid,permission:trip.ownerId===user.uid?'Owner':'Editor'}]:[]);
     api<{members:any[]}>('trip.members',{tripId:trip.id}).then(r=>{
       if(live)setTravelers([...new globalThis.Map<string,any>(r.members.map((member:any):[string,any]=>[member.id,member])).values()] as any[]);
     }).catch(e=>{if(live)setMessage(e.message);});
@@ -645,6 +648,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         const list=result.trips,r={settings:result.settings};
         setTourSeen(result.tourSeen);
         savedAccountName.current=(result.settings.displayName??"").trim();
+        setSavedProfile({displayName:result.settings.displayName,photoURL:result.settings.photoURL});
         setChooseName(!practice&&!result.settings.displayName?.trim());
         setTrips(list);
         const restoredHome=availableHome(result.home??emptyHome(),list);
@@ -1233,6 +1237,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     try {
       await api("settings.save", { settings: next });
       savedAccountName.current=(next.displayName??"").trim();
+      setSavedProfile({displayName:next.displayName,photoURL:next.photoURL});
 
       return true;
     } catch (e: any) {
@@ -1279,11 +1284,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
   if(user&&(verified===null||verified===true&&!ready))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
-  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
+  if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (
     <>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
-      {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(settings.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(settings.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1372,7 +1377,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             </AsyncButton>
           )}
           <div className="profile-control" ref={profileAnchor}>
-            <AsyncButton className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/><span>{accountName(settings.displayName)}</span><ChevronDown size={14}/></AsyncButton>
+            <AsyncButton className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(savedProfile.displayName)}/><span>{accountName(savedProfile.displayName)}</span><ChevronDown size={14}/></AsyncButton>
             {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</Popover>}
           </div>
         </div>
@@ -2156,7 +2161,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.displayName}/><strong>{t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
           {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=Boolean(trip.lodging?.name&&!/^(Lodging|Unnamed location|Unknown location)$/i.test(trip.lodging.name));setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
@@ -2280,7 +2285,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <AsyncButton type="button" className="button account-methods-button" disabled={practice} title={practice?"Account changes are unavailable during the guided tutorial.":undefined} onClick={()=>setModal("account-settings")}>Manage sign-in methods <ChevronRight size={16}/></AsyncButton>
             </div>
             <div className="field photo-field">
-              <div className="settings-photo-preview"><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(settings.displayName)}/></div>
+              <div className="settings-photo-preview"><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={draftPhoto} name={accountName(settings.displayName)}/></div>
               <span>Profile photo</span>
               <input
                 aria-label="Choose profile photo"

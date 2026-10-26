@@ -283,23 +283,33 @@ export class JournasService {
             }
             if (action === 'share.join') {
                 const share = await this.share(tx, input.token);
-                if (share.mode !== 'editor')
-                    fail(403, 'VIEW_ONLY', 'This link allows viewing only');
                 const id = identifier(share.tripId);
                 const trip = await tx.get(tripPath(id)) as Trip;
-                if (trip.memberIds.includes(userId))
+                if (trip.memberIds.includes(userId)){
+                    if(share.mode==='editor'&&(trip.viewerIds as string[]|undefined)?.includes(userId)){
+                        const updated={...trip,viewerIds:(trip.viewerIds as string[]).filter(value=>value!==userId),updatedAt:this.now()};
+                        tx.set(tripPath(id),updated);
+                        const membership=await tx.get(membershipPath(userId,id));
+                        tx.set(membershipPath(userId,id),{...membership,shareId:hash(String(input.token)),mode:'editor'});
+                        return {trip:updated};
+                    }
                     return { trip };
+                }
                 const user = await this.checkQuota(tx, userId);
                 if (trip.memberIds.length >= 100)
                     fail(409, 'MEMBER_LIMIT', 'This trip has reached its participant limit');
-                const updated = { ...trip, memberIds: [...trip.memberIds, userId], updatedAt: this.now() };
+                const updated = { ...trip, memberIds: [...trip.memberIds, userId],viewerIds:[...(trip.viewerIds as string[]??[]).filter(value=>value!==userId),...(share.mode==='viewer'?[userId]:[])], updatedAt: this.now() };
                 tx.set(tripPath(id), updated);
-                tx.set(membershipPath(userId, id), {...this.membership(userId, trip, user.settings),shareId:hash(String(input.token))});
+                tx.set(membershipPath(userId, id), {...this.membership(userId, trip, user.settings),shareId:hash(String(input.token)),mode:share.mode});
                 tx.delete(`cleanupJobs/${userId}_${id}`);
                 tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
                 return { trip: updated };
             }
             const id = identifier(input.tripId);
+            if(['trip.update','member.remove','item.patch','item.delete','item.copy-pin'].includes(action)){
+                const access=await this.member(tx,id,userId);
+                if(access.ownerId!==userId&&(access.viewerIds as string[]|undefined)?.includes(userId))fail(403,'VIEW_ONLY','This trip allows viewing only');
+            }
             if (action === 'trip.update') {
                 const trip=await this.member(tx,id,userId);
                 const name=text(input.name,120).trim(),startDate=date(input.startDate),endDate=date(input.endDate);
@@ -383,7 +393,7 @@ export class JournasService {
             const trip = await this.member(tx, id, userId);
             const day = action === 'trip.members' ? trip.startDate : date(input.date);
             this.dayWithin(trip, day);
-            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,accent:prefs?.accent??defaultSettings.accent,owner:uid===trip.ownerId,permission:uid===trip.ownerId?'Owner':trip.memberIds.includes(uid)?'Editor':'Owner (not participating)'};}));return {members};}
+            if(action === 'trip.members'){const members=await Promise.all([...new Set([trip.ownerId,...trip.memberIds])].map(async uid=>{const user=await tx.get(userPath(uid));const prefs=user?.settings as any;return {id:uid,displayName:prefs?.displayName??'Traveler',photoURL:prefs?.photoURL??null,accent:prefs?.accent??defaultSettings.accent,owner:uid===trip.ownerId,permission:uid===trip.ownerId?'Owner':trip.memberIds.includes(uid)?(trip.viewerIds as string[]|undefined)?.includes(uid)?'Viewer':'Editor':'Owner (not participating)'};}));return {members};}
             if (action === 'trip.get')
                 return { trip, day: await this.day(tx, id, day), layout: (await tx.get(layoutPath(userId, id, day)))?.layout ?? null };
             if (action === 'layout.save') {
@@ -585,7 +595,7 @@ export class JournasService {
         if (user)
             tx.set(userPath(uid), { ...user, tripCount: Math.max(0, Number(user.tripCount ?? 0) - 1) });
         tx.set(`cleanupJobs/${uid}_${trip.id}`, { uid, tripId: trip.id, removedAt: this.now(), version: randomUUID() });
-        tx.set(tripPath(trip.id), { ...trip, memberIds: members, deleted: members.length === 0, updatedAt: this.now() });
+        tx.set(tripPath(trip.id), { ...trip, viewerIds:(trip.viewerIds as string[]??[]).filter(value=>value!==uid),memberIds: members, deleted: members.length === 0, updatedAt: this.now() });
         if (!members.length)
             await this.revokeAll(tx, trip);
     }

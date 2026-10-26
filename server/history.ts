@@ -15,6 +15,7 @@ export async function historyTransaction(store:Store,uid:string,input:Data,now:n
   for(const entry of entries.filter(e=>Number(e.at)<=now-lifetime).slice(0,100))raw.delete(`${root}/${entry.id}`);
   if(input.action==='history.status')return {undo:recent.filter(e=>!e.undone).at(-1)?.id??null,redo:recent.find(e=>e.undone)?.id??null};
   if(input.action==='history.undo'||input.action==='history.redo'){
+   if(activeTrip.ownerId!==uid&&(activeTrip.viewerIds as string[]|undefined)?.includes(uid))throw new ApiError(403,'VIEW_ONLY','This trip allows viewing only');
    const undo=input.action==='history.undo',entry=undo?recent.filter(e=>!e.undone).at(-1):recent.find(e=>e.undone);
    if(!entry)throw new ApiError(409,'HISTORY_EMPTY','No recent action to restore');
    const changes=entry.changes as {path:string;before:Data|null;after:Data|null}[];

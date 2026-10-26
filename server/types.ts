@@ -7,6 +7,7 @@ export interface Trip extends Data {
     endDate: string;
     ownerId: string;
     memberIds: string[];
+    viewerIds?: string[];
     deleted: boolean;
     createdAt: number;
     updatedAt: number;

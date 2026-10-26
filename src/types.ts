@@ -62,6 +62,7 @@ export type Trip = {
   endDate: string;
   ownerId: string;
   memberIds: string[];
+  viewerIds?: string[];
   appearance?: TripAppearance;
   lodging?: {name: string; nameSource?:'location'|'custom'; lng: number; lat: number; timezone: string; color?:string; symbol?:string; note?:string};
 };

@@ -229,7 +229,7 @@ describe("Journas server contract", () => {
     expect((shared.trip as Trip).memberIds).toEqual([]);
     await expect(
       service.execute("bob", { action: "share.join", token }),
-    ).rejects.toMatchObject({ code: "VIEW_ONLY" });
+    ).resolves.toHaveProperty("trip");
     await expect(
       service.execute("bob", {
         action: "item.patch",
@@ -764,7 +764,7 @@ it('editor links permit joining and saved edits; viewer links never grant write 
  const item=created.item as Data;
  await service.execute('bob',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'editor-pin',patch:{title:'Edited by traveler'},baseVersions:item.versions});
  expect((await service.execute('alice',{action:'trip.get',tripId:id,date:day})).day).toMatchObject({pins:[expect.objectContaining({title:'Edited by traveler'})]});
- await expect(service.execute('eve',{action:'share.join',token:viewer.token})).rejects.toMatchObject({code:'VIEW_ONLY'});
+ await expect(service.execute('eve',{action:'share.join',token:viewer.token})).resolves.toHaveProperty('trip');
  await expect(service.execute('eve',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'viewer-pin',patch:pin,baseVersions:{},token:viewer.token})).rejects.toMatchObject({status:403});
  await expect(service.execute(null,{action:'item.patch',tripId:id,date:day,kind:'pins',id:'anonymous-pin',patch:pin,token:viewer.token})).rejects.toMatchObject({status:401});
 });
@@ -779,4 +779,21 @@ it('editors can update trip details and manage travelers but cannot manage links
  await expect(service.execute('bob',{action:'share.revoke',tripId:id})).rejects.toMatchObject({code:'FORBIDDEN'});
  expect(await service.execute('bob',{action:'trip.remove',tripId:id})).toEqual({global:false});
  await expect(service.execute('alice',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip.name','Edited trip');
+});
+
+it('viewer travelers appear in the trip and can upgrade only with an editor link',async()=>{
+ const {service,id}=await setup();
+ const viewer=await service.execute('alice',{action:'share.create',tripId:id,mode:'viewer'});
+ const editor=await service.execute('alice',{action:'share.create',tripId:id,mode:'editor'});
+ await service.execute('bob',{action:'share.join',token:viewer.token});
+ expect((await service.execute('bob',{action:'trip.list'})).trips).toEqual(expect.arrayContaining([expect.objectContaining({id,memberIds:['alice','bob'],viewerIds:['bob']})]));
+ expect((await service.execute('alice',{action:'trip.members',tripId:id})).members).toEqual(expect.arrayContaining([expect.objectContaining({id:'bob',permission:'Viewer'})]));
+ for(const action of ['trip.update','member.remove','item.patch','item.delete','item.copy-pin','history.undo','history.redo'])await expect(service.execute('bob',{action,tripId:id})).rejects.toMatchObject({code:'VIEW_ONLY'});
+ await service.execute('bob',{action:'share.join',token:editor.token});
+ await expect(service.execute('bob',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'upgraded',patch:pin,baseVersions:{}})).resolves.toHaveProperty('item');
+ const links=(await service.execute('alice',{action:'share.list',tripId:id})).links as Data[];
+ await service.execute('alice',{action:'share.revoke',tripId:id,shareId:links.find(link=>link.token===viewer.token)!.id});
+ await expect(service.execute('bob',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip');
+ await service.execute('alice',{action:'share.revoke',tripId:id,shareId:links.find(link=>link.token===editor.token)!.id});
+ await expect(service.execute('bob',{action:'trip.get',tripId:id,date:day})).rejects.toMatchObject({code:'FORBIDDEN'});
 });

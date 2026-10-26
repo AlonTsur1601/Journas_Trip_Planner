@@ -618,7 +618,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
   useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>{if(live)setMessage(e.message);});return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
-   if(!trip||shareTrip||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
+   if(!trip||readonly||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
    const version=navigationVersion.current;
    try{const r=await api<{screen:any}>(`history.${direction}`,{tripId:trip.id});const list=await refresh();if(version!==navigationVersion.current)return;const screen=r.screen;if(screen){const selected=list.find(t=>t.id===screen.tripId)??null;if(selected)localStorage.setItem(`journas-layout:${user?.uid}:${selected.id}:${screen.date}`,JSON.stringify(screen.layout));setTrip(selected);setDate(screen.date??today());setLayout(screen.layout??defaultLayout());if(selected&&screen.date>=selected.startDate&&screen.date<=selected.endDate){const restored=await api<{day:Day}>("trip.get",{tripId:selected.id,date:screen.date});if(version!==navigationVersion.current)return;setDay(restored.day);}else setDay(emptyDay());setEdit(null);setModal(null);setCalendar(false);requestAnimationFrame(()=>{if(scroller.current)scroller.current.scrollTop=screen.layout?.scroll??0;});}setHistoryState(await api('history.status',{tripId:trip.id}));}catch(e:any){setMessage(e.message);}finally{setHistoryBusy(false);}
   }
@@ -951,7 +951,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     return()=>{cancelled=true;stop();};
   },[token,shareTrip,shareReady,joinedToken,practice,user?.uid,trips]);
   useEffect(()=>{
-    if(!token||!shareTrip||!shareReady||!ready||publicMode!=='editor'||joinedToken===token||practice)return;
+    if(!token||!shareTrip||!shareReady||!ready||joinedToken===token||practice)return;
     if(!user){setModal('share-auth');return;}
     if(!verified)return;
     let cancelled=false;
@@ -1093,7 +1093,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     showPlanner(tripForDate(trips,trip??trips.find(t=>t.id===lastTarget?.tripId),value),value);
   }
   const readonly =
-    shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;
+    shareTrip || !user || !trip || (trip.ownerId!==user.uid&&Boolean(trip.viewerIds?.includes(user.uid))) || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
   else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){const lodging=lodgingForDate(trip,date);if(lodging)timezone=tzlookup(lodging.lat,lodging.lng);}
@@ -1475,8 +1475,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </div>
         <div className="top-actions">
           <div className="planning-history-actions">
-          <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
-          <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
+          <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={readonly||!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
+          <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={readonly||!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
           <div className="save-control">
           <span className={`save-indicator${manualSaving?" saving":" saved"}`} role="status" title={manualSaving?"Saving…":status} aria-label={manualSaving?"Saving…":status} />
           <AsyncButton className="icon" aria-label="Save planning" title="Save planning (Ctrl+S)" disabled={!user || manualSaving || saving} onClick={saveManually}>
@@ -1511,7 +1511,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       <div className="workspace-toolbar">
         <div className="places-toolbar-heading">
           <Map size={17} /><h1>Places & routes</h1>
-          {shareTrip && <span className="shared-label">View only</span>}
+          {(shareTrip||Boolean(user&&trip?.viewerIds?.includes(user.uid))) && <span className="shared-label">View only</span>}
 
         </div>
         <div className="view-controls">
@@ -2273,14 +2273,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&!shareTrip&&user&&trip.memberIds.includes(user.uid)&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
-          {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&!readonly&&user&&trip.memberIds.includes(user.uid)&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          {!readonly&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
               <p>
                 {publicMode === "editor"
                   ? "This link grants editing access. Sign in to edit this trip with the group."
-                  : "This link allows viewing only. Ask the trip owner for an invitation to collaborate."}
+                  : "This link adds you as a traveler with viewing access. Sign in to join."}
               </p>
               {publicMode === "editor" &&
                 (!user ? (

@@ -228,7 +228,7 @@ export class JournasService {
                 let restore=null;
                 if(selected&&requestedDate>=selected.startDate&&requestedDate<=selected.endDate){
                     const [day,view]=await Promise.all([this.day(tx,selected.id,requestedDate),tx.get(layoutPath(userId,selected.id,requestedDate))]);
-                    restore={trip:selected,day,layout:view?.layout??null};
+                    restore={trip:selected,date:requestedDate,day,layout:view?.layout??null};
                 }
                 return {trips,settings:{...defaultSettings,...object(user?.settings??{})},home:user?.home??{recentTrips:[],recentDays:[],pins:[]},restore,tourSeen:hasAcknowledgedTour(user)};
             }

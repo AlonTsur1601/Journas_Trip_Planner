@@ -1,3 +1,4 @@
+import {dayLayout,screenLayout,restoredDayMatches,fallbackDayLayout} from './view-restore';
 import {visibleConnections,type PendingConnection} from './connection-preview';
 import {SearchInput} from './SearchInput';
 import {taskLinkLabels} from './plan-labels';
@@ -395,6 +396,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
  const api:typeof profileApi=(action,data,signal,background)=>profileApi(action,data,signal,background,practiceData);
  const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
  const loadedAccount=useRef('');
+ const observedAccount=useRef<string|null|undefined>(undefined);
  const loadedDay=useRef('');
  const navigationVersion=useRef(0);
  const dayCache=useRef(new globalThis.Map<string,{day:Day;layout:Layout|null}>());
@@ -473,7 +475,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [,refreshAccount]=useState(0);
   const [verificationRevision,setVerificationRevision]=useState(0);
   useEffect(()=>user?listenForVerificationSession(user):undefined,[user?.uid]);
-  useEffect(()=>{if(user&&ready&&verified===true&&!practice)finishStartup();},[user?.uid,ready,verified]);
+  useEffect(()=>{if(user&&ready&&loadedAccount.current===user.uid&&verified===true&&!practice)finishStartup();},[user?.uid,ready,verified]);
   const reloadVisit=useRef((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming|undefined)?.type==="reload");
   const screenReady=useRef(false);
   useEffect(()=>{if(ready&&user&&!practice)cacheAppearance(settings,user.uid);},[ready,user?.uid,practice,settings.theme,settings.accent]);
@@ -542,7 +544,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   useEffect(() => {
     if (!auth) return;
     return observeAuthSession((u) => {
-      if(u&&loadedAccount.current===u.uid){setUser(u);return;}
+      if(observedAccount.current===(u?.uid??null)){setUser(u);return;}
+      observedAccount.current=u?.uid??null;
       loadedAccount.current="";
       screenReady.current=false;
       setChooseName(false);setTourSeen(undefined);
@@ -608,19 +611,28 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     ++navigationVersion.current;
     rememberDay();void saveLayout();
     const key=selected?`${selected.id}:${nextDate}`:'',cached=dayCache.current.get(key);
-    let local:Layout|null=null;try{local=selected?JSON.parse(localStorage.getItem(`journas-layout:${user?.uid}:${selected.id}:${nextDate}`)??'null'):null;}catch{}
+    const local=dayLayout(localStorage,user?.uid??'',selected?.id,nextDate);
     const lodging=lodgingForDate(selected,nextDate);
-    const view=local??cached?.layout??{...defaultLayout(),...(lodging?{center:[lodging.lng,lodging.lat] as [number,number],zoom:14}:{})};
+    const view=local??cached?.layout??fallbackDayLayout(selected,nextDate);
     initialTripRequest.current=cached&&selected?{tripId:selected.id,date:nextDate,promise:Promise.resolve({trip:selected,day:cached.day,layout:view})}:null;
     layoutLoading.current=true;setTrip(selected);setDate(nextDate);setLayout(view);setDay(cached?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
-    if(!selected||nextDate<selected.startDate||nextDate>selected.endDate){layoutLoading.current=false;void startingLayout(settings,lodging).then(view=>{if(tripRef.current?.id===selected?.id&&dateRef.current===nextDate&&!dirty.current)setLayout(view);});}
+    if(!selected||nextDate<selected.startDate||nextDate>selected.endDate){layoutLoading.current=false;if(!local&&!cached?.layout)void startingLayout(settings,lodging).then(view=>{if(tripRef.current?.id===selected?.id&&dateRef.current===nextDate&&!dirty.current)setLayout(view);});}
   }
   async function openPlanner(target:HomeTarget){
     const selected=target.tripId?trips.find(t=>t.id===target.tripId)??null:target.date?null:trips.find(t=>t.id===lastTarget?.tripId)??trips[0]??null;
     const nextDate=target.date??(selected?.id===lastTarget?.tripId?lastTarget?.date:null)??selected?.startDate??today();
     if(!selected&&!trips.length){setHome(true);createTrip();return;}
+    if(selected&&nextDate>=selected.startDate&&nextDate<=selected.endDate&&!dayCache.current.has(`${selected.id}:${nextDate}`)){
+      const version=++navigationVersion.current;
+      try{
+        const prepared=initialTripRequest.current;
+        const restored=prepared?.tripId===selected.id&&prepared.date===nextDate?await prepared.promise:await api<{trip:Trip;day:Day;layout:Layout|null}>("trip.get",{tripId:selected.id,date:nextDate},undefined,true);
+        if(version!==navigationVersion.current)return;
+        if(restored)dayCache.current.set(`${selected.id}:${nextDate}`,{day:restored.day,layout:dayLayout(localStorage,user?.uid??'',selected.id,nextDate)??restored.layout});
+      }catch(error:any){setMessage(error.message);return;}
+    }
     showPlanner(selected,nextDate);
-  }
+  }
   function createTrip(){lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
   function editTrip(selected:Trip){lodgingNameEdited.current=isManualLodgingName(selected.lodging);setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
@@ -640,14 +652,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     try{if(reloadVisit.current)saved=JSON.parse(sessionStorage.getItem("journas-current-screen")??"null");}catch{}
     // Start the map download alongside the single authorized screen restore.
     // Neither cached screen data nor preloading grants permission to a trip.
-    void loadMapPanel().catch(()=>{});
-    if(saved?.uid===user.uid&&saved.tripId&&!token)void import('./live-database').catch(()=>{});
+    const plannerModules=Promise.all([loadMapPanel(),...(!practice&&!token?[import('./live-database')]:[])]);
     const hasSaved=saved?.uid===user.uid&&!token;
-    const bootstrap=!practice&&initialProfile(user.uid)?Promise.resolve(initialProfile(user.uid)!):api<{tourSeen?:boolean;trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;day:Day;layout:Layout|null}|null}>("planner.restore",{
+    const bootstrap=!practice&&initialProfile(user.uid)?Promise.resolve(initialProfile(user.uid)!):api<{tourSeen?:boolean;trips:Trip[];settings:Settings;home:HomeState;restore:{trip:Trip;date:string;day:Day;layout:Layout|null}|null}>("planner.restore",{
       date:hasSaved?saved.date:today(),
       ...(hasSaved&&saved.tripId?{tripId:saved.tripId}:token?{tripId:null}:{})
     });
-    Promise.all([bootstrap,user.getIdTokenResult()])
+    Promise.all([bootstrap,user.getIdTokenResult(),plannerModules])
       .then(async ([result, identity]) => {
         if(cancelled)return;
         loadedAccount.current=user.uid;
@@ -665,11 +676,26 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         setHomeState(restoredHome);
         homeLastQueued.current=JSON.stringify(restoredHome);
         setLastTarget(selected?{tripId:selected.id,date:selectedDate}:null);
-        if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${hasSaved?saved.date:today()}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:hasSaved?saved.date:today(),promise:Promise.resolve(result.restore)};}
+        if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${result.restore.date}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:result.restore.date,promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,mapStart:(r.settings.mapStart==="custom"||r.settings.mapStart==="current"&&!r.settings.mapStartConfigured)?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
         savedSettings.current=preferences;
-        if(!token){const initial=selected&&saved?.tripId===selected.id&&saved?.date===selectedDate&&saved.layout?saved.layout:result.restore&&selected&&result.restore.trip.id===selected.id&&result.restore.layout?result.restore.layout:defaultLayout();settingsRef.current=preferences;layoutLoading.current=true;setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);if(result.restore&&selected&&selectedDate===(hasSaved?saved.date:today()))setDay(result.restore.day);setHome(!(hasSaved&&saved.home===false));if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);if(hasSaved&&selected&&saved.tripId===selected.id&&saved.layout)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(saved.layout));screenReady.current=true;if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});return;}
+        if(!token){
+          const local=dayLayout(localStorage,user.uid,selected?.id,selectedDate);
+          const session=screenLayout(saved,user.uid,selected?.id,selectedDate);
+          const matches=restoredDayMatches(result.restore,selected?.id,selectedDate);
+          const initial=local??session??(matches?result.restore?.layout:null)??fallbackDayLayout(selected,selectedDate);
+          settingsRef.current=preferences;layoutLoading.current=true;
+          setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);
+          if(matches&&result.restore)setDay(result.restore.day);
+          setHome(!(hasSaved&&saved.home===false));
+          if(hasSaved&&["settings","account-settings","trip"].includes(saved.modal))setModal(saved.modal);
+          // Only a real planner screen can supply a per-day view; home has no camera.
+          if(!local&&session&&selected)localStorage.setItem(`journas-layout:${user.uid}:${selected.id}:${selectedDate}`,JSON.stringify(session));
+          screenReady.current=true;
+          if(!selected||selectedDate<selected.startDate||selectedDate>selected.endDate)requestAnimationFrame(()=>{layoutLoading.current=false;});
+          return;
+        }
         screenReady.current=true;
         setSettings(preferences);
         if (!token && !list.some((t) => t.startDate <= today() && t.endDate >= today()))
@@ -877,7 +903,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }, [token, date, shareTrip, shareReady, joinedToken]);
   async function saveLayout(force=false) {
     setTime(new Date());
-    if ((!force&&!dirty.current) || !tripRef.current) return;
+    if (layoutLoading.current || (!force&&!dirty.current) || !tripRef.current) return;
     if (shareTrip) {
       localStorage.setItem(
         `journas-viewlayout:${user?.uid ?? "guest"}:${tripRef.current.id}:${dateRef.current}`,
@@ -961,6 +987,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   },[user,saving]);
   function changeLayout(patch: Partial<Layout>) {
     if(!screenReady.current)return;
+    if(layoutLoading.current&&["center","zoom","bearing"].some(key=>key in patch))return;
     if (
       Object.entries(patch).every(
         ([key, value]) =>
@@ -1287,7 +1314,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   const [taskSearch,setTaskSearch]=useState("");
   const visibleTasks=[...displayTasks].filter(task=>[task.title,...taskLinkLabels(task,day.blocks,mapPins,visibleDayConnections)].join(" ").toLocaleLowerCase().includes(taskSearch.toLocaleLowerCase())).sort((a,b)=>a.title.localeCompare(b.title));
-  if (!ready && !user && !hasOpenedWorkspace())
+  if (configured&&!practice&&observedAccount.current===undefined || !ready && !user && !hasOpenedWorkspace())
     return (
       <LoadingScreen startup text="Getting Journas ready…"/>
     );
@@ -1298,7 +1325,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Toast message={message} onDismiss={() => setMessage("")} />
       </>
     );
-  if(user&&(verified===null||verified===true&&!ready))return <LoadingScreen startup text="Getting Journas ready…"/>;
+  if(user&&(verified===null||verified===true&&(!ready||loadedAccount.current!==user.uid)))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
   return (

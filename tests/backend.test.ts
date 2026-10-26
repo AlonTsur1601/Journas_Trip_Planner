@@ -719,3 +719,11 @@ describe('linked names, lodging and saved direction',()=>{
   await expect(ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:{...layout,bearing:Infinity}})).rejects.toMatchObject({code:'INVALID_LAYOUT'});
  });
 });
+
+it('tags initial restored data with its exact date so another recent day keeps its own saved view',async()=>{
+ const ctx=await setup();await ctx.service.execute('alice',{action:'trip.update',tripId:ctx.id,name:'Paris',startDate:day,endDate:'2026-10-03',lodging:{name:'Stay',lng:2.3,lat:48.8}});
+ const first={...layout,center:[2.36,48.86],zoom:15.25,bearing:37},last={...layout,center:[-0.12,51.5],zoom:10};
+ for(const [date,view]of [[day,first],['2026-10-03',last]] as const)await ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date,layout:view});
+ expect((await ctx.service.execute('alice',{action:'planner.restore',date:'2026-10-03'})).restore).toMatchObject({date:'2026-10-03',layout:last});
+ expect((await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).layout).toEqual(first);
+});

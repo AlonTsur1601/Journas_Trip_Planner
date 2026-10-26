@@ -16,6 +16,8 @@ service cloud.firestore {
         match /items/{itemId} { allow read: if member(tripId); allow write: if false; }
       }
     }
+    // A secret link hash reveals only whether that capability is still active.
+    match /shareStatus/{linkHash} { allow get: if true; allow list, write: if false; }
     match /users/{uid} {
       allow read: if verified() && request.auth.uid == uid;
       allow write: if false;

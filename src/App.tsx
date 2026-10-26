@@ -933,6 +933,23 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     return () => clearInterval(id);
   }, [token, date, shareTrip, shareReady, joinedToken, ready]);
+  useEffect(()=>{
+    if(!token||!shareTrip||!shareReady||joinedToken===token||practice)return;
+    let cancelled=false,stop=()=>{};
+    const revoked=()=>{
+      if(cancelled)return;
+      const owned=trips.find(value=>value.id===tripRef.current?.id&&value.ownerId===user?.uid);
+      setShareReady(false);setShareTrip(false);setJoinedToken(token);setEdit(null);setModal(null);
+      if(owned){setTrip(owned);setHome(false);}
+      else{setTrip(null);setDay(emptyDay());setHome(true);setMessage('This sharing link has been revoked.');}
+    };
+    void crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)).then(async digest=>{
+      const key=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+      const {db,doc,onSnapshot}=await import('./live-database');if(cancelled)return;
+      stop=onSnapshot(doc(db,'shareStatus',key),snapshot=>{if(!snapshot.metadata.fromCache&&snapshot.exists()&&snapshot.data().active===false)revoked();},()=>{});
+    });
+    return()=>{cancelled=true;stop();};
+  },[token,shareTrip,shareReady,joinedToken,practice,user?.uid,trips]);
   async function saveLayout(force=false) {
     setTime(new Date());
     if (layoutLoading.current || (!force&&!dirty.current) || !tripRef.current) return;
@@ -2306,7 +2323,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                           tripId: trip.id,
                           mode: shareMode,
                         });
-                        setShareLinks((previous)=>[...previous,{id:r.token,token:r.token,mode:shareMode}]);
+                        setShareLinks((await api<{links:any[]}>('share.list',{tripId:trip.id})).links);
                       } catch (e: any) {
                         setMessage(e.message);
                       }
@@ -2314,9 +2331,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   >
                     <Share2 size={16} /> Create share link
                   </AsyncButton>
-                  <div className="share-links" aria-label="Existing share links">{!shareLinks.length&&<small>No active sharing links</small>}{shareLinks.map(link=><div className="share-link-row" key={link.id}><span>{link.mode==='editor'?'View and join as an editor':'View only'}</span>{link.token?<div className="share-result"><input readOnly aria-label={`${link.mode==='editor'?'Editor':'Viewer'} share link`} value={`${location.origin}/?share=${encodeURIComponent(link.token)}`}/><AsyncButton className="button" onClick={()=>navigator.clipboard.writeText(`${location.origin}/?share=${encodeURIComponent(link.token)}`).then(()=>setMessage('Link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}>Copy</AsyncButton></div>:<small>Older link: URL unavailable. Revoke and create a new link to copy it.</small>}</div>)}</div>
+                  <div className="share-links" aria-label="Existing share links">{!shareLinks.length&&<small>No active sharing links</small>}{shareLinks.map(link=><div className="share-link-row" key={link.id}><span>{link.mode==='editor'?'View and join as an editor':'View only'}</span>{link.token?<div className="share-result"><input readOnly aria-label={`${link.mode==='editor'?'Editor':'Viewer'} share link`} value={`${location.origin}/?share=${encodeURIComponent(link.token)}`}/><AsyncButton className="button" onClick={()=>navigator.clipboard.writeText(`${location.origin}/?share=${encodeURIComponent(link.token)}`).then(()=>setMessage('Link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}>Copy</AsyncButton></div>:<small>Older link: URL unavailable. Revoke and create a new link to copy it.</small>}<AsyncButton className="button danger" onClick={async()=>{try{await api('share.revoke',{tripId:trip.id,shareId:link.id});setShareLinks(previous=>previous.filter(value=>value.id!==link.id));if(shareLink.includes(link.token))setShareLink('');}catch(e:any){setMessage(e.message);}}}>Revoke link</AsyncButton></div>)}</div>
                   <AsyncButton
-                    className="text-button"
+                    className="button danger revoke-all-links"
                     onClick={async () => {
                       try {
                         await api("share.revoke", { tripId: trip.id });
@@ -2327,7 +2344,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                       }
                     }}
                   >
-                    Revoke sharing links
+                    Revoke all sharing links
                   </AsyncButton>
 
                 </>

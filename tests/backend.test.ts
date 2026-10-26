@@ -735,3 +735,20 @@ it('persists timeline spacing per day and accepts older layouts without it',asyn
  for(const hourHeight of [0,241,Infinity])await expect(ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:{...layout,hourHeight}})).rejects.toMatchObject({code:'INVALID_LAYOUT'});
  await ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout});
 });
+
+it('revokes one link and its members while preserving the other link and owner',async()=>{
+ const {service,id}=await setup();
+ const a=await service.execute('alice',{action:'share.create',tripId:id,mode:'editor'});
+ const b=await service.execute('alice',{action:'share.create',tripId:id,mode:'editor'});
+ await service.execute('bob',{action:'share.join',token:a.token});
+ await service.execute('eve',{action:'share.join',token:b.token});
+ const links=(await service.execute('alice',{action:'share.list',tripId:id})).links as Data[];
+ await service.execute('alice',{action:'share.revoke',tripId:id,shareId:links.find(l=>l.token===a.token)!.id});
+ await expect(service.execute(null,{action:'share.read',token:a.token})).rejects.toMatchObject({code:'INVALID_SHARE'});
+ await expect(service.execute('bob',{action:'trip.get',tripId:id,date:day})).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(service.execute(null,{action:'share.read',token:b.token})).resolves.toHaveProperty('trip');
+ await expect(service.execute('eve',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip');
+ await service.execute('alice',{action:'share.revoke',tripId:id});
+ await expect(service.execute('eve',{action:'trip.get',tripId:id,date:day})).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(service.execute('alice',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip');
+});

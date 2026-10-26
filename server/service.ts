@@ -294,7 +294,7 @@ export class JournasService {
                     fail(409, 'MEMBER_LIMIT', 'This trip has reached its participant limit');
                 const updated = { ...trip, memberIds: [...trip.memberIds, userId], updatedAt: this.now() };
                 tx.set(tripPath(id), updated);
-                tx.set(membershipPath(userId, id), this.membership(userId, trip, user.settings));
+                tx.set(membershipPath(userId, id), {...this.membership(userId, trip, user.settings),shareId:hash(String(input.token))});
                 tx.delete(`cleanupJobs/${userId}_${id}`);
                 tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
                 return { trip: updated };
@@ -338,6 +338,7 @@ export class JournasService {
                 const key = hash(token);
                 const share = { tripId: id, mode: input.mode, version: trip.shareVersion ?? 0, createdAt: this.now() };
                 tx.set(`shares/${key}`, share);
+                tx.set(`shareStatus/${key}`,{active:true});
                 // Owner-only server endpoint can retrieve links; public lookup remains hashed.
                 tx.set(`trips/${id}/shares/${key}`, { id: key, token, mode: input.mode, createdAt: this.now() });
                 return { token };
@@ -349,13 +350,25 @@ export class JournasService {
                 return {links};
             }
             if (action === 'share.revoke') {
-                const trip = await this.owner(tx, id, userId);
+                let trip = await this.owner(tx, id, userId);
                 const shares = await tx.list(`trips/${id}/shares`);
-                for (const share of shares) {
+                const shareId=input.shareId===undefined?null:text(input.shareId,100);
+                const selected=shareId?shares.filter(share=>share.id===shareId):shares;
+                if(shareId&&!selected.length)fail(404,'INVALID_SHARE','Sharing link is invalid or expired');
+                const revoked=new Set(selected.map(share=>share.id));
+                for(const memberId of trip.memberIds.filter(memberId=>memberId!==trip.ownerId)){
+                    const membership=await tx.get(membershipPath(memberId,id));
+                    if(!shareId||revoked.has(membership?.shareId)){
+                        await this.personalRemove(tx,trip,memberId);
+                        trip={...trip,memberIds:trip.memberIds.filter(value=>value!==memberId)};
+                    }
+                }
+                for (const share of selected) {
                     tx.delete(`shares/${share.id}`);
                     tx.delete(`trips/${id}/shares/${share.id}`);
+                    tx.set(`shareStatus/${share.id}`,{active:false});
                 }
-                tx.set(tripPath(id), { ...trip, shareVersion: Number(trip.shareVersion ?? 0) + 1 });
+                tx.set(tripPath(id), { ...trip, ...(!shareId?{shareVersion:Number(trip.shareVersion??0)+1}:{}),updatedAt:this.now() });
                 return { ok: true };
             }
             if (action === 'member.remove') {
@@ -536,6 +549,8 @@ export class JournasService {
         const trip = await tx.get(tripPath(identifier(share.tripId)));
         if (!trip || trip.deleted || trip.shareVersion !== share.version)
             fail(404, 'INVALID_SHARE', 'Sharing link is invalid or expired');
+        const statusPath=`shareStatus/${hash(token)}`;
+        if(!(await tx.get(statusPath)))tx.set(statusPath,{active:true});
         return share;
     }
     private async readShare(input: Data) { return this.store.transaction(async (tx) => { const share = await this.share(tx, input.token); const trip = await tx.get(tripPath(identifier(share.tripId))) as Trip; const day = input.date ? date(input.date) : trip.startDate; this.dayWithin(trip, day); return { trip: { ...trip, memberIds: [], ownerId: '' }, day: await this.day(tx, trip.id, day), mode: share.mode }; }); }
@@ -578,6 +593,7 @@ export class JournasService {
         const shares = await tx.list(`trips/${trip.id}/shares`);
         for (const share of shares) {
             tx.delete(`shares/${share.id}`);
+            tx.set(`shareStatus/${share.id}`,{active:false});
             tx.delete(`trips/${trip.id}/shares/${share.id}`);
         }
     }

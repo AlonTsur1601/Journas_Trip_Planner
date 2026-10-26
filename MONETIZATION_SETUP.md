@@ -32,10 +32,11 @@
 2. צרו מוצר traveler ומוצר adventurer. לכל אחד צרו מחיר חודשי ושנתי בדולרים: 4.99/49.99 ו־9.99/99.99.
 3. הגדירו את כתובת סביבת הבדיקה ככתובת Checkout מותרת ואת `/upgrade` כעמוד התשלום/החזרה.
 4. צרו מפתח Sandbox בעל הרשאות Transactions, Subscriptions ו־Customer portal sessions. הכניסו אותו ישירות ב־Vercel במשתנה השרת `PADDLE_API_KEY`. אין להשתמש בקידומת `VITE_`.
-5. הגדירו את ארבעת מזהי המחירים במשתנים `PADDLE_PRICE_TRAVELER_MONTH`, `PADDLE_PRICE_TRAVELER_YEAR`, `PADDLE_PRICE_ADVENTURER_MONTH`, `PADDLE_PRICE_ADVENTURER_YEAR`.
-6. צרו Notification destination לכתובת `/api/billing-webhook` באתר הבדיקה והזינו את סוד החתימה במשתנה השרת `PADDLE_WEBHOOK_SECRET`.
-7. הפעילו אירועי subscription, transaction.completed ו־adjustment.updated הרלוונטיים.
-8. פרסו מחדש **רק את פרויקט הבדיקה**. התחברו בחשבון billing ובדקו רכישה, ביטול, שינוי תוכנית וכשל תשלום בעזרת כרטיסי הבדיקה שבתיעוד Paddle.
+5. בלשונית **Client-side tokens** צרו אסימון Sandbox שמתחיל ב־`test_` והזינו ב־`PADDLE_CLIENT_TOKEN`. זהו אסימון ציבורי המיועד ל־Paddle.js; מפתח השרת לעולם אינו נשלח לדפדפן. ספריית התשלום נטענת רק לאחר חיבור Sandbox, והמחירים נקבעים בשרת.
+6. הגדירו את ארבעת מזהי המחירים במשתנים `PADDLE_PRICE_TRAVELER_MONTH`, `PADDLE_PRICE_TRAVELER_YEAR`, `PADDLE_PRICE_ADVENTURER_MONTH`, `PADDLE_PRICE_ADVENTURER_YEAR`.
+7. צרו Notification destination לכתובת `/api/billing-webhook` באתר הבדיקה והזינו את סוד החתימה במשתנה השרת `PADDLE_WEBHOOK_SECRET`.
+8. הפעילו אירועי subscription, transaction.completed ו־adjustment.updated הרלוונטיים.
+9. פרסו מחדש **רק את פרויקט הבדיקה**. התחברו בחשבון billing ובדקו רכישה, ביטול, שינוי תוכנית וכשל תשלום בעזרת כרטיסי הבדיקה שבתיעוד Paddle.
 
 חשבון דרגה קבועה אינו מתאים לבדיקה הזו: הוא בכוונה אינו משתנה כתוצאה מתשלום.
 
@@ -63,4 +64,8 @@
 
 ## המשך ב־01:00
 
-החידוש `journas-01-00` מיועד להמשיך רק אם העבודה נקטעה בגלל מגבלת שימוש ועדיין לא הסתיימה. הוא אינו עוקף מגבלה פעילה ואינו מחליף השלמת חיבור לחשבון חיצוני. עם השלמת העבודה יש לבטל אותו.
+העבודה חודשה ב־27 באוקטובר 2026 ב־01:00 לאחר בדיקת המכסה. התזמון החד־פעמי `journas-01-00` בוטל לאחר החידוש המוצלח. הוא לא צרך זיכויי איפוס ולא החליף חיבור לחשבון חיצוני.
+
+שינוי חודשי/שנתי משמר את מועד סיום התקופה שכבר שולמה, ללא חיוב מיידי. ההרשאות ותדירות החיוב משתנות לאחר אישור תשלום לתקופה החדשה. יש להשלים בדיקת ספק בפועל לאחר הזנת פרטי Sandbox. מקורות: [עדכון מנוי](https://developer.paddle.com/api-reference/subscriptions/update-subscription/), [מעבר בין תדירויות](https://developer.paddle.com/build/subscriptions/replace-products-prices-upgrade-downgrade/), [קישור תשלום](https://developer.paddle.com/build/transactions/pass-transaction-checkout/).
+
+תזמון התרעות, ביטולן אחרי שדרוג, ניסיונות חוזרים ונעילת עובדים מקבילים נבדקו אוטומטית. מסירת דוא״ל אמיתית דורשת בדיקת תיבת קבלה אחרי חיבור SMTP נפרד. תקלה אחרי קבלת הודעה אצל הספק ולפני שמירת ההצלחה עלולה לגרום למסירה חוזרת; SMTP אינו מספק הבטחת exactly-once.

@@ -631,7 +631,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     return()=>{live=false;};
   },[trip?.id,trip?.ownerId,trip?.memberIds.join(','),user?.uid,shareTrip]);
 
-  useEffect(()=>{if(modal!=='trip'||!trip||shareTrip)return;let live=true;setShareLinks([]);if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>{if(live)setMessage(e.message);});return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
+  useEffect(()=>{if(modal!=='trip'||!trip||shareTrip||practice)return;let live=true;setShareLinks([]);if(trip.ownerId===user?.uid)api<{links:any[]}>('share.list',{tripId:trip.id}).then(r=>{if(live)setShareLinks(r.links);}).catch(e=>{if(live)setMessage(e.message);});return()=>{live=false;};},[modal,trip?.id,trip?.memberIds.join(',')]);
   async function restoreHistory(direction:'undo'|'redo'){
    if(!trip||readonly||historyBusy||saving||!historyState[direction])return;setHistoryBusy(true);
    const version=navigationVersion.current;
@@ -1594,7 +1594,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onCancelMove={()=>setMovingPinId(null)}
                 onMovePin={async(pin,lng,lat)=>{if(await mutate("pins",{...pin,lng,lat})){setMovingPinId(null);}}}
                 onView={(center, zoom, bearing) => changeLayout({ center, zoom, bearing })}
-                onPin={(pin) => {if(!practice)setEdit({kind:"pins",item:pin});}}
+                onPin={(pin) => {if(!practice||document.querySelector('.guided-tour[data-stage="Copy a place to another day"]'))setEdit({kind:"pins",item:pin});}}
                 onAdd={(lng, lat) => newItem("pins", { lng, lat })}
               />
             </Suspense>
@@ -1987,8 +1987,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             }}
           >
             {trip&&localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)&&JSON.parse(localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)??'{}')[edit.item.id]&&<div className="recovered-draft"><p>These changes were recovered from an unfinished save on this device. Review and save below, or discard this draft.</p><AsyncButton type="button" className="button danger" disabled={saving} onClick={async()=>{if(!await confirmAction('Discard this recovered draft? The saved version will stay unchanged.'))return;const key=`journas-drafts:${user?.uid}:${trip.id}:${date}`,pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[edit.item.id];const remaining=Object.values(pending) as Edit[];if(remaining.length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);setEdit(remaining[0]??null);}}>Discard draft</AsyncButton></div>}
-            {!readonly&&['tasks','blocks'].includes(edit.kind)&&!plans[trip?.access?.ownerPlan??planState.personal.plan].features.linkedPlanning&&(edit.item.pinId||edit.item.connectionId||edit.item.blockId)&&<div className="plan-readonly-notice"><p>This linked item is view-only on the trip owner's plan.</p><button type="button" className="button" onClick={()=>setEdit({...edit,item:{...edit.item,pinId:null,connectionId:null,blockId:null}})}>Make independent</button></div>}
-            {practice&&edit.kind==='pins'&&edit.item.id!=='trip-lodging'&&day.pins.some(pin=>pin.id===edit.item.id)&&trip&&<button type="button" className="button" onClick={async()=>{const next=new Date(`${date}T12:00:00`);next.setDate(next.getDate()+(date<trip.endDate?1:-1));const destination=next.toLocaleDateString('en-CA');try{await api('item.copy-pin',{tripId:trip.id,date:destination,sourceTripId:trip.id,sourceDate:date,sourceId:edit.item.id});recordPracticeFeature('copyPlaces');setMessage('Copied in the tutorial only.');}catch(e:any){setMessage(e.message);}}}>Copy place to another day · traveler</button>}
+            {!practice&&!readonly&&['tasks','blocks'].includes(edit.kind)&&!plans[trip?.access?.ownerPlan??planState.personal.plan].features.linkedPlanning&&(edit.item.pinId||edit.item.connectionId||edit.item.blockId)&&<div className="plan-readonly-notice"><p>This linked item is view-only on the trip owner's plan.</p><button type="button" className="button" onClick={()=>setEdit({...edit,item:{...edit.item,pinId:null,connectionId:null,blockId:null}})}>Make independent</button></div>}
+            {practice&&edit.kind==='pins'&&edit.item.id!=='trip-lodging'&&day.pins.some(pin=>pin.id===edit.item.id)&&trip&&<button type="button" className="button" onClick={async()=>{const next=new Date(`${date}T12:00:00`);next.setDate(next.getDate()+(date<trip.endDate?1:-1));const destination=next.toLocaleDateString('en-CA');try{await api('item.copy-pin',{tripId:trip.id,date:destination,sourceTripId:trip.id,sourceDate:date,sourceId:edit.item.id});recordPracticeFeature('copyPlaces');setEdit(null);setMessage('Copied in the tutorial only.');}catch(e:any){setMessage(e.message);}}}>Copy place to another day · traveler</button>}
             <fieldset disabled={readonly || saving || !practice&&['tasks','blocks'].includes(edit.kind)&&!plans[trip?.access?.ownerPlan??planState.personal.plan].features.linkedPlanning&&Boolean(edit.item.pinId||edit.item.connectionId||edit.item.blockId)}>
               {edit.kind !== "connections" && (
                 <Input
@@ -2021,7 +2021,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   }
                 />
               )}
-              {edit.kind === "pins" && <LocationPicker contextPins={mapPins} contextConnections={visibleDayConnections} editingPinId={edit.item.id} key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>{if(current?.kind!=='pins'||current.item.id!==edit.item.id)return current;const lodging=current.item.id==='trip-lodging';let manual=isManualLodgingName({name:current.item.title,nameSource:current.item.nameSource});if(lodging&&source==='reverse'&&!current.item.nameSource&&current.item.lng===place.lng&&current.item.lat===place.lat&&current.item.title.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())manual=false;return {...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,...(lodging?{title:lodgingName(current.item.title,place.name,manual),nameSource:manual?'custom':'location'}:{title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title})}};})}/>}
+              {edit.kind === "pins" && <LocationPicker contextPins={mapPins} contextConnections={visibleDayConnections} editingPinId={edit.item.id} key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>{if(current?.kind!=='pins'||current.item.id!==edit.item.id)return current;if(source==='reverse'&&pendingItemWrites.current.has([trip?.id,date,'pins',current.item.id].join(':')))return current;const lodging=current.item.id==='trip-lodging';let manual=isManualLodgingName({name:current.item.title,nameSource:current.item.nameSource});if(lodging&&source==='reverse'&&!current.item.nameSource&&current.item.lng===place.lng&&current.item.lat===place.lat&&current.item.title.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())manual=false;return {...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,...(lodging?{title:lodgingName(current.item.title,place.name,manual),nameSource:manual?'custom':'location'}:{title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title})}};})}/>}
 
               {edit.kind === "blocks" && (
                 <>
@@ -2490,14 +2490,15 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <label className="checkbox-field">
               <input
                 type="checkbox"
-                disabled={planState.personal.retentionDays!==null} checked={settings.autoDelete||planState.personal.retentionDays!==null}
+                disabled={planState.effective.retentionDays!==null} checked={settings.autoDelete||planState.effective.retentionDays!==null}
                 onChange={(e) =>
                   setSettings({ ...settings, autoDelete: e.target.checked })
                 }
               />{" "}
               Automatically remove old trips from my account
             </label>
-            <Select disabled={!settings.autoDelete}
+            <div className="plan-retention-hint">{(planState.effective.retentionDays!==null||practice)&&<button type="button" className="plan-requirement" aria-label="Unlimited retention requires adventurer" onClick={()=>{if(!practice)openUpgrade("retention","adventurer");}}><PlanBadge plan="adventurer"/><span>{practice?"Included in this tutorial":"Unlimited retention"}</span></button>}</div>
+            <Select disabled={!settings.autoDelete&&planState.effective.retentionDays===null}
               label="Remove from my account after the trip ends"
               value={settings.retentionDays}
               onChange={(e: any) =>

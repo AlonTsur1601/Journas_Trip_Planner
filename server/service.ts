@@ -228,7 +228,9 @@ export class JournasService {
                 const ids=input.tripIds;if(!Array.isArray(ids)||ids.some(id=>typeof id!=='string')||new Set(ids).size!==ids.length)fail(400,'INVALID_INPUT','Choose unique trip identifiers');
                 const user=await tx.get(userPath(userId))??{};if(ids.length>plans[billingStatus(user,this.now()).plan].trips)fail(400,'INVALID_INPUT','Too many active trips');
                 const refs=await tx.list(`users/${userId}/trips`);if(ids.some(id=>!refs.some(ref=>ref.id===id)))fail(403,'FORBIDDEN','Choose trips in your account');
-                tx.set(userPath(userId),{...user,activeTripIds:ids});return {ok:true};
+                const selected=await Promise.all(ids.map(id=>tx.get(tripPath(id))));
+                if(!plans[billingStatus(user,this.now()).plan].overlaps&&selected.some((trip,i)=>trip?.ownerId===userId&&selected.slice(0,i).some(other=>other?.ownerId===userId&&String(trip.startDate)<=String(other.endDate)&&String(other.startDate)<=String(trip.endDate))))fail(400,'ACTIVE_TRIP_OVERLAP','Choose only one active owned trip for overlapping dates.');
+                tx.set(userPath(userId),{...user,activeTripIds:ids,activeSelectionPlan:billingStatus(user,this.now()).plan});return {ok:true};
             }
             if(action === 'planner.restore') {
                 const requestedDate=date(input.date);

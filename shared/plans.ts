@@ -18,14 +18,16 @@ basicEmojiKeys.add('🫱‍🫲');
 export const isBasicEmoji=(value:string)=>basicEmojiKeys.has(emojiKey(value));
 export const isJournasSymbol=(value:string)=>!value||/^icon:[a-z][a-z0-9-]{0,30}$/.test(value)||['★','●','◆','■','▲','✦','✧',''].includes(value);
 export function addCalendarYears(day:string,years:number){const [y,m,d]=day.split('-').map(Number);const last=new Date(Date.UTC(y+years,m,0)).getUTCDate();return `${y+years}-${String(m).padStart(2,'0')}-${String(Math.min(d,last)).padStart(2,'0')}`;}
-export type BillingStatus={plan:PlanId;source:'free'|'sandbox'|'test';status:string;periodEnd:number|null;pendingPlan:PlanId|null;pendingInterval?:'month'|'year'|null;subscriptionId?:string;interval?:'month'|'year';graceUntil?:number;changedAt?:number;downgradedAt?:number};
+export type BillingStatus={plan:PlanId;source:'free'|'sandbox'|'test';status:string;periodEnd:number|null;pendingPlan:PlanId|null;pendingInterval?:'month'|'year'|null;paidChange?:{plan:PlanId;interval:'month'|'year';startsAt:number;periodEnd:number}|null;subscriptionId?:string;interval?:'month'|'year';graceUntil?:number;changedAt?:number;downgradedAt?:number};
 export function billingStatus(user:Record<string,unknown>|undefined,now=Date.now()):BillingStatus{
- const raw=user?.billing as Partial<BillingStatus>|undefined;
+ let raw=user?.billing as Partial<BillingStatus>|undefined;
+ const paid=raw?.paidChange;
+ if(paid&&isPlan(paid.plan)&&paid.startsAt<=now)raw={...raw,plan:paid.plan,interval:paid.interval,periodEnd:paid.periodEnd,pendingPlan:null,pendingInterval:null,paidChange:null,...(planIds.indexOf(paid.plan)<planIds.indexOf(raw!.plan!)?{downgradedAt:paid.startsAt}:{})};
  if(raw?.source==='test'&&isPlan(raw.plan))return {...raw,plan:raw.plan,source:'test',status:'active',periodEnd:null,pendingPlan:null};
  if(raw?.source==='sandbox'&&isPlan(raw.plan)){
   const end=Number(raw.periodEnd??0),pending=raw.pendingPlan;
   if(end>now)return {...raw,plan:raw.plan,source:'sandbox',status:raw.status??'active',periodEnd:end,pendingPlan:isPlan(pending)?pending:null};
   if(raw.status==='past_due'&&Number(raw.graceUntil)>now)return {...raw,plan:raw.plan,source:'sandbox',status:'past_due',periodEnd:end,pendingPlan:null};
  }
- return {plan:'tourist',source:'free',status:'free',periodEnd:null,pendingPlan:null,downgradedAt:Number(raw?.downgradedAt??raw?.periodEnd??0)||undefined};
+ return {...raw,plan:'tourist',source:'free',status:raw?.status==='canceled'||raw?.status==='refunded'?raw.status:'free',periodEnd:null,pendingPlan:null,paidChange:null,downgradedAt:Math.max(Number(raw?.downgradedAt??0),Number((raw?.status==='past_due'?raw.graceUntil:raw?.periodEnd)??0))||undefined};
 }

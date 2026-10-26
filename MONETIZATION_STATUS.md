@@ -1,6 +1,6 @@
 # Journas monetization staging
 
-Status: stopping intentionally near the user's 5% remaining usage threshold; INCOMPLETE. Resume independently at 01:00 Asia/Jerusalem on 27 October 2026 after checking quota. This qualifies for heartbeat journas-01-00.
+Status: RESUMED at 01:00 Asia/Jerusalem on 27 October 2026 after quota reset (96% primary remaining). IN PROGRESS. The one-shot heartbeat journas-01-00 was deleted after successful resumption, as instructed.
 
 - Branch: codex/monetization-staging. Regular production must remain frozen.
 - New Vercel project created: journas-monetization-staging.
@@ -19,3 +19,5 @@ Status: stopping intentionally near the user's 5% remaining usage threshold; INC
 - Latest small UI fixes show actual trip quota and owner-plan date limits; verify the final deployed create/edit-trip screens and mobile topbar. The original source had CRCRLF line endings: preserve unrelated lines and strip trailing CR only on newly changed lines if git diff --check complains.
 - Local Vite/API sessions may be running on 5173/3001; use .env.staging.local only. No secrets in committed sources or browser bundle (scans passed). Do not print full firebase-admin errors: their nested request metadata can include ephemeral authorization headers; print only sanitized error code/name.
 - External dependencies: Paddle Sandbox account/prices/webhook secrets and separate SMTP are not connected. BILLING_NOT_CONFIGURED is verified instead of fake purchase success. Real AdSense is not approved or loaded; all ads remain mock and unsuitable navigation/settings screens are excluded.
+
+- Resumed work: strengthened renewal/cadence transitions, retained portal identity after expiration, projected realtime retention deadlines, and refreshed owner deadlines on billing/settings changes. Added 10 lifecycle tests and two emulator checks (expiry rules and overlapping email workers); 16 targeted emulator tests now pass. Fixed tutorial checklist targeting, required-link instructions, copy-place interaction/closing, and reverse-geocoding updates during save. Full tour runtime rerun is in progress. Sandbox Paddle.js initialization and CSP are now implemented; external Sandbox account/client token remain required.

@@ -23,6 +23,15 @@ export function retentionAt(trip:Data,user:Data|undefined,now:number){
  const end=resolveWallTime(String(trip.endDate),'24:00',zone,'later');
  return Math.max(end+days*dayMs,Number(status.downgradedAt??0)?Number(status.downgradedAt)+30*dayMs:0);
 }
+/** Earliest future policy deadline, including an unattended paid-plan lapse. */
+export function retentionDeadline(trip:Data,user:Data|undefined,now:number){
+ let deadline=retentionAt(trip,user,now);const raw=user?.billing as Data|undefined;
+ if(raw?.source!=='sandbox')return deadline;
+ const paid=raw.paidChange as Data|undefined;
+ const transitions=[Number(raw.periodEnd),Number(raw.graceUntil),Number(paid?.startsAt),Number(paid?.periodEnd)].filter(at=>Number.isFinite(at)&&at>now).sort((a,b)=>a-b);
+ for(const at of transitions)deadline=Math.min(deadline,Math.max(at,retentionAt(trip,user,at)));
+ return deadline;
+}
 export function localDay(now:number,zone='UTC'){try{return new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);}catch{throw new ApiError(400,'INVALID_TIMEZONE','Invalid local timezone');}}
 export function rangeIssue(trip:Data,owner:Data|undefined,now:number,zone='UTC'){
  const plan=plans[billingStatus(owner,now).plan];
@@ -35,18 +44,29 @@ const intersects=(a:Data,b:Data)=>String(a.startDate)<=String(b.endDate)&&String
 async function accountTrips(tx:Transaction,uid:string){const refs=await tx.list(`users/${uid}/trips`);return (await Promise.all(refs.map(ref=>tx.get(`trips/${ref.id}`)))).filter(trip=>trip&&!trip.deleted&&(trip.memberIds as string[]).includes(uid)) as Trip[];}
 export async function accessFor(tx:Transaction,uid:string,trip:Data,user:Data|undefined,now:number){
  const owner=await tx.get(`users/${trip.ownerId}`),status=billingStatus(owner,now),owned=await accountTrips(tx,String(trip.ownerId));
- const personal=await accountTrips(tx,uid),limit=plans[billingStatus(user,now).plan].trips;
- const active=Array.isArray(user?.activeTripIds)?user.activeTripIds as string[]:[];
+ const personal=await accountTrips(tx,uid),personalStatus=billingStatus(user,now),limit=plans[personalStatus.plan].trips;
+ const selected=Array.isArray(user?.activeTripIds)&&user?.activeSelectionPlan===personalStatus.plan;
+ const active=selected?(user!.activeTripIds as string[]).slice(0,limit):[];
  const today=localDay(now);
  const priority=(t:Data)=>String(t.startDate)<=today&&String(t.endDate)>=today?0:String(t.startDate)>today?1:2;
- personal.sort((a,b)=>{const ai=active.indexOf(a.id),bi=active.indexOf(b.id);if(ai>=0||bi>=0)return (ai<0?1e6:ai)-(bi<0?1e6:bi);return priority(a)-priority(b)||(priority(a)===1?a.startDate.localeCompare(b.startDate):b.endDate.localeCompare(a.endDate))||a.id.localeCompare(b.id);});
- let reason=(Array.isArray(user?.activeTripIds)?!active.includes(String(trip.id)):personal.findIndex(t=>t.id===trip.id)>=limit)?'trips':rangeIssue(trip,owner,now,String(trip.planningTimezone??'UTC'));
- const ownerActive=owner?.activeTripIds as string[]|undefined,ownerLimit=plans[status.plan].trips;
+ const order=(preferred:string[])=>(a:Trip,b:Trip)=>{const ai=preferred.indexOf(a.id),bi=preferred.indexOf(b.id);if(ai>=0||bi>=0)return (ai<0?1e6:ai)-(bi<0?1e6:bi);return priority(a)-priority(b)||(priority(a)===1?a.startDate.localeCompare(b.startDate):b.endDate.localeCompare(a.endDate))||a.id.localeCompare(b.id);};
+ personal.sort(order(active));
+ let reason=(selected?!active.includes(String(trip.id)):personal.findIndex(t=>t.id===trip.id)>=limit)?'trips':rangeIssue(trip,owner,now,String(trip.planningTimezone??'UTC'));
+ const ownerLimit=plans[status.plan].trips,ownerActive=Array.isArray(owner?.activeTripIds)&&owner?.activeSelectionPlan===status.plan?(owner.activeTripIds as string[]).slice(0,ownerLimit):undefined;
+ owned.sort(order(ownerActive??[]));
  if(!reason&&uid!==trip.ownerId){
   if(Array.isArray(ownerActive)){if(!ownerActive.includes(String(trip.id)))reason='trips';}
-  else{owned.sort((a,b)=>priority(a)-priority(b)||(priority(a)===1?a.startDate.localeCompare(b.startDate):b.endDate.localeCompare(a.endDate))||a.id.localeCompare(b.id));if(owned.findIndex(t=>t.id===trip.id)>=ownerLimit)reason='trips';}
+  else if(owned.findIndex(t=>t.id===trip.id)>=ownerLimit)reason='trips';
  }
- if(!reason&&!plans[status.plan].overlaps&&owned.some(other=>other.id!==trip.id&&other.ownerId===trip.ownerId&&intersects(trip,other)))reason='overlaps';
+ if(!reason&&!plans[status.plan].overlaps){
+  const accepted:Trip[]=[];
+  for(const [index,candidate] of owned.entries()){
+   if(candidate.ownerId!==trip.ownerId||(ownerActive?!ownerActive.includes(candidate.id):index>=ownerLimit)||rangeIssue(candidate,owner,now,String(candidate.planningTimezone??'UTC')))continue;
+   const overlap=accepted.some(other=>intersects(candidate,other));
+   if(candidate.id===trip.id){if(overlap)reason='overlaps';break;}
+   if(!overlap)accepted.push(candidate);
+  }
+ }
  const ownerExpired=retentionAt(trip,owner,now)<=now,personalExpired=retentionAt(trip,user,now)<=now;
  return {ownerPlan:status.plan,readonlyReason:reason,expired:ownerExpired||personalExpired,cleanupAt:Math.min(retentionAt(trip,owner,now),retentionAt(trip,user,now)),ownerCleanupAt:retentionAt(trip,owner,now)};
 }
@@ -101,9 +121,17 @@ export function policyStore(store:Store,uid:string,input:Data,now:number):Store{
     }
    }
   }
-  // Materialize expiry for realtime security rules as well as API checks.
-  for(const [path,value]of [...writes])if(value&&/^trips\/[^/]+$/.test(path)&&!value.deleted){const owner=await tx.get(`users/${value.ownerId}`);writes.set(path,{...value,ownerCleanupAt:retentionAt(value,owner,now)});}
-  for(const [path,value]of writes)if(value)raw.set(path,value);else raw.delete(path);
+  // Owner settings affect the deadline for every participant, including realtime access.
+  if(writes.has(`users/${uid}`)&&['settings.save','profile.save'].includes(action)){
+   const updated=await tx.get(`users/${uid}`);
+   for(const ref of await tx.list(`users/${uid}/trips`)){const trip=await tx.get(`trips/${ref.id}`);if(trip){tx.set(`users/${uid}/trips/${ref.id}`,{...ref,cleanupAt:retentionDeadline(trip,updated,now)});if(trip.ownerId===uid)tx.set(`trips/${trip.id}`,trip);}}
+  }
+  // Forecast paid-plan expiration so rules do not depend on the next cron invocation.
+  for(const [path,value]of [...writes])if(value&&/^trips\/[^/]+$/.test(path)&&!value.deleted){const owner=await tx.get(`users/${value.ownerId}`);writes.set(path,{...value,ownerCleanupAt:retentionDeadline(value,owner,now)});}
+  for(const [path,value]of writes){
+   if(value&&/^users\/[^/]+\/trips\/[^/]+$/.test(path)){const trip=await tx.get(`trips/${value.id}`),member=await tx.get(`users/${path.split('/')[1]}`);if(trip)value.cleanupAt=retentionDeadline(trip,member,now);}
+   if(value)raw.set(path,value);else raw.delete(path);
+  }
   return result;
  })};
 }

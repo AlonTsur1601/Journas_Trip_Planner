@@ -28,6 +28,7 @@ export function tourClickAllowed(stage:string,target:Element){
  if(stage==='Browse your connections'&&within('.connections-list button'))return false;
  if(stage==='Arrange your workspace'&&within('[aria-label="Map"], [aria-label="Schedule"]'))return false;
  if(within('.map-panel .map-pin')){
+  if(stage==='Copy a place to another day')return true;
   if(stage!=='Connect your places')return false;
   if(!target.closest('.map-panel')?.querySelector('[aria-label="Connect pins on map"].active'))return false;
  }

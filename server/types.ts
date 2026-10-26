@@ -37,6 +37,7 @@ export interface Transaction {
 export interface Store {
     transaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T>;
     list(path: string, limit?: number): Promise<Data[]>;
+    pendingRetentionNotices?(limit: number): Promise<Data[]>;
     scanTrips(after: string, limit: number): Promise<Data[]>;
     dueMemberships(now: number, limit: number): Promise<Data[]>;
     purgeTrip(id: string): Promise<void>;

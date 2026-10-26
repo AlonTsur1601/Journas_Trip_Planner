@@ -2705,4 +2705,8 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 .share-link-row .share-result>.button:not(:last-child){border-radius:0;}
 
-.top-down-control button{display:grid;place-items:center;padding:0;}
+.top-down-control button{display:grid;place-items:center;padding:0;border-radius:4px;}
+
+/* Fill the joined trip selector so its frame ends at the final action. */
+.trip-selector:has(>.dropdown)>.dropdown{max-width:none;min-width:0;flex:1;}
+.trip-selector:has(>.dropdown)>.icon{flex-shrink:0;}

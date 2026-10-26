@@ -1103,7 +1103,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   const readonly =
     shareTrip || !user || !trip || Boolean(trip.access?.readonlyReason) || (trip.ownerId!==user.uid&&Boolean(trip.viewerIds?.includes(user.uid))) || date < trip.startDate || date > trip.endDate;
-  let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const personalDateMax=(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears));
+    const tripPlan=plans[practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan];
+    const viewDateMax=trip&&trip.endDate>personalDateMax?trip.endDate:personalDateMax;
+    let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
   else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){const lodging=lodgingForDate(trip,date);if(lodging)timezone=tzlookup(lodging.lat,lodging.lng);}
   try {
@@ -1460,7 +1463,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             className="icon"
             aria-label="Next day" pending={pendingDayNavigation?.direction==='next'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
             disabled={
-              date >= (planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears)) ||
+              date >= viewDateMax ||
               Boolean((shareTrip || practice) && trip && date >= trip.endDate)
             }
             onClick={()=>navigateDay('next')}
@@ -1891,7 +1894,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </div></WorkspaceMotion>
       {calendar && (
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
-          <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears))}
+          <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={viewDateMax}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
             dayTitle={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
             dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
@@ -1954,7 +1957,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               maxLength={120}
               required
             />
-            <DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears))}/>
+            <p className="form-note">{(modal==='edit-trip'?tripPlan:planState.effective).days??'Unlimited'}{(modal==='edit-trip'?tripPlan:planState.effective).days?' days per trip':' trip length'} · {(modal==='edit-trip'?tripPlan:planState.effective).horizonYears??'Unlimited'}{(modal==='edit-trip'?tripPlan:planState.effective).horizonYears?' years ahead':' planning horizon'}</p><DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={modal==='edit-trip'?(tripPlan.horizonYears===null?'9999-12-31':addCalendarYears(today(),tripPlan.horizonYears)):personalDateMax}/>
             <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><AsyncButton type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</AsyncButton><AsyncButton type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</AsyncButton></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><AsyncButton type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</AsyncButton></div>}</div></div></div>
             </div><div className="trip-location-column"><span className="lodging-label">Lodging location</span>
             <LocationPicker contextPins={modal==='edit-trip'?mapPins:undefined} contextConnections={modal==='edit-trip'?visibleDayConnections:undefined} editingPinId={modal==='edit-trip'?'trip-lodging':undefined} value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
@@ -1968,7 +1971,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </AsyncButton>
-            {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/100 saved trips</small>}
+            {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/{planState.effective.trips} saved trips</small>}
           </form>
         </Modal>
       )}

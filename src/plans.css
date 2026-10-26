@@ -8,3 +8,4 @@
 @media(max-width:700px){.top-actions>.upgrade-topbar{grid-row:1;grid-column:1/-1;justify-self:start;margin-left:144px;width:28px;height:34px;font-size:0;padding:0}.upgrade-topbar::after{content:'↑';font-size:20px}.top-actions>.profile-control{max-width:calc(100% - 180px)}}
 
 body:has(.modal-shade) .home-page .mock-ad{visibility:hidden}
+body:has(.bounded-popover:not([inert]),.home-context-menu:not([inert])) .mock-ad{visibility:hidden}

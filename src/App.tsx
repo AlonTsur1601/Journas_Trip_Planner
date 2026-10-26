@@ -642,7 +642,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     const local=dayLayout(localStorage,user?.uid??'',selected?.id,nextDate);
     const lodging=lodgingForDate(selected,nextDate);
     const view=local??cached?.layout??fallbackDayLayout(selected,nextDate);
-    initialTripRequest.current=cached&&selected?{tripId:selected.id,date:nextDate,promise:Promise.resolve({trip:selected,day:cached.day,layout:view})}:null;
+    initialTripRequest.current=cached&&selected?{tripId:selected.id,date:nextDate,promise:Promise.resolve({trip:selected,day:cached.day,layout:local??cached.layout})}:null;
     layoutLoading.current=true;setTrip(selected);setDate(nextDate);setLayout(view);setDay(cached?.day??emptyDay());setShareTrip(false);setHome(false);setCalendar(false);
     if(!selected||nextDate<selected.startDate||nextDate>selected.endDate){layoutLoading.current=false;if(!local&&!cached?.layout)void startingLayout(settings,lodging).then(view=>{if(tripRef.current?.id===selected?.id&&dateRef.current===nextDate&&!dirty.current)setLayout(view);});}
   }
@@ -707,12 +707,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         if(result.restore){dayCache.current.set(`${result.restore.trip.id}:${result.restore.date}`,{day:result.restore.day,layout:result.restore.layout});initialTripRequest.current={tripId:result.restore.trip.id,date:result.restore.date,promise:Promise.resolve(result.restore)};}
         setGoogleSession(identity.signInProvider==='google.com');
         const preferences = { ...defaultSettings, ...r.settings,mapStart:(r.settings.mapStart==="custom"||r.settings.mapStart==="current"&&!r.settings.mapStartConfigured)?"trip" as const:r.settings.mapStart??defaultSettings.mapStart,clock:r.settings.clock==="destination"||r.settings.clock==="local"&&!r.settings.clockConfigured?"lodging" as const:r.settings.clock??defaultSettings.clock };
-        savedSettings.current=preferences;
+        savedSettings.current=preferences;settingsRef.current=preferences;
         if(!token){
           const local=dayLayout(localStorage,user.uid,selected?.id,selectedDate);
           const session=screenLayout(saved,user.uid,selected?.id,selectedDate);
           const matches=restoredDayMatches(result.restore,selected?.id,selectedDate);
-          const initial=local??session??(matches?result.restore?.layout:null)??fallbackDayLayout(selected,selectedDate);
+          const initial=local??session??(matches?result.restore?.layout:null)??await startingLayout(preferences,lodgingForDate(selected,selectedDate));
+          if(cancelled)return;
           settingsRef.current=preferences;layoutLoading.current=true;
           setDate(selectedDate);setSettings(preferences);setLayout(initial);setTrip(selected);
           if(matches&&result.restore)setDay(result.restore.day);
@@ -742,6 +743,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if (!token || joinedToken === token) return;
     let cancelled = false;
     setShareTrip(true);
+    layoutLoading.current=true;
     setShareReady(false);
     api<{ trip: Trip; day: Day; mode: "viewer" | "editor" }>("share.read", {
       token,
@@ -766,7 +768,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     if (user && modal === "share-auth") setModal("trip");
   }, [user?.uid, modal]);
   useEffect(() => {
-    if (!token || !shareTrip || !shareReady || joinedToken === token) return;
+    if (!token || !shareTrip || !shareReady || !ready || joinedToken === token) return;
     let cancelled = false;
     api<{ trip: Trip; day: Day; mode: "viewer" | "editor" }>("share.read", {
       token,
@@ -779,9 +781,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         const local = localStorage.getItem(
           `journas-viewlayout:${user?.uid ?? "guest"}:${r.trip.id}:${date}`,
         );
-        const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
+        const nextLayout = local ? JSON.parse(local) : await startingLayout(settingsRef.current, lodgingForDate(r.trip,date));
         if (cancelled) return;
         setLayout({ ...defaultLayout(), ...nextLayout });
+        dirty.current=false;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!cancelled)layoutLoading.current=false;}));
         finishDayNavigation(r.trip.id,date);
       })
       .catch((e) => {
@@ -795,7 +799,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       cancelled = true;
       if(trip)finishDayNavigation(trip.id,date);
     };
-  }, [token, date, shareTrip, shareReady, joinedToken, user?.uid]);
+  }, [token, date, shareTrip, shareReady, ready, joinedToken, user?.uid]);
   useEffect(() => {
     if (
       home ||
@@ -822,7 +826,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           `journas-layout:${user.uid}:${trip.id}:${date}`,
         );
         const restored = local ? JSON.parse(local) : r.layout;
-        const nextLayout = restored ?? await startingLayout(settingsRef.current, lodgingForDate(tripRef.current,dateRef.current));
+        const nextLayout = restored ?? await startingLayout(settingsRef.current, lodgingForDate(r.trip,date));
         if (cancelled) return;
         const layoutChanged=layoutRef.current!==layoutAtRequest;
         if(!layoutChanged)setLayout({ ...defaultLayout(), ...nextLayout });
@@ -916,7 +920,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     };
   }, [trip?.id,trip?.startDate,trip?.endDate, date, user?.uid, shareTrip,home]);
   useEffect(() => {
-    if (!token || !shareTrip || !shareReady || joinedToken === token) return;
+    if (!token || !shareTrip || !shareReady || !ready || joinedToken === token) return;
     const id = setInterval(
       () =>
         api<{ trip: Trip; day: Day }>("share.read", { token, date })
@@ -928,7 +932,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       15000,
     );
     return () => clearInterval(id);
-  }, [token, date, shareTrip, shareReady, joinedToken]);
+  }, [token, date, shareTrip, shareReady, joinedToken, ready]);
   async function saveLayout(force=false) {
     setTime(new Date());
     if (layoutLoading.current || (!force&&!dirty.current) || !tripRef.current) return;

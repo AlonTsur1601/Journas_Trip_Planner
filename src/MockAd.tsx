@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {usePlan} from './plan-state';
 export function MockAd({placement}:{placement:string}){return <aside className={`mock-ad mock-${placement}`} aria-label="Test advertisement"><small>Advertisement · test placement</small><span>Ad preview</span><small>Google approval required · no tracking</small></aside>;}
 export function ModalAd({title}:{title:string}){
@@ -6,5 +7,5 @@ export function ModalAd({title}:{title:string}){
  const eligible=/^(Places|Connections|Trip details|Create trip|Edit trip)$/.test(title);
  useEffect(()=>{if(!eligible)return;const element=anchor.current?.closest<HTMLElement>('.modal');if(!element)return;const update=()=>{const surfaces=[...document.querySelectorAll<HTMLElement>('.modal-shade')].filter(node=>!node.closest('[inert],[data-motion-exit]')&&node.getBoundingClientRect().width>0);setTopmost(Boolean(surfaces.at(-1)?.contains(element)));const r=element.getBoundingClientRect(),width=160,gap=24;if(innerWidth<=700){setSide(null);return;}const left=r.right+gap+width<=innerWidth-16?r.right+gap:r.left-gap-width>=16?r.left-gap-width:null;const next=left===null?null:{left,top:Math.max(70,r.top),width};setSide(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);};const observer=new ResizeObserver(update),mutations=new MutationObserver(update);observer.observe(element);mutations.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['inert','data-motion-exit']});window.addEventListener('resize',update);update();return()=>{observer.disconnect();mutations.disconnect();window.removeEventListener('resize',update);};},[eligible,personal.ads,practice]);
  if(!personal.ads||practice||!eligible)return null;
- return <div ref={anchor} className={`modal-ad${side?' has-space':''}`} style={{...(side?{left:side.left,top:side.top,width:side.width}:{}),...(!topmost?{visibility:'hidden'}:{})}}><MockAd placement="dialog"/></div>;
+ return <><div ref={anchor} className="modal-ad" style={{...(side?{display:'none'}:{}),...(!topmost?{visibility:'hidden'}:{})}}>{!side&&<MockAd placement="dialog"/>}</div>{side&&createPortal(<div className="modal-ad has-space" style={{left:side.left,top:side.top,width:side.width,...(!topmost?{visibility:'hidden'}:{})}}><MockAd placement="dialog"/></div>,document.body)}</>;
 }

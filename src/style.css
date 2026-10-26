@@ -541,7 +541,7 @@ textarea {
   right: 3px;
   width: 24px;
   height: 24px;
-  cursor: nesw-resize;
+  cursor: nwse-resize;
   touch-action: none;
 }
 .conflict-table {

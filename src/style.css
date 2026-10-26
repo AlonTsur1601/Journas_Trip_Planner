@@ -2711,3 +2711,8 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .trip-selector:has(>.dropdown)>.dropdown{max-width:none;min-width:0;flex:1;}
 .trip-selector:has(>.dropdown)>.icon{flex-shrink:0;}
 .member-row>button.button.danger{min-height:28px;height:28px;padding:4px 8px;}
+
+:is(.dropdown-menu,.symbol-menu,.modal,.task-list)>.search-input{margin-top:6px;}
+.dropdown-menu>.symbol-tabs{margin-bottom:8px;}
+.dropdown-menu[aria-label="Share permissions"] .dropdown-scroll-options{scrollbar-gutter:auto;}
+.share-link-permissions{font-weight:600;color:var(--ink);padding:3px 0;}

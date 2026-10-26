@@ -6,17 +6,20 @@ import { Children, isValidElement, useEffect, useId, useRef, useState } from "re
 import { ChevronDown, Check } from "lucide-react";
 import {Popover} from "./Popover";
 
-export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, scrollable: _scrollable, ...props }: any) {
+export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, groupTabs=false, scrollable: _scrollable, ...props }: any) {
   const [open, setOpen] = useState(false);
   const [search,setSearch]=useState("");
+  const [activeGroup,setActiveGroup]=useState("");
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
   type Option={value:string;label:any;disabled?:boolean;group?:string};
   const readOptions=(nodes:any,group?:string):Option[]=>Children.toArray(nodes).filter(isValidElement).flatMap((element:any)=>element.type==='optgroup'?readOptions(element.props.children,element.props.label):[{value:String(element.props.value??element.props.children),label:element.props.children,disabled:element.props.disabled,group}]);
   const options=readOptions(children);
-  const filtered=options.filter(option=>String(option.label).toLowerCase().includes(search.toLowerCase()));
-  const toggle=()=>{setOpen(!open);setSearch('');};
-  const optionButtons=filtered.map((option,index) => <div className="dropdown-option-row" key={option.value}>{option.group&&option.group!==filtered[index-1]?.group&&<div className="dropdown-category" role="presentation">{option.group}</div>}<button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
+  const groups=[...new Set(options.map(option=>option.group).filter((group):group is string=>Boolean(group)))];
+  const group=groups.includes(activeGroup)?activeGroup:groups[0];
+  const filtered=options.filter(option=>(!groupTabs||!option.group||option.group===group)&&String(option.label).toLowerCase().includes(search.toLowerCase()));
+  const toggle=()=>{setOpen(!open);setSearch('');setActiveGroup(options.find(option=>option.value===String(value))?.group??groups[0]??'');};
+  const optionButtons=filtered.map((option,index) => <div className="dropdown-option-row" key={option.value}>{!groupTabs&&option.group&&option.group!==filtered[index-1]?.group&&<div className="dropdown-category" role="presentation">{option.group}</div>}<button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
         onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
       }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button></div>);
   return <div ref={root} className="dropdown" onKeyDown={(event) => {
@@ -36,6 +39,7 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
     </button>
     {open && <Popover anchor={root} width={Math.max(220,root.current?.getBoundingClientRect().width??220)} height={searchable?294:256} onClose={()=>setOpen(false)} id={id} role="listbox" aria-label={props["aria-label"]} className="dropdown-menu">
       {searchable&&<SearchInput aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onValueChange={setSearch}/>}
+      {groupTabs&&<div className="symbol-tabs" role="tablist" aria-label="Link category">{groups.map(name=><button type="button" role="tab" aria-selected={name===group} className={name===group?"selected":""} key={name} onClick={()=>setActiveGroup(name)}>{name}</button>)}</div>}
       <div className="dropdown-scroll-options">{optionButtons}</div>
       {!filtered.length&&<p>No matching options</p>}
     </Popover>}

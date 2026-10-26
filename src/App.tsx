@@ -2164,7 +2164,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               )}
               {edit.kind === "tasks" && (
                 <>
-                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={mapPins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
+                  <PlanLinkField groupTabs pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={mapPins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
                   <Select
                     label="Linked time" searchable
                     value={edit.item.blockId ?? ""}
@@ -2176,7 +2176,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     }
                   >
                     <option value="">No time block</option>
-                    {[...day.blocks].sort((a,b)=>a.title.localeCompare(b.title)).map((b) => (
+                    {[...day.blocks].sort((a,b)=>blockRange(a,date).start.localeCompare(blockRange(b,date).start)||a.id.localeCompare(b.id)).map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.start} · {b.title}
                       </option>

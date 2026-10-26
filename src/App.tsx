@@ -466,6 +466,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const pinPasteBusy=useRef(false);
   const liveLocation=useLiveLocation(ready&&(!home||shareTrip)&&!practice);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
+  const taskToggleQueue=useRef(new Map<string,{checked:boolean;item:Day['tasks'][number]}>());
   const [pendingDayNavigation,setPendingDayNavigation]=useState<{tripId:string;date:string;direction:'next'|'previous'}|null>(null);
   const finishDayNavigation=(tripId:string,loadedDate:string)=>setPendingDayNavigation(previous=>previous?.tripId===tripId&&previous.date===loadedDate?null:previous);
   useEffect(()=>{if(home||!trip||(!user&&!shareTrip)||date<trip.startDate||date>trip.endDate)setPendingDayNavigation(null);},[home,trip?.id,trip?.startDate,trip?.endDate,date,user?.uid,shareTrip]);
@@ -1237,21 +1238,32 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     }
   }
   async function toggleTask(task:Day['tasks'][number]) {
-    if(!trip||readonly||optimisticTasks[task.id]?.saving)return;
-    const tripId=trip.id,dayDate=date,checked=!task.checked;
+    if(!trip||readonly)return;
+    const tripId=trip.id,dayDate=date,saveKey=`${tripId}:${dayDate}:${task.id}`;
+    const pendingSave=taskToggleQueue.current.get(saveKey);
+    const checked=!(pendingSave?.checked??task.checked);
     setOptimisticTasks(previous=>({...previous,[task.id]:{checked,saving:true}}));
-    const draft={kind:'tasks',item:{...task,checked},base:task};
+    const queued=pendingSave??{checked,item:task};queued.checked=checked;
     const key=`journas-drafts:${user?.uid}:${tripId}:${dayDate}`;
-    const drafts=JSON.parse(localStorage.getItem(key)??'{}');localStorage.setItem(key,JSON.stringify({...drafts,[task.id]:draft}));
+    const keepDraft=()=>{const drafts=JSON.parse(localStorage.getItem(key)??'{}');localStorage.setItem(key,JSON.stringify({...drafts,[task.id]:{kind:'tasks',item:{...queued.item,checked:queued.checked},base:queued.item}}));};
+    keepDraft();
+    if(pendingSave)return;
+    taskToggleQueue.current.set(saveKey,queued);
     try{
-      const result=await api<{item:Day['tasks'][number]}>('item.patch',{tripId,date:dayDate,kind:'tasks',id:task.id,patch:{checked},baseVersions:task.versions},undefined,true);
-      if(tripRef.current?.id===tripId&&dateRef.current===dayDate)setDay(previous=>({...previous,tasks:previous.tasks.map(t=>t.id===task.id?result.item:t)}));
+      while(true){
+        const savingChecked=queued.checked;
+        const result=await api<{item:Day['tasks'][number]}>('item.patch',{tripId,date:dayDate,kind:'tasks',id:task.id,patch:{checked:savingChecked},baseVersions:queued.item.versions},undefined,true);
+        queued.item=result.item;
+        if(tripRef.current?.id===tripId&&dateRef.current===dayDate)setDay(previous=>({...previous,tasks:previous.tasks.map(t=>t.id===task.id?result.item:t)}));
+        if(queued.checked===savingChecked)break;
+        keepDraft();
+      }
       const pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[task.id];if(Object.keys(pending).length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);
       setTime(new Date());
     }catch(e:any){
-      setMessage(e.message);setStatus('Save pending — draft kept on this device');
-      if(e.code==='CONFLICT')setConflict({draft,current:e.current,fields:e.details?.fields??[]});
-    }finally{setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
+      keepDraft();setMessage(e.message);setStatus('Save pending — draft kept on this device');
+      if(e.code==='CONFLICT')setConflict({draft:{kind:'tasks',item:{...queued.item,checked:queued.checked},base:queued.item},current:e.current,fields:e.details?.fields??[]});
+    }finally{taskToggleQueue.current.delete(saveKey);setOptimisticTasks(previous=>{const next={...previous};delete next[task.id];return next;});}
   }
   async function logout(){if(practice){window.dispatchEvent(new CustomEvent('journas-practice',{detail:false}));return;}const finish=beginActivity('Saving your plan and signing out…');try{sessionStorage.removeItem("journas-current-screen");screenReady.current=false;await saveLayout();await signOut(auth!);setTrip(null);setTrips([]);setHome(true);setHomeState(emptyHome());setLastTarget(null);setSettings(defaultSettings);setShareLink('');setProfileOpen(false);setModal(null);}finally{finish();}}
   function newItem(kind: Edit["kind"], extras: any = {}) {
@@ -1754,7 +1766,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     type="checkbox"
                     aria-label={`Complete ${t.title}`}
                     checked={t.checked}
-                    disabled={readonly||optimisticTasks[t.id]?.saving}
+                    disabled={readonly}
                     onChange={() => toggleTask(t)}
                   />
                   <AsyncButton onClick={() => setEdit({ kind: "tasks", item: t })}>

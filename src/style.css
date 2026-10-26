@@ -2443,7 +2443,7 @@ input[type=checkbox],label:has(>input[type=checkbox]){cursor:pointer;}
 
 /* Use the visible viewport consistently; retain scrolling for genuinely long content. */
 .modal-shade{padding:12px;}
-.modal{max-height:calc(100dvh - 24px);overscroll-behavior:contain;scrollbar-gutter:stable;}
+.modal{max-height:calc(100dvh - 24px);overscroll-behavior:contain;scrollbar-gutter:auto;}
 @media(max-height:800px){
  .modal{padding:16px;}
  .modal>header{margin-bottom:10px;}
@@ -2635,7 +2635,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .map-focus-tools{flex-direction:row;}
 .map-focus-tools>.icon+.icon{border-top:0;border-left:1px solid var(--line);}
 /* Scrollbar space is symmetric, so menu content keeps equal side insets. */
-.modal,.symbol-scroll,.dropdown-scroll-options,.calendar-trips{scrollbar-gutter:stable both-edges;}
+.modal,.symbol-scroll,.dropdown-scroll-options,.calendar-trips{scrollbar-gutter:auto;}
 .calendar-trips{border:1px solid var(--line);border-radius:5px;padding:4px;margin-top:8px;}
 .calendar-trips>button{min-height:32px;gap:9px;width:100%;padding:8px 10px;border-radius:3px;font-size:12px;}
 .calendar-trips>button>span{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

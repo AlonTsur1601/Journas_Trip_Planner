@@ -76,7 +76,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         }
         if(input.action==='auth.verification-status')return send(res,200,await verificationStatus(uid!));
         const startup=input.action==='auth.session';
-        if(input.action!=='auth.email-verification'){
+        if(input.action!=='auth.email-verification'&&input.action!=='share.read'){
             const status=await verificationStatus(uid!);
             if(!status.verified){if(startup)return send(res,200,{verified:false});throw new ApiError(403,'EMAIL_UNVERIFIED','Confirm your email again to continue.');}
         }

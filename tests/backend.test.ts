@@ -768,3 +768,15 @@ it('editor links permit joining and saved edits; viewer links never grant write 
  await expect(service.execute('eve',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'viewer-pin',patch:pin,baseVersions:{},token:viewer.token})).rejects.toMatchObject({status:403});
  await expect(service.execute(null,{action:'item.patch',tripId:id,date:day,kind:'pins',id:'anonymous-pin',patch:pin,token:viewer.token})).rejects.toMatchObject({status:401});
 });
+
+it('editors can update trip details and manage travelers but cannot manage links or delete the trip',async()=>{
+ const {service,id}=await setup();await join(service,id,'bob');await join(service,id,'eve');
+ await service.execute('bob',{action:'trip.update',tripId:id,name:'Edited trip',startDate:day,endDate:day,lodging:{name:'Edited stay',lng:2.3,lat:48.8}});
+ await service.execute('bob',{action:'member.remove',tripId:id,userId:'eve'});
+ await expect(service.execute('eve',{action:'trip.get',tripId:id,date:day})).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(service.execute('bob',{action:'member.remove',tripId:id,userId:'alice'})).rejects.toMatchObject({code:'OWNER_REMOVAL'});
+ await expect(service.execute('bob',{action:'share.create',tripId:id,mode:'editor'})).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(service.execute('bob',{action:'share.revoke',tripId:id})).rejects.toMatchObject({code:'FORBIDDEN'});
+ expect(await service.execute('bob',{action:'trip.remove',tripId:id})).toEqual({global:false});
+ await expect(service.execute('alice',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip.name','Edited trip');
+});

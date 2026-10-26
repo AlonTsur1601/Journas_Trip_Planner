@@ -950,6 +950,19 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     });
     return()=>{cancelled=true;stop();};
   },[token,shareTrip,shareReady,joinedToken,practice,user?.uid,trips]);
+  useEffect(()=>{
+    if(!token||!shareTrip||!shareReady||!ready||publicMode!=='editor'||joinedToken===token||practice)return;
+    if(!user){setModal('share-auth');return;}
+    if(!verified)return;
+    let cancelled=false;
+    void api<{trip:Trip}>('share.join',{token},undefined,true).then(result=>{
+      if(cancelled)return;
+      setJoinedToken(token);setTrip(result.trip);setShareTrip(false);setShareReady(false);setHome(false);setModal(null);
+      setTrips(previous=>[...previous.filter(value=>value.id!==result.trip.id),result.trip]);
+      history.replaceState({},'',location.pathname);
+    }).catch(error=>{if(!cancelled)setMessage(error.message);});
+    return()=>{cancelled=true;};
+  },[token,shareTrip,shareReady,ready,publicMode,joinedToken,practice,user?.uid,verified]);
   async function saveLayout(force=false) {
     setTime(new Date());
     if (layoutLoading.current || (!force&&!dirty.current) || !tripRef.current) return;
@@ -2260,13 +2273,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&trip.ownerId===user?.uid&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&!shareTrip&&user&&trip.memberIds.includes(user.uid)&&<AsyncButton className="text-button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
           {!shareTrip&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
               <p>
                 {publicMode === "editor"
-                  ? "This itinerary is shared for viewing. Join the trip to collaborate with the group."
+                  ? "This link grants editing access. Sign in to edit this trip with the group."
                   : "This link allows viewing only. Ask the trip owner for an invitation to collaborate."}
               </p>
               {publicMode === "editor" &&

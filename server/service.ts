@@ -372,7 +372,7 @@ export class JournasService {
                 return { ok: true };
             }
             if (action === 'member.remove') {
-                const trip = await this.owner(tx, id, userId);
+                const trip = await this.member(tx, id, userId);
                 const target = identifier(input.userId);
                 if (target === trip.ownerId)
                     fail(400, 'OWNER_REMOVAL', 'The owner cannot be removed using participant management');

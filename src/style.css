@@ -2674,8 +2674,8 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
  .topbar .planning-history-actions>.icon:first-child{border-radius:4px 0 0 4px;}
 }
 @media(max-width:700px){.planning-history-actions{border-radius:5px;}}
-.search-input{position:relative;min-width:0;flex-shrink:0;}
-.search-input>input{width:100%;min-height:36px;padding-right:40px!important;}
+.search-input{position:relative;min-width:0;max-width:100%;flex-shrink:0;contain:inline-size;}
+.search-input>input{width:100%;min-width:0;max-width:100%;min-height:36px;padding-right:40px!important;}
 .search-input>.search-clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:28px;height:28px;min-width:28px;padding:0;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;border-radius:4px;}
 .search-input>.search-clear:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--ink);}
 .modal>.search-input{margin-bottom:12px;}

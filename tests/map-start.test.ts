@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { startingLayout, lodgingForDate } from "../src/map-start";
+import { startingLayout, lodgingForDate, tripForDate } from "../src/map-start";
 import { defaultSettings } from "../src/types";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -34,3 +34,17 @@ it('respects world preference even with lodging',async()=>{expect(await starting
 
 it('defaults to the trip without requesting the current location',async()=>{const getCurrentPosition=vi.fn();vi.stubGlobal('navigator',{geolocation:{getCurrentPosition}});expect(await startingLayout(defaultSettings,{lng:2.35,lat:48.85})).toMatchObject({center:[2.35,48.85],zoom:14});expect(getCurrentPosition).not.toHaveBeenCalled();});
 it('uses lodging only within the selected trip dates',()=>{const trip={startDate:'2026-10-20',endDate:'2026-10-22',lodging:{lng:2.35,lat:48.85}} as any;expect(lodgingForDate(trip,'2026-10-20')).toBe(trip.lodging);expect(lodgingForDate(trip,'2026-10-22')).toBe(trip.lodging);expect(lodgingForDate(trip,'2026-10-19')).toBeUndefined();expect(lodgingForDate(trip,'2026-10-23')).toBeUndefined();});
+
+it('leaves a trip outside its date range and rejoins it when calendar navigation returns',()=>{
+ const trip={id:'a',startDate:'2026-10-20',endDate:'2026-10-22'} as any;
+ expect(tripForDate([trip],trip,'2026-10-19')).toBeNull();
+ expect(tripForDate([trip],trip,'2026-10-23')).toBeNull();
+ expect(tripForDate([trip],null,'2026-10-20')).toBe(trip);
+ expect(tripForDate([trip],null,'2026-10-22')).toBe(trip);
+});
+it('switches into another matching trip and keeps the preferred trip on overlapping dates',()=>{
+ const a={id:'a',startDate:'2026-10-20',endDate:'2026-10-22'} as any,b={id:'b',startDate:'2026-10-22',endDate:'2026-10-25'} as any;
+ expect(tripForDate([a,b],a,'2026-10-24')).toBe(b);
+ expect(tripForDate([a,b],b,'2026-10-22')).toBe(b);
+ expect(tripForDate([a,b],null,'2026-10-29')).toBeNull();
+});

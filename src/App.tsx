@@ -73,7 +73,7 @@ import {verificationReturnClient,listenForVerificationSession} from './email-ver
 import {changeBlockPlace,changeBlockConnection} from './block-link';
 import {blockRange} from './block-range';
 import { observeClock, followCalendarDay } from "./day-clock";
-import { startingLayout, lodgingForDate } from "./map-start";
+import { startingLayout, lodgingForDate, tripForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import {calendarTripColors} from "./calendar-colors";
@@ -1017,16 +1017,17 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   function navigateDay(direction:'next'|'previous'){
     const next=new Date(`${date}T12:00:00`);next.setDate(next.getDate()+(direction==='next'?1:-1));const value=next.toLocaleDateString('en-CA');
     if(practice&&trip&&(value<trip.startDate||value>trip.endDate))return;
-    const within=Boolean(trip&&value>=trip.startDate&&value<=trip.endDate);
-    const cached=trip&&!shareTrip&&dayCache.current.has(`${trip.id}:${value}`);
-    setPendingDayNavigation(within&&(user||shareTrip)&&!cached?{tripId:trip!.id,date:value,direction}:null);
+    const selected=shareTrip?trip:tripForDate(trips,trip??trips.find(t=>t.id===lastTarget?.tripId),value);
+    const within=Boolean(selected&&value>=selected.startDate&&value<=selected.endDate);
+    const cached=selected&&!shareTrip&&dayCache.current.has(`${selected.id}:${value}`);
+    setPendingDayNavigation(within&&(user||shareTrip)&&!cached?{tripId:selected!.id,date:value,direction}:null);
     void switchDate(value);
   }
   async function switchDate(value:string){
     if(practice&&trip&&(value<trip.startDate||value>trip.endDate))return;
     if(shareTrip&&trip){value=value<trip.startDate?trip.startDate:value>trip.endDate?trip.endDate:value;if(value===date)return;void saveLayout();setDate(value);setDay(emptyDay());setCalendar(false);return;}
     if(value===date)return;
-    showPlanner(trip,value);
+    showPlanner(tripForDate(trips,trip??trips.find(t=>t.id===lastTarget?.tripId),value),value);
   }
   const readonly =
     shareTrip || !user || !trip || date < trip.startDate || date > trip.endDate;

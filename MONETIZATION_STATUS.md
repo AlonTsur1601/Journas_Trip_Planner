@@ -18,4 +18,4 @@ Status: IMPLEMENTATION VERIFIED IN ISOLATED STAGING; external provider connectio
 - Deliverables: MONETIZATION_DELIVERY.md, MONETIZATION_SETUP.md, ADVERTISING_RESEARCH.md. Local JSON evidence and screenshots under C:/Users/alont/.codex/visualizations/2026/10/26/01a179a9-fd4b-7091-8a0a-7be4306b1df9 .
 - External tasks: Paddle Sandbox account, products/prices/client token/API and webhook secrets, then real provider lifecycle acceptance; separate SMTP and actual authorized inbox delivery; AdSense/CMP approval before any real ads. No production rollout or real payments authorized for this implementation.
 - Remaining device limitation: viewport tests do not establish physical-phone touch/OS keyboard behavior.
-- Last known READY staging deployment before the final queue/docs follow-up: dpl_H9mPsjZNhmGsnkpZ2xKRXNvQGNoa . Require final follow-up deployment READY before delivery.
+- Final code deployment READY: dpl_3gbixknWmppNBqfRk1orYYQiLYYs (implementation commit a16f7b2). Mobile dialog ad scroll flow and background suppression verified; desktop unit rendered through a body portal to avoid clipping by modal overflow.

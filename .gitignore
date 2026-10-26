@@ -24,3 +24,26 @@ ui-debug.log
 /devpost/submission-requirements.json
 .vercel
 .env*
+
+# Local authoring tools and generated submission/video material.
+/.claude/
+/agent/
+/skills-lock.json
+/output/
+/recordings/
+/tmp/
+/journas-compass.png
+/journas-compass-white.png
+/*.mp3
+/*.wav
+/*.mp4
+/*.zip
+
+# Keep project documentation, without publishing submission assets.
+/devpost/*
+!/devpost/scope.md
+!/devpost/prd.md
+!/devpost/spec.md
+!/devpost/checklist.md
+!/devpost/learning-record.md
+!/devpost/app-map.html

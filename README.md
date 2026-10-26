@@ -12,10 +12,6 @@ The production site connects to the Firebase project `journas-trip-planner`. Ear
 
 **Planning documents:** All planning files are in [`devpost/`](devpost/): [scope.md](devpost/scope.md), [prd.md](devpost/prd.md), [spec.md](devpost/spec.md), and [checklist.md](devpost/checklist.md).
 
-![Journas production daily planner with fictional trip data](devpost/assets/planner-desktop.png)
-
-
-
 ## What you can plan
 
 - Trip dates up to one year ahead, with a monthly calendar of saved trips.

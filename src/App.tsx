@@ -1757,7 +1757,6 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     disabled={readonly||optimisticTasks[t.id]?.saving}
                     onChange={() => toggleTask(t)}
                   />
-                  {optimisticTasks[t.id]?.saving&&<span className="task-save-spinner" role="status" aria-label={`Saving ${t.title}`}><LoadingSpinner/></span>}
                   <AsyncButton onClick={() => setEdit({ kind: "tasks", item: t })}>
                     <span className={t.checked ? "completed" : ""}>
                       {t.title}

@@ -2600,7 +2600,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .time-block>.nearby-activity-label{display:inline-flex;width:max-content;max-width:100%;margin:3px 0;}.task-row .nearby-activity-label{margin-left:6px;}
 .place-list-actions{display:flex;flex-shrink:0;gap:6px;}.places-list .connection-list-title{display:flex;align-items:center;gap:9px;}.places-list .connection-list-title>svg{flex-shrink:0;width:23px;height:23px;}.places-list .connection-list-title small{display:block;color:var(--muted);font-size:12px;}
 
-.task-save-spinner{display:inline-flex;align-items:center;flex-shrink:0;margin-left:4px;}.task-save-spinner>.loading-spinner{width:13px;height:13px;border-width:2px;}
+
 .map-focus-tools .loading-spinner,.map-context-menu .loading-spinner{width:16px;height:16px;border-width:2px;}
 
 /* All map controls share the planner surface, including MapLibre image icons. */

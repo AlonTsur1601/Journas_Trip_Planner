@@ -2704,3 +2704,5 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .keyboard-shortcuts section+section{margin-top:18px;}
 
 .share-link-row .share-result>.button:not(:last-child){border-radius:0;}
+
+.top-down-control button{display:grid;place-items:center;padding:0;}

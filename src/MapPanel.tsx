@@ -167,6 +167,15 @@ export default function MapPanel({
     });
     map.current = m;
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
+    m.addControl({
+      onAdd:()=>{
+        const group=document.createElement('div');group.className='maplibregl-ctrl maplibregl-ctrl-group top-down-control';
+        const button=document.createElement('button');button.type='button';button.title='Return to top-down view';button.setAttribute('aria-label','Return to top-down view');
+        button.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h16v6H4zM12 3v8m-3-3 3 3 3-3"/></svg>';
+        button.addEventListener('click',()=>m.easeTo({pitch:0,duration:350}));group.append(button);return group;
+      },
+      onRemove:()=>{container.current?.querySelector('.top-down-control')?.remove();},
+    },'bottom-left');
     m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "bottom-left");
     for(const [name,path] of [['zoom-in','M12 5v14m-7-7h14'],['zoom-out','M5 12h14']]){
       container.current.querySelector(`.maplibregl-ctrl-${name} span`)!.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="${path}"/></svg>`;

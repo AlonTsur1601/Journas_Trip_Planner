@@ -1106,7 +1106,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const personalDateMax=(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears));
     const tripPlan=plans[practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan];
     const viewDateMax=trip&&trip.endDate>personalDateMax?trip.endDate:personalDateMax;
-    let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
   else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){const lodging=lodgingForDate(trip,date);if(lodging)timezone=tzlookup(lodging.lat,lodging.lng);}
   try {
@@ -1971,7 +1971,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </AsyncButton>
-            {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/{planState.effective.trips} saved trips</small>}
+            {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/{planState.effective.trips} saved trips</small>}
           </form>
         </Modal>
       )}

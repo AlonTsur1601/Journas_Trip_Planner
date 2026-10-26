@@ -1,3 +1,11 @@
+import {practiceFeatures,recordPracticeFeature} from './practice';
+import {plans,addCalendarYears,type PlanId} from '../shared/plans';
+import {usePlan,openUpgrade,requirePersonal} from './plan-state';
+import {PlanBadge} from './PlanBadge';
+import {PlanGate} from './PlanGate';
+import {TripPlanContext} from './trip-plan';
+import UpgradePage from './UpgradePage';
+import {MockAd,ModalAd} from './MockAd';
 import {draftIsSaved} from "./draft-recovery";
 import KeyboardShortcuts from './KeyboardShortcuts';
 import {timelineZoom,outsideTimelineHeight,outsideTimelineKey} from './timeline-zoom';
@@ -109,10 +117,10 @@ type Edit = {
   base?: Record<string, any>;
   locationSelected?: boolean;
 };
-function ProfileAvatar({src, fallback, name, id, accent="var(--accent)"}: {src?:string;fallback?:string;name:string;id:string;accent?:string}) {
-  const [failed, setFailed] = useState<string[]>([]);
+function ProfileAvatar({src, fallback, name, id, accent="var(--accent)",plan}: {plan?:PlanId;src?:string;fallback?:string;name:string;id:string;accent?:string}) {
+  const ownPlan=usePlan();const [failed, setFailed] = useState<string[]>([]);
   const photo = [src, fallback].find(url => url && !failed.includes(url));
-  return <span className="avatar profile-avatar" style={photo?undefined:{background:isBlackAccent(accent)?"var(--neutral-accent)":accent,color:isBlackAccent(accent)?"var(--neutral-accent-ink)":"#fff"}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span>;
+  return <span className="profile-with-plan"><span className="avatar profile-avatar" style={photo?undefined:{background:isBlackAccent(accent)?"var(--neutral-accent)":accent,color:isBlackAccent(accent)?"var(--neutral-accent-ink)":"#fff"}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span><PlanBadge compact plan={plan??ownPlan.personal.plan}/></span>;
 }
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;
@@ -187,7 +195,7 @@ function Modal({ title, children, onClose, inactive=false, locked=false }: any) 
             <X size={20} />
           </AsyncButton>}
         </header>
-        {children}
+        {children}<ModalAd title={title}/>
       </section>
     </div></MotionSurface>
   );
@@ -301,8 +309,8 @@ const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) 
         ) : (
           <>
             <AsyncButton
-              className="google button"
-              disabled={busy}
+              className="google button" title="Google sign-in is not enabled in this isolated test environment. Use the supplied test email and password."
+              disabled={busy||import.meta.env.VITE_JOURNAS_ENV==='monetization-staging'}
               onClick={() =>
                 run(() => signInWithPopup(auth!, new GoogleAuthProvider()))
               }
@@ -374,9 +382,9 @@ const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) 
               {register ? "Already have an account?" : "New to Journas?"}{" "}
               <AsyncButton
                 className="button primary"
-                onClick={() => setRegister(!register)}
+                disabled={import.meta.env.VITE_JOURNAS_ENV==='monetization-staging'} onClick={() => setRegister(!register)}
               >
-                {register ? "Sign in" : "Create an account"}
+                {import.meta.env.VITE_JOURNAS_ENV==='monetization-staging'?"Test accounts only":register ? "Sign in" : "Create an account"}
               </AsyncButton>
             </p>
           </>
@@ -395,6 +403,12 @@ export default function App(){
  return <><Activity mode={practice?'hidden':'visible'}><PlannerApp key={verification.accountId??"signed-out"} practice={false} verified={verification.verified} onVerified={verification.confirm}/></Activity>{practice&&<PlannerApp practice verified={verification.verified} onVerified={verification.confirm}/>}</>;
 }
 function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:boolean|null;onVerified:()=>void}) {
+ const planState=usePlan();
+ const [paidFeatures,setPaidFeatures]=useState(practiceFeatures);
+ useEffect(()=>{const update=()=>setPaidFeatures(practiceFeatures());window.addEventListener('journas-practice-feature',update);return()=>window.removeEventListener('journas-practice-feature',update);},[]);
+ const [upgrade,setUpgrade]=useState<{feature?:string}|null>(location.pathname==='/upgrade'?{}:null);
+ useEffect(()=>{const show=(event:Event)=>{setUpgrade((event as CustomEvent).detail??{});history.pushState({},'', '/upgrade');};const pop=()=>setUpgrade(location.pathname==='/upgrade'?{}:null);window.addEventListener('journas-upgrade',show);window.addEventListener('popstate',pop);return()=>{window.removeEventListener('journas-upgrade',show);window.removeEventListener('popstate',pop);};},[]);
+
  const [practiceData]=useState(()=>practice?getPracticeSession():null);
  const api:typeof profileApi=(action,data,signal,background)=>profileApi(action,data,signal,background,practiceData);
  const localStorage=practice?practiceLocal:window.localStorage,sessionStorage=practice?practiceSession:window.sessionStorage;
@@ -662,7 +676,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     }
     showPlanner(selected,nextDate);
   }
-  function createTrip(){lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
+  function createTrip(){if(!practice&&trips.length>=planState.effective.trips){openUpgrade('trips',planState.personal.plan==='tourist'?'traveler':'adventurer');return;}lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
   function editTrip(selected:Trip){lodgingNameEdited.current=isManualLodgingName(selected.lodging);setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
     if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
@@ -892,7 +906,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           lostAccess();
         } else if (!cancelled) {
           const updated = { ...snap.data(), id: snap.id } as Trip;
-          setTrip(updated);
+          setTrip(previous=>({...updated,access:previous?.access}));
           setTrips((current) =>
             current.map((value) => (value.id === updated.id ? updated : value)),
           );
@@ -1088,7 +1102,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     showPlanner(tripForDate(trips,trip??trips.find(t=>t.id===lastTarget?.tripId),value),value);
   }
   const readonly =
-    shareTrip || !user || !trip || (trip.ownerId!==user.uid&&Boolean(trip.viewerIds?.includes(user.uid))) || date < trip.startDate || date > trip.endDate;
+    shareTrip || !user || !trip || Boolean(trip.access?.readonlyReason) || (trip.ownerId!==user.uid&&Boolean(trip.viewerIds?.includes(user.uid))) || date < trip.startDate || date > trip.endDate;
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(settings.clock==='utc')timezone='UTC';
   else if(settings.clock==='lodging'||settings.clock==='destination'||settings.clock==='local'&&!settings.clockConfigured){const lodging=lodgingForDate(trip,date);if(lodging)timezone=tzlookup(lodging.lat,lodging.lng);}
@@ -1368,12 +1382,14 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
     const range=blockRange(block,date);const minute=(value:string)=>{const [h,m]=value.split(':').map(Number);return h*60+m;};return date===displayedToday&&nowMinutes>=minute(range.start)&&nowMinutes<minute(range.end);
   };
-  const nearby=nearbyActivities(day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
-  const nearbyTodo=nearbyTasks(displayTasks,day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
+  const computedNearby=nearbyActivities(day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
+  const computedNearbyTodo=nearbyTasks(displayTasks,day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
+  const nearby=planState.effective.features.nearbyBlocks?computedNearby:{blockIds:[],pinIds:[]};
+  const nearbyTodo=planState.effective.features.nearbyTasks?computedNearbyTodo:{taskIds:[],pinIds:[]};
   const activePinIds=useMemo(()=>[...new Set([...nearby.pinIds,...nearbyTodo.pinIds])],[nearby.pinIds.join(','),nearbyTodo.pinIds.join(',')]);
   const canPastePin=!readonly&&!practice&&!pastingPin&&canPasteCopiedPin(copiedPin,trip?.id,date,day.pins);
   function copyPin(pin:Pin){
-    if(!trip||practice||pin.id==='trip-lodging')return;
+    if(!requirePersonal('copyPlaces')||!trip||practice||pin.id==='trip-lodging')return;
     setCopiedPin({sourceTripId:trip.id,sourceDate:date,sourceId:pin.id,origin:pin.copyOrigin??{tripId:trip.id,date,id:pin.id}});
     setMessage('Place copied. Open another trip day and right-click the map to paste it.');
   }
@@ -1402,10 +1418,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   if(user&&(verified===null||verified===true&&(!ready||loadedAccount.current!==user.uid)))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
+  if(user&&ready&&upgrade)return <UpgradePage feature={upgrade.feature} onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/>;
   return (
-    <>
+    <TripPlanContext.Provider value={practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan}>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
-      {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      <div className="testing-banner" role="status">Testing · isolated environment · no real payments or ads</div>{home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1433,7 +1450,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             title="Create trip"
             aria-label="Create trip"
             onClick={createTrip}
-            disabled={practice || !user || trips.length >= 100}
+            disabled={practice || !user}
           >
             <Plus size={18} />
           </AsyncButton>
@@ -1443,7 +1460,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             className="icon"
             aria-label="Next day" pending={pendingDayNavigation?.direction==='next'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
             disabled={
-              date >= maxDate() ||
+              date >= (planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears)) ||
               Boolean((shareTrip || practice) && trip && date >= trip.endDate)
             }
             onClick={()=>navigateDay('next')}
@@ -1473,7 +1490,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           </AsyncButton>
         </div>
         <div className="top-actions">
-          <div className="planning-history-actions">
+          <button className="button upgrade-topbar" title="Upgrade plan" aria-label="Upgrade plan" onClick={()=>openUpgrade()}>Upgrade plan</button><div className="planning-history-actions">
           <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={readonly||!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
           <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={readonly||!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
           <div className="save-control">
@@ -1501,7 +1518,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </header>
       {trips.length >= 80 && (
         <div className="verification">
-          {trips.length >= 100
+          {trips.length >= planState.effective.trips
             ? "Your saved-trip limit is reached. Remove an old trip before creating or joining another."
             : "You are approaching your saved-trip limit. Remove old trips to make room."}
         </div>
@@ -1563,8 +1580,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 onStartPinSearch={settings.pinPlacementOnMap===false?()=>newItem("pins"):undefined}
                 movingPinId={movingPinId}
                 onConnection={connection=>{if(!practice)setEdit({kind:"connections",item:connection});}}
-                onConnections={trip?()=>setModal("connections"):undefined}
-                onPlaces={trip?()=>setModal("places"):undefined}
+                onConnections={trip?()=>{if(requirePersonal("placeMenus"))setModal("connections");}:undefined}
+                onPlaces={trip?()=>{if(requirePersonal("placeMenus"))setModal("places");}:undefined}
                 liveLocation={liveLocation.position??undefined}
                 locationStatus={liveLocation.status} onLocate={practice?undefined:liveLocation.request}
                 lodging={lodgingForDate(trip,date)} activePinIds={activePinIds}
@@ -1874,7 +1891,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </div></WorkspaceMotion>
       {calendar && (
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
-          <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={maxDate()}
+          <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears))}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
             dayTitle={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
             dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
@@ -1908,6 +1925,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               const f = new FormData(form);
               const finish=beginActivity(modal==='edit-trip'?'Saving your trip details…':'Creating your trip and opening your plan…');
               try {
+                if(practice&&String(f.get("start"))===String(f.get("end")))throw new Error("Choose at least two days in the tutorial so you can copy a place between dates.");
                 const r = await api<{ trip: Trip }>(modal === "edit-trip" ? "trip.update" : "trip.create", {
                   tripId: modal === "edit-trip" ? trip?.id : undefined,
                   appearance:tripLook,
@@ -1936,7 +1954,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               maxLength={120}
               required
             />
-            <DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={maxDate()}/>
+            <DateRangeFields startValue={modal==='edit-trip'?trip?.startDate:today()} endValue={modal==='edit-trip'?trip?.endDate:today()} min={modal==='edit-trip'?undefined:today()} max={(planState.effective.horizonYears===null?'9999-12-31':addCalendarYears(today(),planState.effective.horizonYears))}/>
             <div className="trip-appearance-editor"><TripBadge trip={{...(trip??{}),appearance:tripLook} as Trip}/><div className="trip-appearance-options"><div className="trip-logo-mode" role="group" aria-label="Trip logo type"><AsyncButton type="button" className={tripLook.mode==='symbol'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'symbol'})}>Symbol</AsyncButton><AsyncButton type="button" className={tripLook.mode==='image'?'active':''} onClick={()=>setTripLook({...tripLook,mode:'image'})}>Image</AsyncButton></div><div className="trip-logo-fields">{tripLook.mode==='symbol'?<><SymbolPicker value={tripLook.symbol} onChange={(e:any)=>setTripLook({...tripLook,symbol:e.target.value})}/><ColorPicker label="Trip color" value={tripLook.color} onChange={(e:any)=>setTripLook({...tripLook,color:e.target.value})}/></>:<div className="field"><span>Trip image</span><input hidden ref={tripPhoto} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose trip image" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>10000000)setMessage('Choose an image smaller than 10 MB.');else setTripCrop(file);}e.target.value='';}}/><AsyncButton type="button" className="button" onClick={()=>tripPhoto.current?.click()}>{tripLook.image?'Change image':'Choose image'}</AsyncButton></div>}</div></div></div>
             </div><div className="trip-location-column"><span className="lodging-label">Lodging location</span>
             <LocationPicker contextPins={modal==='edit-trip'?mapPins:undefined} contextConnections={modal==='edit-trip'?visibleDayConnections:undefined} editingPinId={modal==='edit-trip'?'trip-lodging':undefined} value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
@@ -1946,7 +1964,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=Boolean(e.target.value.trim());setLodgingDraft({...lodgingDraft!,name:e.target.value,nameSource:e.target.value.trim()?'custom':'location'});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
             </div><AsyncButton
               className="button primary full"
-              pending={tripSaving} disabled={tripSaving||(modal === "new-trip" && trips.length >= 100)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
+              pending={tripSaving} disabled={tripSaving||(modal === "new-trip" && trips.length >= planState.effective.trips)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
             >
               {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
             </AsyncButton>
@@ -1966,7 +1984,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             }}
           >
             {trip&&localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)&&JSON.parse(localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)??'{}')[edit.item.id]&&<div className="recovered-draft"><p>These changes were recovered from an unfinished save on this device. Review and save below, or discard this draft.</p><AsyncButton type="button" className="button danger" disabled={saving} onClick={async()=>{if(!await confirmAction('Discard this recovered draft? The saved version will stay unchanged.'))return;const key=`journas-drafts:${user?.uid}:${trip.id}:${date}`,pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[edit.item.id];const remaining=Object.values(pending) as Edit[];if(remaining.length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);setEdit(remaining[0]??null);}}>Discard draft</AsyncButton></div>}
-            <fieldset disabled={readonly || saving}>
+            {!readonly&&['tasks','blocks'].includes(edit.kind)&&!plans[trip?.access?.ownerPlan??planState.personal.plan].features.linkedPlanning&&(edit.item.pinId||edit.item.connectionId||edit.item.blockId)&&<div className="plan-readonly-notice"><p>This linked item is view-only on the trip owner's plan.</p><button type="button" className="button" onClick={()=>setEdit({...edit,item:{...edit.item,pinId:null,connectionId:null,blockId:null}})}>Make independent</button></div>}
+            {practice&&edit.kind==='pins'&&edit.item.id!=='trip-lodging'&&day.pins.some(pin=>pin.id===edit.item.id)&&trip&&<button type="button" className="button" onClick={async()=>{const next=new Date(`${date}T12:00:00`);next.setDate(next.getDate()+(date<trip.endDate?1:-1));const destination=next.toLocaleDateString('en-CA');try{await api('item.copy-pin',{tripId:trip.id,date:destination,sourceTripId:trip.id,sourceDate:date,sourceId:edit.item.id});recordPracticeFeature('copyPlaces');setMessage('Copied in the tutorial only.');}catch(e:any){setMessage(e.message);}}}>Copy place to another day · traveler</button>}
+            <fieldset disabled={readonly || saving || !practice&&['tasks','blocks'].includes(edit.kind)&&!plans[trip?.access?.ownerPlan??planState.personal.plan].features.linkedPlanning&&Boolean(edit.item.pinId||edit.item.connectionId||edit.item.blockId)}>
               {edit.kind !== "connections" && (
                 <Input
                   label={
@@ -2165,7 +2185,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               {edit.kind === "tasks" && (
                 <>
                   <PlanLinkField groupTabs pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={mapPins} connections={visibleDayConnections} emptyLabel="No place or connection" onChange={(kind,id)=>setEdit({...edit,item:{...edit.item,pinId:kind==='pins'?id:null,connectionId:kind==='connections'?id:null}})}/>
-                  <Select
+                  <PlanGate feature="linkedPlanning" ownerPlan={trip?.access?.ownerPlan}><Select
                     label="Linked time" searchable
                     value={edit.item.blockId ?? ""}
                     onChange={(e: any) =>
@@ -2181,7 +2201,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                         {b.start} · {b.title}
                       </option>
                     ))}
-                  </Select>
+                  </Select></PlanGate>
                 </>
               )}
               {edit.kind === "connections" && (
@@ -2273,8 +2293,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <Modal title="Trip details" onClose={() => setModal(null)}>
           <h3>{trip.name}</h3>
           <h3>Travelers</h3>
-          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&!readonly&&user&&trip.memberIds.includes(user.uid)&&<AsyncButton className="button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
-          {!readonly&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
+          <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar plan={t.plan??"tourist"} accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&user&&trip.ownerId===user.uid&&<AsyncButton className="button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
+          {(!readonly||trip.ownerId===user?.uid&&Boolean(trip.access?.readonlyReason))&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}
           {shareTrip ? (
             <>
               <p>
@@ -2467,7 +2487,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <label className="checkbox-field">
               <input
                 type="checkbox"
-                checked={settings.autoDelete}
+                disabled={planState.personal.retentionDays!==null} checked={settings.autoDelete||planState.personal.retentionDays!==null}
                 onChange={(e) =>
                   setSettings({ ...settings, autoDelete: e.target.checked })
                 }
@@ -2487,12 +2507,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
-              <option value={365}>One year</option>
+              <option value={365} disabled={planState.effective.retentionDays!==null&&planState.effective.retentionDays<365}>One year</option>
 
             </Select>
             <p className="form-note">
-              Automatic removal affects your account only. Other travelers keep
-              their copy of the shared trip.
+              Removing a trip you own removes it for every traveler. Removing a trip you joined affects only your access. Plan retention limits still apply.
             </p>
             <AsyncButton pending={settingsSaving} className="button primary full" disabled={!user||(!practice&&(settings.displayName??"").trim()!==savedAccountName.current&&!accountNameValid)}>
               Save preferences
@@ -2608,10 +2627,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);}}/></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><AsyncButton className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</AsyncButton><AsyncButton className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</AsyncButton></div></Modal>}
       <Toast message={message} onDismiss={() => setMessage("")} />
-      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:visibleDayConnections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
+      {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{paidFeatures,mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,linkedBlocks:day.blocks.filter(b=>b.pinId||b.connectionId).length,linkedTasks:day.tasks.filter(t=>t.pinId||t.connectionId||t.blockId).length,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:visibleDayConnections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}
-    </>
+    </TripPlanContext.Provider>
   );
 }

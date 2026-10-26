@@ -5,6 +5,9 @@ service cloud.firestore {
     function member(tripId) {
       return verified() && exists(/databases/$(database)/documents/trips/$(tripId))
         && get(/databases/$(database)/documents/trips/$(tripId)).data.deleted == false
+        && (!('ownerCleanupAt' in get(/databases/$(database)/documents/trips/$(tripId)).data) || request.time.toMillis() < get(/databases/$(database)/documents/trips/$(tripId)).data.ownerCleanupAt)
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/trips/$(tripId))
+        && request.time.toMillis() < get(/databases/$(database)/documents/users/$(request.auth.uid)/trips/$(tripId)).data.cleanupAt
         && request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds;
     }
     match /trips/{tripId} {

@@ -7,11 +7,13 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "dev": "vite --mode staging --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build --mode staging",
     "preview": "vite preview --host 127.0.0.1",
-    "api:dev": "tsx server/dev.ts",
-    "dev:api": "tsx --env-file=.env.local server/dev.ts",
+    "api:dev": "tsx --env-file=.env.staging.local server/dev.ts",
+    "dev:api": "tsx --env-file=.env.staging.local server/dev.ts",
+    "test": "vitest run",
+    "test:monetization": "vitest run tests/monetization.test.ts",
     "dev:emulators": "firebase emulators:start --only auth,firestore --project demo-journas"
   },
   "dependencies": {

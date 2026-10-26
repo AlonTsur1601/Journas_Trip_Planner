@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.env*
+**/*.local*
+**/*service-account*.json
+tests
+test-results
+playwright-report
+devpost
+recordings
+output
+.agents
+.claude
+.todo-mcp
+firebase-debug.log
+firestore-debug.log

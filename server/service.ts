@@ -3,6 +3,9 @@ import {connectionTitle,connectionTitleSource} from '../src/connection-label.js'
 import {accountNameAvailable,claimAccountName} from './account-names.js';
 import {hasAcknowledgedTour} from '../src/tour-state.js';
 import {historyTransaction} from './history.js';
+import {stagingEnabled} from './staging.js';
+import {policyStore,accessFor,retentionAt} from './entitlements.js';
+import {plans,billingStatus} from '../shared/plans.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ApiError, defaultSettings, type Data, type Item, type Kind, type Store, type Transaction, type Trip } from './types.js';
 import { resolveWallTime } from './time.js';
@@ -184,7 +187,7 @@ function bump(item: Item, patch: Data): Item {
     return next;
 }
 export class JournasService {
-    constructor(private store: Store, private now: () => number = Date.now) { }
+    constructor(private store: Store, private now: () => number = Date.now, private monetization=stagingEnabled()) { }
     private async member(tx: Transaction, id: string, uid: string): Promise<Trip> {
         const trip = await tx.get(tripPath(id)) as Trip | undefined;
         if (!trip || trip.deleted)
@@ -211,7 +214,7 @@ export class JournasService {
             fail(400, 'DATE_OUTSIDE_TRIP', 'Choose a date within this trip');
     }
     private cleanupAt(endDate: string, settingsInput: unknown) { const settings = { ...defaultSettings, ...object(settingsInput ?? {}) }; return settings.autoDelete ? Date.parse(`${endDate}T23:59:59.999Z`) + Number(settings.retentionDays) * 86400000 : Number.MAX_SAFE_INTEGER; }
-    private membership(uid: string, trip: Trip, settings: unknown) { return { id: trip.id, uid, endDate: trip.endDate, joinedAt: this.now(), cleanupAt: this.cleanupAt(trip.endDate, settings) }; }
+    private membership(uid: string, trip: Trip, settings: unknown, user?:Data) { return { id: trip.id, uid, endDate: trip.endDate, joinedAt: this.now(), cleanupAt: this.monetization?retentionAt(trip,user??{settings},this.now()):this.cleanupAt(trip.endDate, settings) }; }
     async execute(uid: string | null, input: Data): Promise<Data> {
         const action = text(input.action, 50);
         if (action === 'share.read')
@@ -219,7 +222,14 @@ export class JournasService {
         if (!uid)
             fail(401, 'UNAUTHENTICATED', 'Sign in to continue');
         const userId = identifier(uid);
-        return historyTransaction(this.store,userId,input,this.now(),async (tx) => {
+        const result=await historyTransaction(this.monetization?policyStore(this.store,userId,input,this.now()):this.store,userId,input,this.now(),async (tx) => {
+            if(action==='billing.status'){const user=await tx.get(userPath(userId));return {billing:billingStatus(user,this.now()),entitlements:plans[billingStatus(user,this.now()).plan]};}
+            if(action==='trip.select-active'){
+                const ids=input.tripIds;if(!Array.isArray(ids)||ids.some(id=>typeof id!=='string')||new Set(ids).size!==ids.length)fail(400,'INVALID_INPUT','Choose unique trip identifiers');
+                const user=await tx.get(userPath(userId))??{};if(ids.length>plans[billingStatus(user,this.now()).plan].trips)fail(400,'INVALID_INPUT','Too many active trips');
+                const refs=await tx.list(`users/${userId}/trips`);if(ids.some(id=>!refs.some(ref=>ref.id===id)))fail(403,'FORBIDDEN','Choose trips in your account');
+                tx.set(userPath(userId),{...user,activeTripIds:ids});return {ok:true};
+            }
             if(action === 'planner.restore') {
                 const requestedDate=date(input.date);
                 const [user,refs]=await Promise.all([tx.get(userPath(userId)),tx.list(`users/${userId}/trips`)]);
@@ -248,7 +258,7 @@ export class JournasService {
                 const settings = { ...defaultSettings, ...object(user.settings ?? {}), ...patch };
                 if ('autoDelete' in patch || 'retentionDays' in patch)
                     for (const ref of await tx.list(`users/${userId}/trips`))
-                        tx.set(membershipPath(userId, identifier(ref.id)), { ...ref, cleanupAt: this.cleanupAt(date(ref.endDate), settings) });
+                        {const trip=await tx.get(tripPath(identifier(ref.id)));tx.set(membershipPath(userId, identifier(ref.id)), { ...ref, cleanupAt: this.monetization&&trip?retentionAt(trip,{...user,settings},this.now()):this.cleanupAt(date(ref.endDate), settings) });}
                 tx.set(userPath(userId), { ...user, settings });
                 return { settings };
             }
@@ -271,14 +281,15 @@ export class JournasService {
                 latest.setUTCFullYear(latest.getUTCFullYear() + 1);
                 if (latest.getUTCMonth() !== today.getUTCMonth())
                     latest.setUTCDate(0);
-                if (startDate > endDate || endDate > latest.toISOString().slice(0, 10) || (Date.parse(endDate) - Date.parse(startDate)) / 86400000 > 366)
+                if (startDate > endDate || (!this.monetization&&(endDate > latest.toISOString().slice(0, 10) || (Date.parse(endDate) - Date.parse(startDate)) / 86400000 > 366)))
                     fail(400, 'INVALID_TRIP', 'Trips must span at most one year and cannot be planned more than one year ahead');
                 const user = await this.checkQuota(tx, userId);
                 const id = randomUUID();
                 const trip: Trip = { id, name, startDate, endDate, appearance: input.appearance===undefined?{color:['#7c5ce7','#2563eb','#059669','#ea580c'][randomBytes(1)[0]%4],symbol:['icon:flight','icon:peak','icon:coast','icon:museum'][randomBytes(1)[0]%4],mode:'symbol',image:''}:appearance(input.appearance), lodging: lodging(input.lodging), ownerId: userId, memberIds: [userId], deleted: false, createdAt: this.now(), updatedAt: this.now(), shareVersion: 0 };
+                if(this.monetization)trip.planningTimezone=zone;
                 tx.set(tripPath(id), trip);
-                tx.set(membershipPath(userId, id), this.membership(userId, trip, user.settings));
-                tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
+                tx.set(membershipPath(userId, id), this.membership(userId, trip, user.settings,user));
+                tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1,...(this.monetization&&Array.isArray(user.activeTripIds)?{activeTripIds:[...user.activeTripIds,id]}:{}) });
                 return { trip };
             }
             if (action === 'share.join') {
@@ -296,13 +307,13 @@ export class JournasService {
                     return { trip };
                 }
                 const user = await this.checkQuota(tx, userId);
-                if (trip.memberIds.length >= 100)
+                if (!this.monetization&&trip.memberIds.length >= 100)
                     fail(409, 'MEMBER_LIMIT', 'This trip has reached its participant limit');
                 const updated = { ...trip, memberIds: [...trip.memberIds, userId],viewerIds:[...(trip.viewerIds as string[]??[]).filter(value=>value!==userId),...(share.mode==='viewer'?[userId]:[])], updatedAt: this.now() };
                 tx.set(tripPath(id), updated);
-                tx.set(membershipPath(userId, id), {...this.membership(userId, trip, user.settings),shareId:hash(String(input.token)),mode:share.mode});
+                tx.set(membershipPath(userId, id), {...this.membership(userId, trip, user.settings,user),shareId:hash(String(input.token)),mode:share.mode});
                 tx.delete(`cleanupJobs/${userId}_${id}`);
-                tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1 });
+                tx.set(userPath(userId), { ...user, tripCount: Number(user.tripCount ?? 0) + 1,...(this.monetization&&Array.isArray(user.activeTripIds)?{activeTripIds:[...user.activeTripIds,id]}:{}) });
                 return { trip: updated };
             }
             const id = identifier(input.tripId);
@@ -312,13 +323,14 @@ export class JournasService {
             }
             if (action === 'trip.update') {
                 const trip=await this.member(tx,id,userId);
+                if(input.clientTimezone!==undefined&&!validTimezone(input.clientTimezone))fail(400,'INVALID_TIMEZONE','Invalid local timezone');
                 const name=text(input.name,120).trim(),startDate=date(input.startDate),endDate=date(input.endDate);
                 const latest=new Date(this.now());latest.setUTCFullYear(latest.getUTCFullYear()+1);
-                if(!name||startDate>endDate||endDate>latest.toISOString().slice(0,10)||(Date.parse(endDate)-Date.parse(startDate))/86400000>366)fail(400,'INVALID_TRIP','Choose a name and a date range within one year.');
-                const updated={...trip,name,startDate,endDate,...(input.appearance===undefined?{}:{appearance:appearance(input.appearance)}),lodging:lodging(input.lodging),updatedAt:this.now()};
+                if(!name||startDate>endDate||(!this.monetization&&(endDate>latest.toISOString().slice(0,10)||(Date.parse(endDate)-Date.parse(startDate))/86400000>366)))fail(400,'INVALID_TRIP','Choose a name and valid date range.');
+                const updated={...trip,name,startDate,endDate,...(this.monetization&&(startDate!==trip.startDate||endDate!==trip.endDate)?{planningTimezone:input.clientTimezone??trip.planningTimezone??'UTC'}:{}),...(input.appearance===undefined?{}:{appearance:appearance(input.appearance)}),lodging:lodging(input.lodging),updatedAt:this.now()};
                 const memberships=await Promise.all(trip.memberIds.map(async uid=>({uid,ref:await tx.get(membershipPath(uid,id)),user:await tx.get(userPath(uid))})));
                 tx.set(tripPath(id),updated);
-                for(const member of memberships) if(member.ref) tx.set(membershipPath(member.uid,id),{...member.ref,endDate,cleanupAt:this.cleanupAt(endDate,member.user?.settings as any)});
+                for(const member of memberships) if(member.ref) tx.set(membershipPath(member.uid,id),{...member.ref,endDate,cleanupAt:this.monetization?retentionAt(updated,member.user,this.now()):this.cleanupAt(endDate,member.user?.settings as any)});
                 if(JSON.stringify(trip.lodging)!==JSON.stringify(updated.lodging)){
                     const oldPlace=this.lodgingPin(trip.lodging as Data|undefined),newPlace=this.lodgingPin(updated.lodging);
                     for(const storedDay of await tx.list(`trips/${id}/days`)){
@@ -383,6 +395,7 @@ export class JournasService {
             }
             if (action === 'member.remove') {
                 const trip = await this.member(tx, id, userId);
+                if(this.monetization&&trip.ownerId!==userId)fail(403,'FORBIDDEN','Only the owner can manage travelers');
                 const target = identifier(input.userId);
                 if (target === trip.ownerId)
                     fail(400, 'OWNER_REMOVAL', 'The owner cannot be removed using participant management');
@@ -518,6 +531,17 @@ export class JournasService {
             if(kind==='pins'||kind==='connections')await this.refreshDependencies(tx,id,day,all,all.map(source=>source.id===itemId?item:source));
             return { item };
         });
+        if(!this.monetization)return result;
+        return this.store.transaction(async tx=>{
+            const user=await tx.get(userPath(userId)),billing=billingStatus(user,this.now());
+            if(result.settings&&plans[billing.plan].retentionDays!==null){const settings=result.settings as Data;result.settings={...settings,autoDelete:true,retentionDays:Math.min(Number(settings.retentionDays??365),plans[billing.plan].retentionDays!)};}
+            const decorate=async(value:Data)=>({...value,access:await accessFor(tx,userId,value,user,this.now())});
+            if(Array.isArray(result.trips)){const decorated=await Promise.all((result.trips as Data[]).map(decorate));result.trips=decorated.filter(trip=>!trip.access.expired);}
+            if(result.trip)result.trip=await decorate(result.trip as Data);
+            if(result.restore){const restore=result.restore as Data,trip=await decorate(restore.trip as Data);result.restore=trip.access.expired?null:{...restore,trip};}
+            if(Array.isArray(result.members))result.members=await Promise.all((result.members as Data[]).map(async member=>({...member,plan:billingStatus(await tx.get(userPath(String(member.id))),this.now()).plan})));
+            return {...result,billing,entitlements:plans[billing.plan]};
+        });
     }
     private lodgingPin(place:Data|undefined):Item|undefined{
         return place?{id:'trip-lodging',kind:'pins',title:place.name,note:place.note??'',color:place.color??'#7c5ce7',symbol:place.symbol??'icon:stay',lng:place.lng,lat:place.lat,versions:{}}:undefined;
@@ -559,6 +583,7 @@ export class JournasService {
         const trip = await tx.get(tripPath(identifier(share.tripId)));
         if (!trip || trip.deleted || trip.shareVersion !== share.version)
             fail(404, 'INVALID_SHARE', 'Sharing link is invalid or expired');
+        if(this.monetization&&retentionAt(trip,await tx.get(userPath(String(trip.ownerId))),this.now())<=this.now())fail(404,'INVALID_SHARE','Sharing link is invalid or expired');
         const statusPath=`shareStatus/${hash(token)}`;
         if(!(await tx.get(statusPath)))tx.set(statusPath,{active:true});
         return share;
@@ -632,12 +657,13 @@ export class JournasService {
                     return false;
                 }
                 const user = await tx.get(userPath(uid));
-                const cleanupAt = this.cleanupAt(trip.endDate, user?.settings);
+                const cleanupAt = this.monetization?retentionAt(trip,user,this.now()):this.cleanupAt(trip.endDate, user?.settings);
                 if (cleanupAt > this.now()) {
                     tx.set(membershipPath(uid, id), { ...membership, cleanupAt });
                     return false;
                 }
-                await this.personalRemove(tx, trip, uid);
+                if(this.monetization&&trip.ownerId===uid)await this.globalDelete(tx,trip);
+                else await this.personalRemove(tx, trip, uid);
                 return true;
             });
             if (didRemove)

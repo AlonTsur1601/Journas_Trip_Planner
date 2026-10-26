@@ -1,6 +1,7 @@
 import {DeviceSession,sessionWeek} from './device-session';
 import {ConcurrentReads,isReadAction} from './request-cache';
 import {defaultSettings} from './types';
+import {acceptPlanResult,resetPlan,openUpgrade} from './plan-state';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
@@ -15,7 +16,7 @@ const config = emulators
       appId: "demo-journas-app",
     }
   : {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      apiKey: 'journas-staging-client',
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
@@ -25,6 +26,11 @@ export const configured = Boolean(
 );
 const app = configured ? initializeApp(config) : null;
 export const auth = app ? initializeAuth(app, { persistence: [browserLocalPersistence,browserSessionPersistence], popupRedirectResolver: browserPopupRedirectResolver }) : null;
+if(auth&&import.meta.env.VITE_JOURNAS_ENV==='monetization-staging'){
+ // Keep the project credential on the server. Only email/password test accounts are enabled.
+ const config=(auth as unknown as {config:{apiHost:string;tokenApiHost:string;apiScheme:string}}).config;
+ config.apiHost=`${location.host}/api/firebase-auth`;config.tokenApiHost=config.apiHost;config.apiScheme=location.protocol.slice(0,-1);
+}
 
 if (emulators && auth) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
@@ -40,7 +46,7 @@ async function refreshDeviceSession(user:User|null){
  await devicePersistenceReady;
  if(user!==auth?.currentUser)return;
  clearTimeout(expiryTimer);
- if(!user){deviceSession.clear();publishSession(null);return;}
+ if(!user){resetPlan();deviceSession.clear();publishSession(null);return;}
  if(!deviceSession.visit(user)){await signOut(auth!);return;}
  publishSession(user);
  expiryTimer=setTimeout(()=>{void refreshDeviceSession(auth?.currentUser??null);},sessionWeek);
@@ -82,6 +88,7 @@ async function request<T = unknown>(
     body: JSON.stringify({ action, screen:JSON.parse(sessionStorage.getItem('journas-current-screen')??'null'), ...data }),
   });
   const result = await response.json();
+  if (!response.ok&&['UPGRADE_REQUIRED','PLAN_READ_ONLY'].includes(result.error?.code))openUpgrade(result.error?.details?.feature,result.error?.details?.requiredPlan);
   if (!response.ok)
     throw Object.assign(
       new Error(
@@ -96,6 +103,7 @@ async function request<T = unknown>(
         current: result.error?.details?.item ?? result.current,
       },
     );
+  acceptPlanResult(result);
   if(result.historyId)window.dispatchEvent(new Event('journas-action-saved'));
   return result as T;
   }finally{finish();}

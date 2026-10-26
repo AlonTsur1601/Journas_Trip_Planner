@@ -6,7 +6,7 @@ import {adminAuth,firestoreStore} from './store.js';
 import {ApiError} from './types.js';
 import {verificationTemplate} from './verification-template.js';
 
-export const siteUrl='https://journas-trip-planner.vercel.app';
+export const siteUrl=process.env.JOURNAS_ENV==='monetization-staging'?(process.env.STAGING_PUBLIC_URL??'https://journas-monetization-staging.vercel.app'):'https://journas-trip-planner.vercel.app';
 export function verificationContent(link:string,requestId:string,accent?:unknown){
  const safe=link.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
  return applyEmailAccent(verificationTemplate,accent).replaceAll('%LINK%',safe).replaceAll('%REQUEST_ID%',requestId);

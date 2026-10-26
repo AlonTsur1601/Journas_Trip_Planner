@@ -7,6 +7,7 @@ import {ActivityOverlay} from './LoadingScreen';
 import { installModuleRecovery } from "./module-recovery";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
+import "./plans.css";
 import { migratePlannerStorage } from "./storage-migration";
 try {
   migratePlannerStorage(localStorage);

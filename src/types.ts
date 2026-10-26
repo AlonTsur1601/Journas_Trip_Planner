@@ -56,6 +56,7 @@ export type Day = {
   connections: Connection[];
 };
 export type Trip = {
+  access?: {ownerPlan:import('../shared/plans').PlanId;readonlyReason:string|null;expired:boolean;cleanupAt:number;ownerCleanupAt:number};
   id: string;
   name: string;
   startDate: string;

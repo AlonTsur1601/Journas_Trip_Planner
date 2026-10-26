@@ -9,6 +9,9 @@ import {practiceExecute} from './practice.js';
 import {verificationStatus,confirmVerification} from './verification-campaign.js';
 import {places} from './places.js';
 import {sendVerificationEmail} from './verification-email.js';
+import {assertStaging,assertStagingAccount} from './staging.js';
+import {billingAction,reconcileBilling} from './billing.js';
+import {retentionNotices} from './retention-notices.js';
 export type Request = IncomingMessage & {
     body?: unknown;
 };
@@ -46,10 +49,11 @@ export async function journasHandler(req: Request, res: ServerResponse) {
     if (req.method !== 'POST')
         return send(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST' } });
     try {
+        if(process.env.VERCEL||process.env.NODE_ENV!=='test')assertStaging();
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json'))
             throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json');
         const input = await body(req);
-        if(input.action==='auth.password-reset'){const address=process.env.VERCEL?String(req.headers['x-forwarded-for']??'').split(',')[0]:req.socket.remoteAddress??'unknown';return send(res,200,await sendPasswordReset(input.email,address));}
+        if(input.action==='auth.password-reset'){if(process.env.VERCEL||process.env.NODE_ENV!=='test')await assertStagingAccount(typeof input.email==='string'?input.email:undefined);const address=process.env.VERCEL?String(req.headers['x-forwarded-for']??'').split(',')[0]:req.socket.remoteAddress??'unknown';return send(res,200,await sendPasswordReset(input.email,address));}
         if(input.action==='auth.confirm-verification')return send(res,200,await confirmVerification(input.proof));
         let uid: string | null = null;
         let authTime=NaN;
@@ -59,6 +63,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
                 throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in to continue');
             try {
                 const token = await adminAuth().verifyIdToken(authorization.slice(7), true);
+                if(process.env.VERCEL||process.env.NODE_ENV!=='test')await assertStagingAccount(token.email);
                 uid = token.uid;authTime=Number(token.auth_time);
                 if (!token.email_verified && !['auth.email-verification','auth.verification-status','auth.session'].includes(String(input.action)))
                     throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email address to continue');
@@ -106,6 +111,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         }
         if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore();return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion,tourAcknowledged:true});return {seen:input.action==='tour.seen'||hasAcknowledgedTour(user)};}));}
         if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
+        if(String(input.action).startsWith('billing.'))return send(res,200,await billingAction(store,uid!,input));
         const result=await new JournasService(firestoreStore()).execute(uid,input);
         send(res,200,startup?{...result,verified:true}:result);
     }
@@ -122,9 +128,12 @@ export async function cleanupHandler(req: Request, res: ServerResponse) {
     if (!secret || Buffer.byteLength(supplied) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected)))
         return send(res, 401, { error: { code: 'UNAUTHENTICATED', message: 'Unauthorized' } });
     try {
+        if(process.env.VERCEL||process.env.NODE_ENV!=='test')assertStaging();
+        const billing=await reconcileBilling(firestoreStore());
+        const notices=await retentionNotices(firestoreStore());
         const result = await new JournasService(firestoreStore()).cleanup();
         const expiredRateLimits = await purgeExpiredRateLimits();
-        send(res, 200, { ...result, expiredRateLimits });
+        send(res, 200, { ...result, expiredRateLimits,notices,billing });
     }
     catch (error) {
         errors(res, error);

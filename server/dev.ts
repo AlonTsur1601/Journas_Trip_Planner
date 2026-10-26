@@ -1,7 +1,11 @@
 import { createServer } from 'node:http';
 import { journasHandler, cleanupHandler } from './http.js';
+import firebaseAuth from '../api/firebase-auth.js';
+import billingWebhook from '../api/billing-webhook.js';
 const port = Number(process.env.API_PORT ?? 3001);
-createServer((req, res) => { if (req.url === '/api/journas')
+createServer((req, res) => { if(req.url?.startsWith('/api/firebase-auth/'))void firebaseAuth(req,res);
+else if(req.url==='/api/billing-webhook')void billingWebhook(req,res);
+else if (req.url === '/api/journas')
     void journasHandler(req, res);
 else if (req.url === '/api/cleanup')
     void cleanupHandler(req, res);

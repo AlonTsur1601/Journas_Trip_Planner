@@ -1,3 +1,4 @@
+import {draftIsSaved} from "./draft-recovery";
 import KeyboardShortcuts from './KeyboardShortcuts';
 import {timelineZoom,outsideTimelineHeight,outsideTimelineKey} from './timeline-zoom';
 import {dayLayout,screenLayout,restoredDayMatches,fallbackDayLayout} from './view-restore';
@@ -833,18 +834,12 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         dirty.current = Boolean(local)||layoutChanged;
         finishDayNavigation(trip.id,date);
         requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!cancelled)layoutLoading.current=false;}));
-        const draft = localStorage.getItem(
-          `journas-drafts:${user.uid}:${trip.id}:${date}`,
-        );
-        if (draft) {
-          const pending = Object.values(JSON.parse(draft)) as Edit[];
-          if (pending.length) {
-            setEdit(pending[0]);
-            setMessage(
-              `Recovered ${pending.length} unsaved draft(s). Review and save them.`,
-            );
-          }
-        }
+        const draftKey=`journas-drafts:${user.uid}:${trip.id}:${date}`;
+        const drafts=JSON.parse(localStorage.getItem(draftKey)??'{}') as Record<string,Edit>;
+        for(const [id,draft] of Object.entries(drafts))if(draftIsSaved(draft,r.day))delete drafts[id];
+        const pending=Object.values(drafts);
+        if(pending.length)localStorage.setItem(draftKey,JSON.stringify(drafts));else localStorage.removeItem(draftKey);
+        if(pending.length&&!(r.trip.viewerIds?.includes(user.uid)))setEdit(pending[0]);
         setTimeout(() => {
           if (!cancelled && !layoutChanged && scroller.current)
             scroller.current.scrollTop = nextLayout.scroll ?? 400;
@@ -1199,7 +1194,11 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     );
     const base = force ? (conflict?.current?.versions ?? {}) : (versions ?? {});
     if (!Object.keys(patch).length) {
-      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
+      const key=`journas-drafts:${user?.uid}:${trip.id}:${date}`;
+      const pending=JSON.parse(localStorage.getItem(key)??'{}');
+      if(pending[id]&&draftIsSaved(pending[id],day)){delete pending[id];if(Object.keys(pending).length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);}
+
+      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?((Object.values(pending) as Edit[])[0]??null):current);
       finishSave();
       return true;
     }
@@ -1222,7 +1221,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       if (Object.keys(pending).length)
         localStorage.setItem(draftKey, JSON.stringify(pending));
       else localStorage.removeItem(draftKey);
-      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?null:current);
+      if(!background)rawSetEdit(current=>current===edit&&current?.kind===kind&&current.item.id===item.id&&tripRef.current?.id===trip.id&&dateRef.current===date?((Object.values(pending) as Edit[])[0]??null):current);
       if(!background)setConflict(null);
       setTime(new Date());
       setStatus("All changes saved");
@@ -1966,6 +1965,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               mutate(edit.kind, edit.item);
             }}
           >
+            {trip&&localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)&&JSON.parse(localStorage.getItem(`journas-drafts:${user?.uid}:${trip.id}:${date}`)??'{}')[edit.item.id]&&<div className="recovered-draft"><p>These changes were recovered from an unfinished save on this device. Review and save below, or discard this draft.</p><AsyncButton type="button" className="button danger" disabled={saving} onClick={async()=>{if(!await confirmAction('Discard this recovered draft? The saved version will stay unchanged.'))return;const key=`journas-drafts:${user?.uid}:${trip.id}:${date}`,pending=JSON.parse(localStorage.getItem(key)??'{}');delete pending[edit.item.id];const remaining=Object.values(pending) as Edit[];if(remaining.length)localStorage.setItem(key,JSON.stringify(pending));else localStorage.removeItem(key);setEdit(remaining[0]??null);}}>Discard draft</AsyncButton></div>}
             <fieldset disabled={readonly || saving}>
               {edit.kind !== "connections" && (
                 <Input

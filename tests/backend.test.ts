@@ -752,3 +752,19 @@ it('revokes one link and its members while preserving the other link and owner',
  await expect(service.execute('eve',{action:'trip.get',tripId:id,date:day})).rejects.toMatchObject({code:'FORBIDDEN'});
  await expect(service.execute('alice',{action:'trip.get',tripId:id,date:day})).resolves.toHaveProperty('trip');
 });
+
+it('editor links permit joining and saved edits; viewer links never grant write access',async()=>{
+ const {service,id}=await setup();
+ const editor=await service.execute('alice',{action:'share.create',tripId:id,mode:'editor'});
+ const viewer=await service.execute('alice',{action:'share.create',tripId:id,mode:'viewer'});
+ expect((await service.execute(null,{action:'share.read',token:editor.token})).mode).toBe('editor');
+ expect((await service.execute(null,{action:'share.read',token:viewer.token})).mode).toBe('viewer');
+ await service.execute('bob',{action:'share.join',token:editor.token});
+ const created=await service.execute('bob',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'editor-pin',patch:pin,baseVersions:{}});
+ const item=created.item as Data;
+ await service.execute('bob',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'editor-pin',patch:{title:'Edited by traveler'},baseVersions:item.versions});
+ expect((await service.execute('alice',{action:'trip.get',tripId:id,date:day})).day).toMatchObject({pins:[expect.objectContaining({title:'Edited by traveler'})]});
+ await expect(service.execute('eve',{action:'share.join',token:viewer.token})).rejects.toMatchObject({code:'VIEW_ONLY'});
+ await expect(service.execute('eve',{action:'item.patch',tripId:id,date:day,kind:'pins',id:'viewer-pin',patch:pin,baseVersions:{},token:viewer.token})).rejects.toMatchObject({status:403});
+ await expect(service.execute(null,{action:'item.patch',tripId:id,date:day,kind:'pins',id:'anonymous-pin',patch:pin,token:viewer.token})).rejects.toMatchObject({status:401});
+});

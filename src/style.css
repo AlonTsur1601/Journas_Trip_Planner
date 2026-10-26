@@ -2710,3 +2710,4 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 /* Fill the joined trip selector so its frame ends at the final action. */
 .trip-selector:has(>.dropdown)>.dropdown{max-width:none;min-width:0;flex:1;}
 .trip-selector:has(>.dropdown)>.icon{flex-shrink:0;}
+.member-row>button.button.danger{min-height:28px;height:28px;padding:4px 8px;}

@@ -2703,5 +2703,4 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .keyboard-shortcuts kbd{font:inherit;font-weight:600;}
 .keyboard-shortcuts section+section{margin-top:18px;}
 
-button.revoke-all-links{color:#fff;background:#b42336;border:2px solid #761526;font-weight:700;}
-button.revoke-all-links:not(:disabled):hover,button.revoke-all-links:not(:disabled):active{color:#fff;background:#941d2d;box-shadow:none;border-color:#761526;}
+.share-link-row .share-result>.button:not(:last-child){border-radius:0;}

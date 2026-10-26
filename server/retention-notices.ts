@@ -21,7 +21,7 @@ export async function retentionNotices(store:Store,now=Date.now(),mail=delivery(
      const id=`${uid}_${trip.id}_${deadline}_${threshold}`,path=`retentionNotices/${id}`;
      if(await tx.get(path))return false;
      const ownerDeletion=retentionAt(trip,owner,now)<=retentionAt(trip,user,now);
-     tx.set(path,{id,uid,tripId:trip.id,deadline,threshold,ownerDeletion,createdAt:now,status:'pending'});return true;
+     tx.set(path,{id,uid,tripId:trip.id,deadline,threshold,ownerDeletion,createdAt:now,status:typeof user?.verifiedEmail==='string'&&user.verifiedEmail.endsWith('.test')?'test-only':'pending'});return true;
     });checked++;if(created)queued++;
    }
   }
@@ -42,16 +42,17 @@ export async function retentionNotices(store:Store,now=Date.now(),mail=delivery(
    tx.set(path,{...notice,leaseUntil:now+10*60000,leaseToken:token});return {notice,trip};
   });
   if(!claimed)continue;
-  let delivered=false;
+  let delivered=false,testOnly=false;
   try{
    const email=await mail.email(String(claimed.notice.uid));
+   testOnly=Boolean(email?.endsWith('.test'));
    if(email&&!email.endsWith('.test')){
     const scope=claimed.notice.ownerDeletion?'The owner’s retention period is ending, so this trip will be removed for every traveler.':'This trip will be removed from your account. Other travelers keep their own access.';
     const message=`Your Journas trip “${String(claimed.trip.name)}” is scheduled for removal on ${new Date(Number(claimed.notice.deadline)).toISOString().slice(0,10)}. ${scope} Review your plan before that date to extend retention. This message is from the isolated Journas testing environment.`;
     await mail.send(email,message);delivered=true;
    }
   }catch{/* Retry failures on a later maintenance run without losing the notice. */}
-  await store.transaction(async tx=>{const current=await tx.get(path);if(current?.leaseToken===token)tx.set(path,{...current,status:delivered?'sent':'pending',leaseUntil:0,leaseToken:null,...(delivered?{sentAt:now}:{})});});
+  await store.transaction(async tx=>{const current=await tx.get(path);if(current?.leaseToken===token)tx.set(path,{...current,status:delivered?'sent':testOnly?'test-only':'pending',leaseUntil:0,leaseToken:null,...(delivered?{sentAt:now}:{})});});
   if(delivered)sent++;
  }
  return {checked,queued,sent};

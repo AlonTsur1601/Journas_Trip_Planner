@@ -83,6 +83,12 @@ describe('retention deadlines and notifications',()=>{
   const at=retentionAt(oldTrip,free,now)-day,send=vi.fn();await retentionNotices(store,at,{enabled:true,email:async()=> 'guest@example.org',send});
   expect(send).toHaveBeenCalledTimes(2);expect((await store.list('retentionNotices')).every(n=>n.ownerDeletion===true)).toBe(true);
  });
+ it('keeps non-deliverable test addresses out of the pending mail queue',async()=>{
+  const store=noticeStore(),at=retentionAt(oldTrip,free,now)-day,send=vi.fn();
+  await store.transaction(async tx=>tx.set('users/alice',{...free,verifiedEmail:'tourist@journas.test'}));
+  await retentionNotices(store,at,{enabled:true,email:async()=> 'tourist@journas.test',send});
+  expect(await store.pendingRetentionNotices(100)).toHaveLength(0);expect(send).not.toHaveBeenCalled();
+ });
 });
 describe('active choices across plan changes',()=>{
  it('caps old selections on downgrade, restores access on upgrade and lets an owner choose an overlap',async()=>{

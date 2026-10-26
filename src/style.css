@@ -2714,5 +2714,6 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 :is(.dropdown-menu,.symbol-menu,.modal,.task-list)>.search-input{margin-top:6px;}
 .dropdown-menu>.symbol-tabs{margin-bottom:8px;}
-.dropdown-menu[aria-label="Share permissions"] .dropdown-scroll-options{scrollbar-gutter:auto;}
-.share-link-permissions{font-weight:600;color:var(--ink);padding:3px 0;}
+.dropdown-menu .dropdown-scroll-options{scrollbar-gutter:auto;}
+.share-link-permissions{font-weight:600;color:var(--ink);margin-left:8px;align-self:center;flex-shrink:0;font-size:11px;}
+.share-link-row .share-result>.button:last-of-type{border-radius:0 5px 5px 0;}

@@ -466,7 +466,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const pinPasteBusy=useRef(false);
   const liveLocation=useLiveLocation(ready&&(!home||shareTrip)&&!practice);
   const [optimisticTasks,setOptimisticTasks]=useState<Record<string,{checked:boolean;saving:boolean}>>({});
-  const taskToggleQueue=useRef(new Map<string,{checked:boolean;item:Day['tasks'][number]}>());
+  const taskToggleQueue=useRef(new globalThis.Map<string,{checked:boolean;item:Day['tasks'][number]}>());
   const [pendingDayNavigation,setPendingDayNavigation]=useState<{tripId:string;date:string;direction:'next'|'previous'}|null>(null);
   const finishDayNavigation=(tripId:string,loadedDate:string)=>setPendingDayNavigation(previous=>previous?.tripId===tripId&&previous.date===loadedDate?null:previous);
   useEffect(()=>{if(home||!trip||(!user&&!shareTrip)||date<trip.startDate||date>trip.endDate)setPendingDayNavigation(null);},[home,trip?.id,trip?.startDate,trip?.endDate,date,user?.uid,shareTrip]);

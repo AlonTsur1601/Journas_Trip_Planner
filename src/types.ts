@@ -97,6 +97,7 @@ export type Layout = {
   center: [number, number];
   zoom: number;
   bearing?: number;
+  hourHeight?: number;
   scroll: number;
 };
 export const emptyDay = (): Day => ({

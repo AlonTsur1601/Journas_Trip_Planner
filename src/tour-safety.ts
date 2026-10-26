@@ -4,7 +4,7 @@ export function tourClickAllowed(stage:string,target:Element){
  const within=(selector:string)=>Boolean(target.closest(selector));
  if(within('.guided-tour'))return true;
  if(within('.topbar .brand'))return stage==='Return home';
- if(within('a[href], .danger, [aria-label="Sign out"], .profile-trigger, .settings-footer .settings-tour-button, .account-methods-button, .photo-picker-button'))return false;
+ if(within('a[href], .danger, [aria-label="Sign out"], .profile-trigger, .settings-footer .settings-tour-button, .account-methods-button, .photo-picker-button, .settings-shortcuts-button'))return false;
  if(within('.modal > header [aria-label^="Close"], .all-trips-modal [aria-label="Close all trips"]'))return false;
  if(within('.trip-selector [aria-label="Create trip"]'))return false;
  if(within('[aria-label="Undo"], [aria-label="Redo"]'))return false;

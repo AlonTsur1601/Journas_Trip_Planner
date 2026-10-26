@@ -1,3 +1,4 @@
+import {minHourHeight,maxHourHeight} from '../src/timeline-zoom.js';
 import {connectionTitle,connectionTitleSource} from '../src/connection-label.js';
 import {accountNameAvailable,claimAccountName} from './account-names.js';
 import {hasAcknowledgedTour} from '../src/tour-state.js';
@@ -150,7 +151,7 @@ function validateItem(kind: Kind, item: Data) {
     }
 }
 function validateLayout(layout: Data) {
-    const allowed = ['map', 'timeline', 'todo', 'split', 'todoX', 'todoY', 'todoWidth', 'todoHeight', 'center', 'zoom', 'bearing', 'scroll'];
+    const allowed = ['map', 'timeline', 'todo', 'split', 'todoX', 'todoY', 'todoWidth', 'todoHeight', 'center', 'zoom', 'bearing', 'hourHeight', 'scroll'];
     for (const key of Object.keys(layout))
         if (!allowed.includes(key))
             fail(400, 'INVALID_LAYOUT', 'Unknown layout field');
@@ -158,6 +159,7 @@ function validateLayout(layout: Data) {
         fail(400, 'INVALID_LAYOUT', 'Select at least one window');
     if (!finite(layout.split, 10, 90) || !finite(layout.zoom, 0, 22) || !finite(layout.scroll, 0, 100000))
         fail(400, 'INVALID_LAYOUT', 'Invalid window position');
+    if(layout.hourHeight!==undefined&&!finite(layout.hourHeight,minHourHeight,maxHourHeight))fail(400,'INVALID_LAYOUT','Invalid timeline scale');
     if(layout.bearing!==undefined&&!finite(layout.bearing,-180,180))fail(400,'INVALID_LAYOUT','Invalid map direction');
     for (const key of ['todoX', 'todoY'])
         if (!finite(layout[key], 0, 20000))

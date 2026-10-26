@@ -2693,3 +2693,12 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .photo-remove{justify-self:start;}
 .task-list>.search-input{margin-bottom:10px;}
 .field:has(.dropdown-trigger:disabled){opacity:.55;}
+
+.settings-help-buttons{display:flex;flex-wrap:wrap;gap:8px;}
+.settings-footer{gap:8px;flex-wrap:wrap;}
+.settings-shortcuts-button{min-height:30px;padding:5px 12px;font-size:12px;}
+.keyboard-shortcuts dl{margin:0;}
+.keyboard-shortcuts dl>div{display:grid;grid-template-columns:minmax(130px,1fr) 1.5fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);}
+.keyboard-shortcuts dt,.keyboard-shortcuts dd{margin:0;font-size:12px;line-height:1.5;}
+.keyboard-shortcuts kbd{font:inherit;font-weight:600;}
+.keyboard-shortcuts section+section{margin-top:18px;}

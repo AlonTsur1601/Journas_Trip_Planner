@@ -727,3 +727,11 @@ it('tags initial restored data with its exact date so another recent day keeps i
  expect((await ctx.service.execute('alice',{action:'planner.restore',date:'2026-10-03'})).restore).toMatchObject({date:'2026-10-03',layout:last});
  expect((await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).layout).toEqual(first);
 });
+
+it('persists timeline spacing per day and accepts older layouts without it',async()=>{
+ const ctx=await setup();const view={...layout,hourHeight:91.25};
+ await ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:view});
+ expect((await ctx.service.execute('alice',{action:'trip.get',tripId:ctx.id,date:day})).layout).toEqual(view);
+ for(const hourHeight of [0,241,Infinity])await expect(ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout:{...layout,hourHeight}})).rejects.toMatchObject({code:'INVALID_LAYOUT'});
+ await ctx.service.execute('alice',{action:'layout.save',tripId:ctx.id,date:day,layout});
+});

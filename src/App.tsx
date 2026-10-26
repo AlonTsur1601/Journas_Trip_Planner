@@ -1,3 +1,5 @@
+import KeyboardShortcuts from './KeyboardShortcuts';
+import {timelineZoom,outsideTimelineHeight,outsideTimelineKey} from './timeline-zoom';
 import {dayLayout,screenLayout,restoredDayMatches,fallbackDayLayout} from './view-restore';
 import {visibleConnections,type PendingConnection} from './connection-preview';
 import {SearchInput} from './SearchInput';
@@ -467,7 +469,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const [pendingDayNavigation,setPendingDayNavigation]=useState<{tripId:string;date:string;direction:'next'|'previous'}|null>(null);
   const finishDayNavigation=(tripId:string,loadedDate:string)=>setPendingDayNavigation(previous=>previous?.tripId===tripId&&previous.date===loadedDate?null:previous);
   useEffect(()=>{if(home||!trip||(!user&&!shareTrip)||date<trip.startDate||date>trip.endDate)setPendingDayNavigation(null);},[home,trip?.id,trip?.startDate,trip?.endDate,date,user?.uid,shareTrip]);
-  const [hourHeight,setHourHeight]=useState(innerWidth<=700?48:57);
+  const [defaultHourHeight,setDefaultHourHeight]=useState(innerWidth<=700?48:57);
+  const hourHeight=layout.hourHeight??(!trip?outsideTimelineHeight(localStorage,user?.uid??'guest',date):undefined)??defaultHourHeight;
   const [historyState,setHistoryState]=useState<{undo:string|null;redo:string|null}>({undo:null,redo:null});
   const [historyBusy,setHistoryBusy]=useState(false);
   const [travelers,setTravelers]=useState<any[]>([]);
@@ -497,12 +500,13 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const dirty = useRef(false);
   const layoutLoading = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline]);
+  useLayoutEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline,hourHeight]);
   const calendarBox = useRef<HTMLDivElement>(null);
   const initialTripRequest=useRef<{tripId:string;date:string;promise:Promise<{trip:Trip;day:Day;layout:Layout|null}|null>}|null>(null);
   useEffect(()=>{if(trip&&loadedDay.current===`${trip.id}:${date}`){const key=loadedDay.current;dayCache.current.delete(key);dayCache.current.set(key,{day,layout});if(dayCache.current.size>24)dayCache.current.delete(dayCache.current.keys().next().value!);}},[trip?.id,date,day,layout]);
   const profilePhoto = useRef<HTMLInputElement>(null);
-  const [photoCrop,setPhotoCrop]=useState<File|null>(null);
+  const [photoCrop,setPhotoCrop]=useState<File|null>(null);
+  const [shortcutsOpen,setShortcutsOpen]=useState(false);
   useEffect(() => {
     if (!calendar) return;
     const outside = (event: PointerEvent) => {
@@ -516,7 +520,30 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }, [calendar]);
   useEffect(()=>{if(modal==='new-trip')setTripLook(randomTripAppearance());else if(modal==='edit-trip'&&trip)setTripLook(tripAppearance(trip));},[modal]);
   const [time, setTime] = useState(new Date());
-  useEffect(()=>{const resize=()=>setHourHeight(innerWidth<=700?48:57);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
+  useEffect(()=>{const resize=()=>setDefaultHourHeight(innerWidth<=700?48:57);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
+  useEffect(()=>{
+    const viewport=scroller.current,panel=viewport?.closest('.schedule-panel');
+    if(home||!ready||!viewport||!panel)return;
+    const zoom=(factor:number,anchor:number)=>{
+      if(layoutLoading.current)return;
+      const height=layoutRef.current.hourHeight??(!tripRef.current?outsideTimelineHeight(localStorage,user?.uid??'guest',dateRef.current):undefined)??(innerWidth<=700?48:57);
+      changeLayout(timelineZoom(height,viewport.scrollTop,anchor,factor,viewport.clientHeight));
+    };
+    const wheel=(event:Event)=>{
+      const e=event as WheelEvent;if(!e.ctrlKey)return;
+      e.preventDefault();
+      const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewport.clientHeight:1);
+      const anchor=Math.max(0,Math.min(viewport.clientHeight,e.clientY-viewport.getBoundingClientRect().top));
+      zoom(Math.exp(-delta*.002),anchor);
+    };
+    const key=(e:KeyboardEvent)=>{
+      if(!e.ctrlKey||e.altKey||!(panel.matches(':hover')||panel.contains(document.activeElement))||(e.target as Element)?.closest('input,textarea,[contenteditable="true"]'))return;
+      if(!['+','=','-','_'].includes(e.key))return;
+      e.preventDefault();zoom(['+','='].includes(e.key)?1.15:1/1.15,viewport.clientHeight/2);
+    };
+    panel.addEventListener('wheel',wheel,{passive:false});document.addEventListener('keydown',key);
+    return()=>{panel.removeEventListener('wheel',wheel);document.removeEventListener('keydown',key);};
+  },[home,ready,layout.timeline]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
 
   useEffect(() => {
@@ -996,6 +1023,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       )
     )
       return;
+    if(!tripRef.current&&patch.hourHeight!==undefined)localStorage.setItem(outsideTimelineKey(user?.uid??'guest',dateRef.current),String(patch.hourHeight));
     dirty.current = true;
     const next={...layoutRef.current,...patch};
     layoutRef.current=next;
@@ -1573,7 +1601,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               <span title="Active time zone">{timezone}</span>
             </div>
             <div
-              className="timeline-scroll"
+              className="timeline-scroll" tabIndex={0} aria-label="Daily timeline"
               ref={scroller}
               onScroll={(e) =>
                 !layoutLoading.current && changeLayout({ scroll: e.currentTarget.scrollTop })
@@ -2310,7 +2338,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {(modal === "settings" || modal === "account-settings") && (
-        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop)} locked={settingsSaving} onClose={discardSettings}>
+        <Modal title="Your preferences" inactive={modal === "account-settings" || Boolean(photoCrop) || shortcutsOpen} locked={settingsSaving} onClose={discardSettings}>
           <form
             onSubmit={async(e) => {
               e.preventDefault();
@@ -2425,7 +2453,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               Save preferences
             </AsyncButton>
             <div className="settings-footer">
-              <AsyncButton type="button" className="button settings-tour-button" onClick={()=>{discardSettings();window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</AsyncButton>
+              <div className="settings-help-buttons"><AsyncButton type="button" className="button settings-tour-button" onClick={()=>{discardSettings();window.dispatchEvent(new Event('journas-start-tour'));}}>Guided tour</AsyncButton><button type="button" className="button settings-shortcuts-button" onClick={()=>setShortcutsOpen(true)}>Keyboard shortcuts</button></div>
               <small>
                 Journas · Version 1.0.0
               </small>
@@ -2530,6 +2558,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         </Modal>
       )}
       {tripCrop&&<Modal title="Crop trip image" onClose={()=>setTripCrop(null)}><Suspense fallback={<Compass/>}><ProfilePhotoCropper file={tripCrop} onCancel={()=>setTripCrop(null)} onError={setMessage} onApply={image=>{setTripLook(previous=>({...previous,image,mode:'image'}));setTripCrop(null);}}/></Suspense></Modal>}
+      {shortcutsOpen&&<Modal title="Keyboard shortcuts" onClose={()=>setShortcutsOpen(false)}><KeyboardShortcuts/></Modal>}
       {photoCrop&&<Modal title="Crop profile photo" onClose={()=>setPhotoCrop(null)}><Suspense fallback={<div>Loading photo editor...</div>}><ProfilePhotoCropper file={photoCrop} onCancel={()=>setPhotoCrop(null)} onError={setMessage} onApply={photo=>{setSettings(previous=>({...previous,photoURL:photo}));setPhotoCrop(null);}}/></Suspense></Modal>}
       {modal === "account-settings" && user && <Modal title="Account sign-in" onClose={()=>setModal("settings")}><AccountCredentials user={user} onMessage={setMessage} onChanged={()=>{refreshAccount(n=>n+1);}}/></Modal>}
       {confirmation&&<Modal title="Confirm deletion" onClose={()=>{confirmation.resolve(false);setConfirmation(null);}}><p>{confirmation.message}</p><div className="modal-actions"><AsyncButton className="button" onClick={()=>{confirmation.resolve(false);setConfirmation(null);}}>Cancel</AsyncButton><AsyncButton className="button danger" onClick={()=>{confirmation.resolve(true);setConfirmation(null);}}>Confirm</AsyncButton></div></Modal>}

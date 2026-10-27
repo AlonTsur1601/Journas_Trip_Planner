@@ -7,6 +7,8 @@ import { ChevronDown, Check } from "lucide-react";
 import {Popover} from "./Popover";
 import {PlanGate} from './PlanGate';
 import {recordPracticeFeature} from './practice';
+import {PlanRequirement} from './PlanBadge';
+import type {PlanId} from '../shared/plans';
 
 export function Dropdown({ children, value, onChange, disabled, placeholder = "Choose", searchable=false, groupTabs=false, scrollable: _scrollable, ...props }: any) {
   const [open, setOpen] = useState(false);
@@ -14,8 +16,8 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
   const [activeGroup,setActiveGroup]=useState("");
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
-  type Option={value:string;label:any;disabled?:boolean;group?:string};
-  const readOptions=(nodes:any,group?:string):Option[]=>Children.toArray(nodes).filter(isValidElement).flatMap((element:any)=>element.type==='optgroup'?readOptions(element.props.children,element.props.label):[{value:String(element.props.value??element.props.children),label:element.props.children,disabled:element.props.disabled,group}]);
+  type Option={value:string;label:any;disabled?:boolean;group?:string;requiredPlan?:PlanId};
+  const readOptions=(nodes:any,group?:string):Option[]=>Children.toArray(nodes).filter(isValidElement).flatMap((element:any)=>element.type==='optgroup'?readOptions(element.props.children,element.props.label):[{value:String(element.props.value??element.props.children),label:element.props.children,disabled:element.props.disabled,requiredPlan:element.props['data-required-plan'],group}]);
   const options=readOptions(children);
   const groups=[...new Set(options.map(option=>option.group).filter((group):group is string=>Boolean(group)))];
   const group=groups.includes(activeGroup)?activeGroup:groups[0];
@@ -23,7 +25,7 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
   const toggle=()=>{setOpen(!open);setSearch('');setActiveGroup(options.find(option=>option.value===String(value))?.group??groups[0]??'');};
   const optionButtons=filtered.map((option,index) => <div className="dropdown-option-row" key={option.value}>{!groupTabs&&option.group&&option.group!==filtered[index-1]?.group&&<div className="dropdown-category" role="presentation">{option.group}</div>}<button type="button" role="option" aria-selected={option.value === String(value)} disabled={option.disabled} key={option.value} onClick={() => {
         onChange?.({ target: { value: option.value }, currentTarget: { value: option.value } }); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
-      }}><span>{option.label}</span>{option.value === String(value) && <Check size={14} />}</button></div>);
+      }}><span className="dropdown-option-label">{option.label}</span>{option.requiredPlan&&<PlanRequirement inline plan={option.requiredPlan} both={option.requiredPlan==='traveler'}/>} {option.value === String(value) && <Check size={14} />}</button></div>);
   return <div ref={root} className="dropdown" onKeyDown={(event) => {
     if (event.key === "Escape") { event.stopPropagation(); setOpen(false); root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {

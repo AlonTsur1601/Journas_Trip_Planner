@@ -467,7 +467,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const calendarDark=settings.theme==='dark'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;
-  const tripDotColors=useMemo(()=>calendarTripColors(trips,settings.accent,calendarDark),[trips,settings.accent,calendarDark]);
+  const calendarTrips=useMemo(()=>[...new globalThis.Map(trips.map(t=>[t.id,t] as const)).values()],[trips]);
+  const tripDotColors=useMemo(()=>calendarTripColors(calendarTrips,settings.accent,calendarDark),[calendarTrips,settings.accent,calendarDark]);
   const [pendingConnections,setPendingConnections]=useState<PendingConnection[]>([]);
   const visibleDayConnections=useMemo(()=>visibleConnections(day.connections,pendingConnections,trip?.id,date),[day.connections,pendingConnections,trip?.id,date]);
   const mapPins=useMemo(()=>trip?.lodging?[{id:"trip-lodging",title:trip.lodging.name,nameSource:trip.lodging.nameSource,note:trip.lodging.note??"",color:trip.lodging.color??settings.accent,symbol:trip.lodging.symbol??"icon:stay",lng:trip.lodging.lng,lat:trip.lodging.lat,versions:{}},...day.pins]:day.pins,[trip?.lodging,day.pins,settings.accent]);
@@ -1897,15 +1898,10 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
           <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={viewDateMax}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
-            dayTitle={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
-            dayContent={(d:string)=>trips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
-          <div className="calendar-trips" role="group" aria-label="Trips in this month" tabIndex={0}>
-            {trips
-              .filter(
-                (t) =>
-                  t.startDate <= `${month}-31` && t.endDate >= `${month}-01`,
-              )
-              .map((t) => (
+            dayTitle={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
+            dayContent={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
+          <div className="calendar-trips" role="group" aria-label="Trips" tabIndex={0}>
+            {calendarTrips.map((t) => (
                 <AsyncButton
                   key={t.id}
                   title={`Show ${t.name}'s starting month`}
@@ -2512,7 +2508,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             >
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
-              <option value={365} disabled={planState.effective.retentionDays!==null&&planState.effective.retentionDays<365}>One year</option>
+              <option value={365} data-required-plan="traveler" disabled={planState.effective.retentionDays!==null&&planState.effective.retentionDays<365}>One year</option>
 
             </Select>
             <p className="form-note">

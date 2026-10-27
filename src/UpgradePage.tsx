@@ -7,8 +7,8 @@ import {api} from './firebase';
 import {AsyncButton} from './AsyncButton';
 const money=(cents:number,currency='USD')=>new Intl.NumberFormat('en-US',{style:'currency',currency}).format(cents/100);
 const benefits:Record<PlanId,string[]>={
- tourist:['Map, search, places and connections','Independent schedule and tasks','5 saved trips · up to 14 days each','Plan up to 1 year ahead · 5 travelers','Basic colors and Journas symbols','90-day retention · ads on eligible screens','No home pins, emoji or advanced colors','No linked items, place menus, copying or nearby highlights','No overlapping owned trips'],
- traveler:['No ads · 20 saved trips','Up to 60 days · plan 2 years ahead','Up to 10 travelers · 4 home pins','Linked schedule and tasks','Basic emoji and all supported skin tones','Place and connection menus · copy places','Nearby time-block highlights','365-day retention','No advanced colors, task highlights or overlapping trips'],
+ tourist:['Map, search, places and connections','Independent schedule and tasks','5 saved trips · up to 14 days each','Plan up to 1 year ahead · 5 travelers','Basic colors and Journas symbols','90-day retention · ads on eligible screens','No home pins, emoji or advanced colors','No linked items, place/connection menus, copying or nearby highlights','No overlapping owned trips'],
+ traveler:['No ads · 20 saved trips','Up to 60 days · plan 2 years ahead','Up to 10 travelers · 4 home pins','Linked schedule and tasks','Basic emoji','Place and connection menus · copy places','Nearby time-block highlights','365-day retention','No advanced colors, task highlights or overlapping trips'],
  adventurer:['100 saved trips · 8 home pins','Unlimited trip length, horizon and travelers','Advanced colors and full emoji catalog','Nearby task highlights','Overlapping owned trips','Unlimited retention'],
 };
 export default function UpgradePage({onClose}:{onClose:()=>void}){

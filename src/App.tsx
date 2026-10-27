@@ -39,7 +39,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-
+
   signOut,
   type User,
 } from "firebase/auth";
@@ -110,7 +110,7 @@ const maxDate = () => {
   d.setFullYear(d.getFullYear() + 1);
   return d.toLocaleDateString("en-CA");
 };
-
+
 type Edit = {
   kind: "pins" | "blocks" | "tasks" | "connections";
   item: Record<string, any>;
@@ -133,8 +133,9 @@ function Input({ label, ...props }: any) {
     </label>
   );
 }
-function Select({ label, children, ...props }: any) {
-  return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
+function Select({ label, children, entitlementMark, entitlementLocked, entitlementAction, ...props }: any) {
+  if(!entitlementMark&&!entitlementLocked)return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
+  return <div className="field"><span>{label}{entitlementMark}</span><div className="plan-control"><div {...(entitlementLocked?{inert:true}:{})}><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>{entitlementLocked&&<button type="button" className="plan-gate-hit" aria-label={`Upgrade for ${label}`} onClick={entitlementAction}/>}</div></div>;
 }
 function Modal({ title, children, onClose, inactive=false, locked=false }: any) {
   const box = useRef<HTMLElement>(null);
@@ -242,7 +243,7 @@ function TripFeatures({ className = "" }: { className?: string }) {
     </div>
   );
 }
-
+
 const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) => void }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -330,7 +331,7 @@ const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) 
                       email,
                       password,
                     );
-
+
                   } else
                     await signInWithEmailAndPassword(auth!, email, password);
                 });
@@ -504,7 +505,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const savedAccountName=useRef<string|undefined>(undefined);
   const [confirmation,setConfirmation]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
   const confirmAction=(message:string)=>new Promise<boolean>(resolve=>setConfirmation({message,resolve}));
-
+
   const token = new URLSearchParams(location.search).get("share");
   const mapFocus=useRef<MapPanelHandle|null>(null);
   const layoutRef = useRef(layout);
@@ -561,7 +562,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     return()=>{panel.removeEventListener('wheel',wheel);document.removeEventListener('keydown',key);};
   },[home,ready,layout.timeline]);
   useEffect(()=>{setAmbiguousTime(false);},[edit?.item.start,edit?.item.end,edit?.item.timezone,date]);
-
+
   useEffect(() => {
     if (!message) return;
     const timeout = setTimeout(() => setMessage(""), 5000);
@@ -1382,7 +1383,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const displayTasks=optimisticTaskList(day.tasks,optimisticTasks);
   const taskIsCurrent=(task:Day['tasks'][number])=>{
     if(task.checked)return false;const block=day.blocks.find(b=>b.id===task.blockId);if(!block)return false;
-
+
     const range=blockRange(block,date);const minute=(value:string)=>{const [h,m]=value.split(':').map(Number);return h*60+m;};return date===displayedToday&&nowMinutes>=minute(range.start)&&nowMinutes<minute(range.end);
   };
   const computedNearby=nearbyActivities(day.blocks,mapPins,date,liveLocation.position,time,trip?.lodging?.timezone||timezone);
@@ -1531,7 +1532,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <div className="places-toolbar-heading">
           <Map size={17} /><h1>Places & routes</h1>
           {(shareTrip||Boolean(user&&trip?.viewerIds?.includes(user.uid))) && <span className="shared-label">View only</span>}
-
+
         </div>
         <div className="view-controls">
           {[
@@ -1890,7 +1891,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             />
           </>}</FloatingChecklist>
         )}
-
+
       </div></WorkspaceMotion>
       {calendar && (
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
@@ -1963,7 +1964,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <LocationPicker contextPins={modal==='edit-trip'?mapPins:undefined} contextConnections={modal==='edit-trip'?visibleDayConnections:undefined} editingPinId={modal==='edit-trip'?'trip-lodging':undefined} value={lodgingDraft} showHints={modal!=='new-trip'} initialView={lodgingView} color={lodgingDraft?.color??settings.accent} symbol={lodgingDraft?.symbol??"icon:stay"} onChange={(place,source)=>{
               setLodgingDraft(previous=>{if(source==='reverse'&&!previous?.nameSource&&previous?.lng===place.lng&&previous?.lat===place.lat&&previous?.name.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())lodgingNameEdited.current=false;return {...previous,lng:place.lng,lat:place.lat,name:lodgingName(previous?.name,place.name,lodgingNameEdited.current),nameSource:lodgingNameEdited.current?'custom':'location',timezone:tzlookup(place.lat,place.lng)};});
             }}/>
-
+
             {<div className="lodging-pin-fields" style={{visibility:lodgingDraft?'visible':'hidden'}} inert={!lodgingDraft}><Input label="Lodging pin name" value={lodgingDraft?.name??''} onChange={(e:any)=>{lodgingNameEdited.current=Boolean(e.target.value.trim());setLodgingDraft({...lodgingDraft!,name:e.target.value,nameSource:e.target.value.trim()?'custom':'location'});}}/><Input label="Color" type="color" value={lodgingDraft?.color??settings.accent} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,color:e.target.value})}/><SymbolPicker value={lodgingDraft?.symbol??"icon:stay"} onChange={(e:any)=>setLodgingDraft({...lodgingDraft!,symbol:e.target.value})}/></div>}
             </div><AsyncButton
               className="button primary full"
@@ -2022,7 +2023,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 />
               )}
               {edit.kind === "pins" && <LocationPicker contextPins={mapPins} contextConnections={visibleDayConnections} editingPinId={edit.item.id} key={edit.item.id} value={edit.locationSelected===false?undefined:{lng:edit.item.lng,lat:edit.item.lat,name:edit.item.title}} initialView={layout} color={edit.item.color} symbol={edit.item.symbol} disabled={readonly} onChange={(place,source)=>rawSetEdit(current=>{if(current?.kind!=='pins'||current.item.id!==edit.item.id)return current;if(source==='reverse'&&pendingItemWrites.current.has([trip?.id,date,'pins',current.item.id].join(':')))return current;const lodging=current.item.id==='trip-lodging';let manual=isManualLodgingName({name:current.item.title,nameSource:current.item.nameSource});if(lodging&&source==='reverse'&&!current.item.nameSource&&current.item.lng===place.lng&&current.item.lat===place.lat&&current.item.title.trim().toLocaleLowerCase()===place.name.trim().toLocaleLowerCase())manual=false;return {...current,locationSelected:source==='reverse'?current.locationSelected:true,item:{...current.item,lng:place.lng,lat:place.lat,...(lodging?{title:lodgingName(current.item.title,place.name,manual),nameSource:manual?'custom':'location'}:{title:source==='search'||!current.item.title||current.item.title==='Unnamed location'?place.name:current.item.title})}};})}/>}
-
+
               {edit.kind === "blocks" && (
                 <>
                   <div className="form-row">
@@ -2276,7 +2277,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               </div>
             )}
           </form>
-
+
         </Modal>
       )}
       {modal === "places" && <Modal title="Places" onClose={()=>setModal(null)}>
@@ -2382,7 +2383,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   >
                     Revoke all sharing links
                   </AsyncButton>
-
+
                 </>
               )}
               <div className="delete-trip">
@@ -2495,9 +2496,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                   setSettings({ ...settings, autoDelete: e.target.checked })
                 }
               />{" "}
-              Automatically remove old trips from my account
+              Automatically remove old trips from my account<PlanRequirement inline plan="adventurer"/>
             </label>
-            <div className="plan-retention-hint"><PlanRequirement plan="adventurer"/></div>
+
             <Select disabled={!settings.autoDelete&&planState.effective.retentionDays===null}
               label="Remove from my account after the trip ends"
               value={settings.retentionDays}

@@ -6,9 +6,9 @@ export function PlanIcon({plan,size=20}:{plan:PlanId;size?:number}){
 export function PlanBadge({plan,compact=false}:{plan:PlanId;compact?:boolean}){return <span className={`plan-badge plan-${plan}`} title={`${plan} plan`} aria-label={`${plan} plan`}><PlanIcon plan={plan} size={16}/>{!compact&&<span>{plan}</span>}</span>;}
 
 /** Decorative entitlement marks never take space away from the original control. */
-export function PlanRequirement({plan,both=false}:{plan:PlanId;both?:boolean}){
+export function PlanRequirement({plan,both=false,inline=false}:{plan:PlanId;both?:boolean;inline?:boolean}){
  const {personal,practice}=usePlan();
  const levels=['tourist','traveler','adventurer'];
  if(!practice&&levels.indexOf(personal.plan)>=levels.indexOf(plan))return null;
- return <span className="plan-requirement" title={practice?'Paid feature included in this tutorial':`Requires ${plan}${both?' or adventurer':''}`} aria-label={`Requires ${plan}${both?' or adventurer':''}`}><PlanBadge compact plan={plan}/>{both&&plan==='traveler'&&<PlanBadge compact plan="adventurer"/>}</span>;
+ return <span className={`plan-requirement${inline?' plan-requirement-inline':''}`} title={practice?'Paid feature included in this tutorial':`Requires ${plan}${both?' or adventurer':''}`} aria-label={`Requires ${plan}${both?' or adventurer':''}`}><PlanBadge compact plan={plan}/>{both&&plan==='traveler'&&<PlanBadge compact plan="adventurer"/>}</span>;
 }

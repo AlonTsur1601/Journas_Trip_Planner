@@ -29,3 +29,9 @@ Status: IMPLEMENTATION VERIFIED IN ISOLATED STAGING; external provider connectio
 - Upgrade action is independent and left of the date picker, with a slow uneven accent halo; Ctrl+= schedule shortcut removed from handler/help/tutorial.
 - Payment-management email queue added per paid transaction: cancel link for paid plans and an additional traveler downgrade link for adventurer. Links require sign-in and confirmation. SMTP/Paddle delivery remains externally unverified.
 - Verification: full suite 403 pass / 0 fail / 21 pending, plus fourth focused billing-mail test passes (transaction retry deduplication); live IAB checks of all three tiers, advanced-color access, paired icon marks, menus/ads, dark/light upgrade and 360/390/430 widths. Actual physical phone not tested.
+
+## Production-project Git isolation (27 October)
+- The production Vercel project `journas-trip-planner` now has a project-level Ignored Build Step that exits 0 only when `VERCEL_GIT_COMMIT_REF` is exactly `codex/monetization-staging`; all other refs exit 1 and retain normal build behavior.
+- This setting is scoped to production project `prj_gwUEDAaOWfIF8ihEGiskovutznbU`; it is deliberately not placed in shared vercel.json. The separate staging project, Firebase configuration and deployed application are unchanged.
+- Vercel may show these skipped Git previews as CANCELED rather than removing their deployment records. They must not run the application build or fail its staging environment guard.
+- Production remains `dpl_AxsppyAijfMhLdQqBftpBUpSeA1X`; staging remains `dpl_FojJ8qxY8LgL6PXb3kpajXCSSu1h`. Re-read and verified the production target after saving the setting.

@@ -8,7 +8,7 @@ export function PlanGate({feature,ownerPlan,children}:{feature:Feature;ownerPlan
  if(child.type==='div'){
   const fields=Children.toArray(child.props.children);
   const heading=fields[0];
-  if(isValidElement<any>(heading))fields[0]=cloneElement(heading,{},heading.props.children,mark);
+  if(isValidElement<any>(heading))fields[0]=cloneElement(heading,{},(heading as ReactElement<any>).props.children,mark);
   if(!allowed)fields[1]=<div key="entitlement-control" className="plan-control"><div inert>{fields[1]}</div><button type="button" className="plan-gate-hit" aria-label={`Upgrade to ${needed} for ${feature}`} onClick={()=>openUpgrade(feature,needed)}/></div>;
   return cloneElement(child,{},...fields);
  }

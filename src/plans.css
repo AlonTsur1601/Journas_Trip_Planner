@@ -53,7 +53,7 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 /* An uneven accent halo turns slowly around each upgrade action. */
 @property --upgrade-turn{syntax:'<angle>';initial-value:0deg;inherits:false;}
 .upgrade-home,.upgrade-topbar{position:relative;isolation:isolate;overflow:visible;border-radius:5px;background:var(--surface);}
-.upgrade-home::before,.upgrade-topbar::before{content:'';position:absolute;inset:-3px;border:2px solid transparent;padding:0;border-radius:8px;background:conic-gradient(from var(--upgrade-turn),transparent 4%,color-mix(in srgb,var(--accent) 25%,transparent) 22%,var(--accent) 33%,transparent 48%,color-mix(in srgb,var(--accent) 40%,transparent) 70%,var(--accent) 80%,transparent 96%);background-origin:border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0) border-box;mask-composite:exclude;pointer-events:none;animation:upgrade-orbit 9s linear infinite;}
+.upgrade-home::before,.upgrade-topbar::before{content:'';position:absolute;inset:-3px;border:2px solid transparent;padding:0;border-radius:8px;background:conic-gradient(from var(--upgrade-turn),color-mix(in srgb,var(--accent) 45%,transparent) 0%,color-mix(in srgb,var(--accent) 60%,transparent) 22%,var(--accent) 33%,color-mix(in srgb,var(--accent) 45%,transparent) 48%,color-mix(in srgb,var(--accent) 60%,transparent) 70%,var(--accent) 80%,color-mix(in srgb,var(--accent) 45%,transparent) 100%);background-origin:border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0) border-box;mask-composite:exclude;pointer-events:none;animation:upgrade-orbit 9s linear infinite;}
 @keyframes upgrade-orbit{to{--upgrade-turn:360deg;}}
 .topbar>.upgrade-topbar{margin-left:auto;flex-shrink:0;}
 .topbar>.date-picker{margin-left:0;}
@@ -88,7 +88,7 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .upgrade-page .plan-price{font-size:30px;margin-top:8px;}
 .upgrade-page .annual-detail{font-size:11px;line-height:1.35;margin-top:3px;}
 .upgrade-page .plan-inheritance{font-size:12px;}
-.upgrade-page .plan-card ul{font-size:12px;line-height:1.35;margin:8px 0 14px;}
+.upgrade-page .plan-card ul{font-size:13px;line-height:1.4;margin:8px 0 14px;}
 .upgrade-page .plan-card li{padding:2px 0;}
 .upgrade-page .billing-disclosure{margin:24px 0 0;}
 .upgrade-back{color:var(--ink);text-decoration:none;}

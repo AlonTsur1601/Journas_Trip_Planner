@@ -93,3 +93,7 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .upgrade-page .billing-disclosure{margin:24px 0 0;}
 .upgrade-back{color:var(--ink);text-decoration:none;}
 @media(max-width:700px){.upgrade-page .plan-card{padding:20px;}.upgrade-page .plan-pricing{min-height:77px;}.upgrade-page .plan-card ul{font-size:13px;line-height:1.5;}.upgrade-intro{padding-top:22px;}}
+
+.upgrade-page .plan-card ul{flex:0 0 auto;}
+.upgrade-page .plan-limits{font-size:12px;line-height:1.4;color:var(--upgrade-muted);margin:0 0 14px;}
+.upgrade-page .plan-card>.button{margin-top:auto;}

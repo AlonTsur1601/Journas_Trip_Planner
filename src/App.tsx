@@ -1422,7 +1422,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   if(user&&(verified===null||verified===true&&(!ready||loadedAccount.current!==user.uid)))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
-  if(user&&ready&&upgrade)return <UpgradePage feature={upgrade.feature} onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/>;
+  if(user&&ready&&upgrade)return <MotionSurface><UpgradePage onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/></MotionSurface>;
   return (
     <TripPlanContext.Provider value={practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan}>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>

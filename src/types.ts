@@ -56,6 +56,8 @@ export type Day = {
   connections: Connection[];
 };
 export type Trip = {
+  /** Isolated staging demo copies only; ordinary trips have no group. */
+  calendarDemoGroup?: string;
   access?: {ownerPlan:import('../shared/plans').PlanId;readonlyReason:string|null;expired:boolean;cleanupAt:number;ownerCleanupAt:number};
   id: string;
   name: string;

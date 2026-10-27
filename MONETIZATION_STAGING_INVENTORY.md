@@ -13,6 +13,7 @@
 ## זהויות, שירותים ובידוד
 
 - פרויקט Firebase `journas-monetization-2026`, פרויקט Vercel `journas-monetization-staging` והחשבונות `*.test` נועדו לבדיקה בלבד. הרשאות תוכנית קבועות מסוג `source: 'test'` מטופלות ב־`shared/plans.ts` וב־`server/billing.ts`; אין להעניק אותן למשתמשי ייצור. תורי ההודעות ב־`server/billing.ts`, `server/billing-mail.ts` ו־`server/retention-notices.ts` מסמנים הודעות לכתובות `.test` כבדיקה בלבד.
+- טיולי ההדגמה הכפולים של פריז מסומנים ב־Firebase הבדיקות בלבד באמצעות `calendarDemoGroup`; קיבוצם בלוח השנה ממומש ב־`src/calendar-trips.ts` ויש להסירו עם נתוני ההדגמה לקראת יציאה לייצור.
 - `server/staging.ts`, `vite.config.ts`, `server/http.ts` ו־`api/firebase-auth.ts`: בדיקות סביבה, רשימת חשבונות מורשים וחסימת חיבור שגוי. אלה הגנות חשובות לבדיקה; מעבר לייצור מחייב חלופה מפורשת ובטוחה, לא מחיקה עיוורת שלהן.
 - `src/firebase.ts` ו־`api/firebase-auth.ts`: תצורת לקוח ו־proxy לאימות הבדיקה. יש להחליף בתצורת האימות שנבחרה לייצור ולבדוק מחדש את גבולות האבטחה.
 - `server/billing.ts`, `src/paddle-checkout.ts`, `api/billing-webhook.ts` ו־`server/billing-mail.ts`: מסלולי Paddle Sandbox וקישורי סביבת בדיקה. נדרשים חשבון ספק, מוצרי ייצור, מפתחות נפרדים ואימות מקצה לקצה לפני חיוב אמיתי.

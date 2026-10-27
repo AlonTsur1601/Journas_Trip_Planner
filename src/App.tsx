@@ -88,6 +88,7 @@ import { startingLayout, lodgingForDate, tripForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import {calendarTripColors} from "./calendar-colors";
+import {calendarTripsForDisplay} from "./calendar-trips";
 import { MonthCalendar, DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
 let mapPanelLoad:ReturnType<typeof importMapPanel>|undefined;
@@ -467,7 +468,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
   const [movingPinId,setMovingPinId]=useState<string|null>(null);
   const calendarDark=settings.theme==='dark'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;
-  const calendarTrips=useMemo(()=>[...new globalThis.Map(trips.map(t=>[t.id,t] as const)).values()],[trips]);
+  const calendarTrips=useMemo(()=>calendarTripsForDisplay(trips,trip?.id),[trips,trip?.id]);
   const tripDotColors=useMemo(()=>calendarTripColors(calendarTrips,settings.accent,calendarDark),[calendarTrips,settings.accent,calendarDark]);
   const [pendingConnections,setPendingConnections]=useState<PendingConnection[]>([]);
   const visibleDayConnections=useMemo(()=>visibleConnections(day.connections,pendingConnections,trip?.id,date),[day.connections,pendingConnections,trip?.id,date]);

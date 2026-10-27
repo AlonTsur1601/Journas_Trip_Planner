@@ -3,7 +3,7 @@ const groups=[
   ['Ctrl + S','Save planning'],['Ctrl + Z','Undo the last planning change'],['Ctrl + Shift + Z','Redo a planning change'],
  ]],
  ['Schedule',[
-  ['Ctrl + + / Ctrl + =','Increase the spacing between hour lines'],['Ctrl + −','Decrease the spacing between hour lines'],['Ctrl + mouse wheel','Zoom the schedule around the pointer'],
+  ['Ctrl + +','Increase the spacing between hour lines'],['Ctrl + −','Decrease the spacing between hour lines'],['Ctrl + mouse wheel','Zoom the schedule around the pointer'],
  ]],
  ['Map (when the map has keyboard focus)',[
   ['Arrow keys','Pan the map'],['+ / −','Zoom the map in or out'],['Shift + + / Shift + −','Zoom the map by two levels'],['Shift + ← / →','Rotate the map'],['Shift + ↑ / ↓','Tilt the map'],

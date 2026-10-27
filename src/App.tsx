@@ -1,7 +1,7 @@
 import {practiceFeatures,recordPracticeFeature} from './practice';
 import {plans,addCalendarYears,type PlanId} from '../shared/plans';
 import {usePlan,openUpgrade,requirePersonal} from './plan-state';
-import {PlanBadge} from './PlanBadge';
+import {PlanBadge,PlanRequirement} from './PlanBadge';
 import {PlanGate} from './PlanGate';
 import {TripPlanContext} from './trip-plan';
 import UpgradePage from './UpgradePage';
@@ -554,8 +554,8 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     };
     const key=(e:KeyboardEvent)=>{
       if(!e.ctrlKey||e.altKey||!(panel.matches(':hover')||panel.contains(document.activeElement))||(e.target as Element)?.closest('input,textarea,[contenteditable="true"]'))return;
-      if(!['+','=','-','_'].includes(e.key))return;
-      e.preventDefault();zoom(['+','='].includes(e.key)?1.15:1/1.15,viewport.clientHeight/2);
+      if(!['+','-','_'].includes(e.key))return;
+      e.preventDefault();zoom(e.key==='+'?1.15:1/1.15,viewport.clientHeight/2);
     };
     panel.addEventListener('wheel',wheel,{passive:false});document.addEventListener('keydown',key);
     return()=>{panel.removeEventListener('wheel',wheel);document.removeEventListener('keydown',key);};
@@ -1425,7 +1425,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   return (
     <TripPlanContext.Provider value={practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan}>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
-      <div className="testing-banner" role="status">Testing · isolated environment · no real payments or ads</div>{home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>
@@ -1458,7 +1458,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <Plus size={18} />
           </AsyncButton>
         </div>
-        <div className="date-picker">
+        <button className="button upgrade-topbar" title="Upgrade plan" aria-label="Upgrade plan" onClick={()=>openUpgrade()}>Upgrade plan</button><div className="date-picker">
           <AsyncButton
             className="icon"
             aria-label="Next day" pending={pendingDayNavigation?.direction==='next'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
@@ -1493,7 +1493,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           </AsyncButton>
         </div>
         <div className="top-actions">
-          <button className="button upgrade-topbar" title="Upgrade plan" aria-label="Upgrade plan" onClick={()=>openUpgrade()}>Upgrade plan</button><div className="planning-history-actions">
+          <div className="planning-history-actions">
           <AsyncButton className="icon" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={readonly||!historyState.undo||historyBusy||saving} onClick={()=>restoreHistory("undo")}><Undo2 size={18}/></AsyncButton>
           <AsyncButton className="icon" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={readonly||!historyState.redo||historyBusy||saving} onClick={()=>restoreHistory("redo")}><Redo2 size={18}/></AsyncButton>
           <div className="save-control">
@@ -2497,7 +2497,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               />{" "}
               Automatically remove old trips from my account
             </label>
-            <div className="plan-retention-hint">{(planState.effective.retentionDays!==null||practice)&&<button type="button" className="plan-requirement" aria-label="Unlimited retention requires adventurer" onClick={()=>{if(!practice)openUpgrade("retention","adventurer");}}><PlanBadge plan="adventurer"/><span>{practice?"Included in this tutorial":"Unlimited retention"}</span></button>}</div>
+            <div className="plan-retention-hint"><PlanRequirement plan="adventurer"/></div>
             <Select disabled={!settings.autoDelete&&planState.effective.retentionDays===null}
               label="Remove from my account after the trip ends"
               value={settings.retentionDays}

@@ -69,3 +69,9 @@
 שינוי חודשי/שנתי משמר את מועד סיום התקופה שכבר שולמה, ללא חיוב מיידי. ההרשאות ותדירות החיוב משתנות לאחר אישור תשלום לתקופה החדשה. יש להשלים בדיקת ספק בפועל לאחר הזנת פרטי Sandbox. מקורות: [עדכון מנוי](https://developer.paddle.com/api-reference/subscriptions/update-subscription/), [מעבר בין תדירויות](https://developer.paddle.com/build/subscriptions/replace-products-prices-upgrade-downgrade/), [קישור תשלום](https://developer.paddle.com/build/transactions/pass-transaction-checkout/).
 
 תזמון התרעות, ביטולן אחרי שדרוג, ניסיונות חוזרים ונעילת עובדים מקבילים נבדקו אוטומטית. מסירת דוא״ל אמיתית דורשת בדיקת תיבת קבלה אחרי חיבור SMTP נפרד. תקלה אחרי קבלת הודעה אצל הספק ולפני שמירת ההצלחה עלולה לגרום למסירה חוזרת; SMTP אינו מספק הבטחת exactly-once.
+
+
+### מיילי חיוב וניהול מנוי
+Paddle כוללת במיילי המנוי קישור לפורטל ולביטול. בנוסף, לאחר `transaction.completed` מאומת Journas שומרת הודעת ניהול אחת לכל עסקה בתור `billingNotices`. ההודעה כוללת כפתור ביטול חיובים עתידיים; ב־adventurer נוסף כפתור מעבר ל־traveler. הקישורים פותחים את עמוד השדרוג ומחייבים כניסה ואישור, ללא שינוי מנוי מעצם פתיחת מייל. ההורדה והביטול נשארים בסוף התקופה ששולמה.
+המסירה משתמשת ב־SMTP הנפרד; webhook מנסה לשלוח, והתחזוקה היומית מנסה שוב הודעות שנכשלו. חשבונות `.test` אינם מקבלים מיילים. אין כרגע Paddle/SMTP מחוברים, ולכן מסירה אמיתית וקבלת קבלה אצל הספק עדיין דורשות בדיקת Sandbox. SMTP עלול למסור כפול אם התהליך קורס לאחר השליחה ולפני שמירת ההצלחה.
+מקורות ספק: https://developer.paddle.com/build/subscriptions/cancel-subscriptions/ ו־https://developer.paddle.com/concepts/sell/customer-portal/ .

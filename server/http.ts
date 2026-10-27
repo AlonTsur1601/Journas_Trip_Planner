@@ -11,6 +11,7 @@ import {places} from './places.js';
 import {sendVerificationEmail} from './verification-email.js';
 import {assertStaging,assertStagingAccount} from './staging.js';
 import {billingAction,reconcileBilling} from './billing.js';
+import {billingNotices} from './billing-mail.js';
 import {retentionNotices} from './retention-notices.js';
 export type Request = IncomingMessage & {
     body?: unknown;
@@ -131,9 +132,10 @@ export async function cleanupHandler(req: Request, res: ServerResponse) {
         if(process.env.VERCEL||process.env.NODE_ENV!=='test')assertStaging();
         const billing=await reconcileBilling(firestoreStore());
         const notices=await retentionNotices(firestoreStore());
+        const billingEmails=await billingNotices(firestoreStore());
         const result = await new JournasService(firestoreStore()).cleanup();
         const expiredRateLimits = await purgeExpiredRateLimits();
-        send(res, 200, { ...result, expiredRateLimits,notices,billing });
+        send(res, 200, { ...result, expiredRateLimits,notices,billing,billingEmails });
     }
     catch (error) {
         errors(res, error);

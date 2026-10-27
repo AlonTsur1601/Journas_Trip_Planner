@@ -59,6 +59,7 @@ export function firestoreStore(): Store {
             });
         },
         async list(path, limit = 100) { return (await db.collection(path).limit(limit).get()).docs.map(doc => doc.data()); },
+        async pendingBillingNotices(limit) { return (await db.collection('billingNotices').where('status', '==', 'pending').limit(limit).get()).docs.map(doc => doc.data()); },
         async pendingRetentionNotices(limit) { return (await db.collection('retentionNotices').where('status', '==', 'pending').limit(limit).get()).docs.map(doc => doc.data()); },
         async scanTrips(after, limit) { const query = db.collection('trips').orderBy(FieldPath.documentId()).limit(limit); return (await (after ? query.startAfter(after) : query).get()).docs.map(doc => doc.data()); },
         async dueMemberships(now, limit) { return (await db.collectionGroup('trips').where('cleanupAt', '<=', now).orderBy('cleanupAt').limit(limit).get()).docs.map(doc => doc.data()); },

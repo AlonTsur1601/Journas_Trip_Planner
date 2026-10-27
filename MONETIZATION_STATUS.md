@@ -19,3 +19,13 @@ Status: IMPLEMENTATION VERIFIED IN ISOLATED STAGING; external provider connectio
 - External tasks: Paddle Sandbox account, products/prices/client token/API and webhook secrets, then real provider lifecycle acceptance; separate SMTP and actual authorized inbox delivery; AdSense/CMP approval before any real ads. No production rollout or real payments authorized for this implementation.
 - Remaining device limitation: viewport tests do not establish physical-phone touch/OS keyboard behavior.
 - Final code deployment READY: dpl_3gbixknWmppNBqfRk1orYYQiLYYs (implementation commit a16f7b2). Mobile dialog ad scroll flow and background suppression verified; desktop unit rendered through a body portal to avoid clipping by modal overflow.
+
+
+## 27 October UI follow-up
+- Removed the top testing notice (staging isolation, noindex, Sandbox/mock guards remain in place).
+- Restyled upgrade using Journas surface/ink/line/accent tokens and its map background, consistent rounded buttons and aligned annual/monthly pricing blocks.
+- Compact noninteractive plan symbols replace verbose upgrade requirements; included tiers disappear outside the tutorial. Home profile badge is horizontal.
+- Home desktop ad sits below account actions without reducing content width; home ads remain visible and dimmed behind menus/dialogs, alongside eligible modal ads.
+- Upgrade action is independent and left of the date picker, with a slow uneven accent halo; Ctrl+= schedule shortcut removed from handler/help/tutorial.
+- Payment-management email queue added per paid transaction: cancel link for paid plans and an additional traveler downgrade link for adventurer. Links require sign-in and confirmation. SMTP/Paddle delivery remains externally unverified.
+- Verification: full suite 403 pass / 0 fail / 21 pending, plus fourth focused billing-mail test passes (transaction retry deduplication); live IAB checks of all three tiers, advanced-color access, paired icon marks, menus/ads, dark/light upgrade and 360/390/430 widths. Actual physical phone not tested.

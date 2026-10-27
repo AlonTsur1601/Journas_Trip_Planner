@@ -102,6 +102,7 @@ export async function applyBillingEvent(store:Store,event:Data){
    tx.set(`billingSubscriptions/${data.subscription_id}`,{uid});
    if(data.id)tx.set(`billingTransactions/${data.id}`,{uid,subscriptionId:data.subscription_id});
    tx.delete(`billingCheckouts/${uid}`);
+   if(data.id&&!await tx.get(`billingNotices/${data.id}`))tx.set(`billingNotices/${data.id}`,{id:data.id,uid,plan:matched.plan,status:typeof user.verifiedEmail==='string'&&user.verifiedEmail.endsWith('.test')?'test-only':'pending',createdAt:Date.now()});
   }
   if(type==='adjustment.updated'&&data.status==='approved'&&data.action==='refund'&&data.type==='full'&&data.transaction_id===old.lastPaidTransactionId)next={...next,source:'free',plan:'tourist',status:'refunded',periodEnd:0,paidChange:null,downgradedAt:Date.now(),canceledAt:at};
   tx.set(`users/${uid}`,{...user,billing:{...next,[clock]:at}});tx.set(`billingEvents/${id}`,{id,at,uid});

@@ -169,6 +169,8 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .upgrade-page .plan-card-heading svg{width:36px;height:36px;flex:none;color:var(--accent);}
 .upgrade-page .plan-card-heading h2{margin:0;}
 .upgrade-page .plan-pricing{min-height:88px;padding-bottom:12px;}
+.upgrade-page .plan-comparison th,.upgrade-page .plan-comparison td{width:25%;white-space:nowrap;}
+.upgrade-page .plan-comparison thead th{background:color-mix(in srgb,var(--accent) 17%,var(--surface));color:var(--ink);font-size:14px;font-weight:750;border-bottom:2px solid color-mix(in srgb,var(--accent) 55%,var(--line));}
 .dropdown-menu button:disabled:has(.plan-requirement){opacity:1;}
 .dropdown-menu button:disabled .dropdown-option-label{opacity:.55;}
 .dropdown-menu .dropdown-option-row .plan-requirement{position:static;transform:none;margin-left:auto;}

@@ -53,7 +53,7 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 /* An uneven accent halo turns slowly around each upgrade action. */
 @property --upgrade-turn{syntax:'<angle>';initial-value:0deg;inherits:false;}
 .upgrade-home,.upgrade-topbar{position:relative;isolation:isolate;overflow:visible;border-radius:5px;background:var(--surface);}
-.upgrade-home::before,.upgrade-topbar::before{content:'';position:absolute;inset:-3px;border:2px solid transparent;padding:0;border-radius:8px;background:conic-gradient(from var(--upgrade-turn),color-mix(in srgb,var(--accent) 45%,transparent) 0%,color-mix(in srgb,var(--accent) 60%,transparent) 22%,var(--accent) 33%,color-mix(in srgb,var(--accent) 45%,transparent) 48%,color-mix(in srgb,var(--accent) 60%,transparent) 70%,var(--accent) 80%,color-mix(in srgb,var(--accent) 45%,transparent) 100%);background-origin:border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0) border-box;mask-composite:exclude;pointer-events:none;animation:upgrade-orbit 9s linear infinite;}
+.upgrade-home::before,.upgrade-topbar::before{content:'';position:absolute;inset:-3px;border:2px solid transparent;padding:0;border-radius:8px;background:conic-gradient(from var(--upgrade-turn),color-mix(in srgb,var(--accent) 18%,transparent) 0%,color-mix(in srgb,var(--accent) 60%,transparent) 22%,var(--accent) 33%,color-mix(in srgb,var(--accent) 18%,transparent) 48%,color-mix(in srgb,var(--accent) 60%,transparent) 70%,var(--accent) 80%,color-mix(in srgb,var(--accent) 18%,transparent) 100%);background-origin:border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0) border-box;mask-composite:exclude;pointer-events:none;animation:upgrade-orbit 9s linear infinite;}
 @keyframes upgrade-orbit{to{--upgrade-turn:360deg;}}
 .topbar>.upgrade-topbar{margin-left:auto;flex-shrink:0;}
 .topbar>.date-picker{margin-left:0;}
@@ -97,3 +97,65 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .upgrade-page .plan-card ul{flex:0 0 auto;}
 .upgrade-page .plan-limits{font-size:12px;line-height:1.4;color:var(--upgrade-muted);margin:0 0 14px;}
 .upgrade-page .plan-card>.button{margin-top:auto;}
+
+/* Unavailable controls dim independently of their non-interactive plan marks. */
+.plan-locked-control{opacity:1;color:color-mix(in srgb,var(--ink) 55%,var(--surface));}
+.plan-locked-control>svg{opacity:.55;}
+.locked-symbol,.locked-home-pin{opacity:1;}
+.locked-symbol>:not(.symbol-plan-mark),.locked-home-pin>.home-tile{opacity:.55;}
+.plan-requirement{opacity:1;}
+.map-list-tools>.icon .plan-requirement{top:-15px;right:auto;left:50%;transform:translateX(-50%);white-space:nowrap;}
+.map-toolbar:has(.plan-requirement){top:20px;}
+/* Account picture and badge share a dedicated, adequately sized grid column. */
+.settings-account .photo-field{grid-template-columns:88px minmax(0,1fr);}
+.settings-photo-preview{justify-items:start;}
+.settings-account .photo-remove{grid-column:2;}
+.home-account-name{min-width:0;flex:0 1 auto;}
+.home-account-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media(max-width:1100px) and (min-width:701px){
+ .home-pins-section .home-pins>.mock-home-mobile-middle{display:flex;grid-column:1/-1;grid-row:span 3;height:100%;width:100%;margin:0;}
+}
+@media(max-width:700px){
+ .settings-account .photo-field{grid-template-columns:76px minmax(0,1fr);}
+ .home-masthead{gap:6px;}.home-brand{flex-shrink:0;}
+ .home-account{flex:1 1 auto;min-width:0;justify-content:flex-end;max-width:none;}
+ .home-account>span.home-account-name{min-width:0;max-width:none;flex:0 1 auto;}
+ .home-account>span.home-account-name>strong{max-width:none;font-size:11px;}
+ .home-account>.upgrade-home{width:auto;min-width:max-content;height:29px;padding:4px 7px;font-size:11px;}
+ .upgrade-home::after{content:none;}
+ .topbar>.upgrade-topbar{width:auto;min-width:max-content;padding:0 6px;font-size:10px;}
+ .topbar>.upgrade-topbar::after{content:none;}
+ .topbar>.date-picker{margin-left:83px;width:calc(100% - 83px);}
+ .date-picker>.date-button{font-size:10px;}
+}
+/* The page and its map texture move together during its entrance and exit. */
+.upgrade-page>.auth-map-background{position:absolute;background-size:max(100%,133.34dvh) auto;background-position:center top;background-repeat:repeat-y;}
+.upgrade-page .plan-card{padding:26px;}
+.upgrade-page .plan-card>svg{width:36px;height:36px;}
+.upgrade-page .plan-card h2{font-size:25px;margin:14px 0 4px;}
+.upgrade-page .plan-pricing{min-height:100px;padding-bottom:20px;}
+.upgrade-page .plan-card ul{font-size:13px;line-height:1.7;margin:14px 0 24px;flex:1;}
+.upgrade-page .plan-card li{padding:3px 0;}
+.upgrade-page .plan-comparison{margin:40px 0;}
+@media(max-width:700px){.upgrade-page .plan-card{padding:24px;}.upgrade-page .plan-card ul{font-size:13px;line-height:1.6;}}
+
+.symbol-choice-mark{position:relative;display:inline-flex;}
+.symbol-plan-mark{right:-7px;bottom:-5px;}
+
+@media(max-width:700px){
+ .home-brand{gap:5px;}
+ .home-brand strong{font-size:19px;letter-spacing:-.9px;}
+ .home-brand svg{width:20px;height:20px;}
+ .home-account{gap:3px;}
+ .home-account .profile-avatar{width:28px;height:28px;min-width:28px;flex-basis:28px;}
+}
+
+@media(min-width:701px) and (max-width:900px){
+ .topbar>.upgrade-topbar{grid-column:2;grid-row:2;justify-self:end;margin:0 192px 0 0;}
+}
+
+.symbol-choice-mark:has(.symbol-plan-mark) .symbol-choice-icon{font-size:15px;line-height:1;display:inline-flex;}
+.symbol-choice-mark:has(.symbol-plan-mark) .symbol-plan-mark{bottom:-9px;}
+
+.locked-home-pin>.plan-requirement{left:2px;right:auto;top:-8px;}
+.map-context-menu>button .plan-requirement{right:5px;top:50%;transform:translateY(-50%);}

@@ -120,7 +120,7 @@ type Edit = {
 function ProfileAvatar({src, fallback, name, id, accent="var(--accent)",plan}: {plan?:PlanId;src?:string;fallback?:string;name:string;id:string;accent?:string}) {
   const ownPlan=usePlan();const [failed, setFailed] = useState<string[]>([]);
   const photo = [src, fallback].find(url => url && !failed.includes(url));
-  return <span className="profile-with-plan"><span className="avatar profile-avatar" style={photo?undefined:{background:isBlackAccent(accent)?"var(--neutral-accent)":accent,color:isBlackAccent(accent)?"var(--neutral-accent-ink)":"#fff"}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span><PlanBadge compact plan={plan??ownPlan.personal.plan}/></span>;
+  return <span className="profile-with-plan"><span className="avatar profile-avatar" style={photo?undefined:{background:isBlackAccent(accent)?"var(--neutral-accent)":accent,color:isBlackAccent(accent)?"var(--neutral-accent-ink)":"#fff"}}>{photo ? <img key={photo} src={photo} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(previous=>[...previous,photo])}/> : Array.from(name.trim())[0]?.toLocaleUpperCase()}</span><PlanBadge compact plan={plan??ownPlan.personal.plan} accent={isBlackAccent(accent)?"var(--neutral-accent)":accent}/></span>;
 }
 function Input({ label, ...props }: any) {
   if (props.type === "date") return <DateField label={label} {...props} />;

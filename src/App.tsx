@@ -88,7 +88,7 @@ import { startingLayout, lodgingForDate, tripForDate } from "./map-start";
 import {Popover} from "./Popover";
 import { Dropdown, ColorPicker, Toast } from "./Controls";
 import {calendarTripColors} from "./calendar-colors";
-import {calendarTripsForDisplay} from "./calendar-trips";
+import {calendarTripName,calendarTripsForDisplay} from "./calendar-trips";
 import { MonthCalendar, DateField, DateRangeFields, TimeField, SymbolPicker, SymbolIcon, FloatingChecklist, TimezonePicker } from "./PlannerControls";
 const ProfilePhotoCropper = lazy(() => import("./ProfilePhotoCropper"));
 let mapPanelLoad:ReturnType<typeof importMapPanel>|undefined;
@@ -1899,17 +1899,17 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
         <MotionSurface><div className="calendar-popover" ref={calendarBox}>
           <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={viewDateMax}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
-            dayTitle={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).map(t=>t.name).join(', ')}
+            dayTitle={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).map(calendarTripName).join(', ')}
             dayContent={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
           <div className="calendar-trips" role="group" aria-label="Trips" tabIndex={0}>
             {calendarTrips.map((t) => (
                 <AsyncButton
                   key={t.id}
-                  title={`Show ${t.name}'s starting month`}
+                  title={`Show ${calendarTripName(t)}'s starting month`}
                   onClick={() => setMonth(t.startDate.slice(0,7))}
                 >
                   <i style={{background:tripDotColors[t.id]}}/>
-                  <span>{t.name}</span>
+                  <span>{calendarTripName(t)}</span>
                 </AsyncButton>
               ))}
           </div>

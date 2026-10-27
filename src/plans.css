@@ -160,7 +160,8 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .locked-home-pin>.plan-requirement{left:2px;right:auto;top:-8px;}
 .map-context-menu>button .plan-requirement{right:5px;top:50%;transform:translateY(-50%);}
 
-.upgrade-page>.auth-map-background{background-position:center -70px;}
+.upgrade-page>.auth-map-background{background-position:center calc(-1 * max(0px, (75vw - 100dvh) / 2));}
+.upgrade-intro{padding-top:4px;}
 .upgrade-page .plan-card-heading{display:flex;align-items:center;gap:12px;min-width:0;}
 .upgrade-page .plan-card-heading svg{width:36px;height:36px;flex:none;color:var(--accent);}
 .upgrade-page .plan-card-heading h2{margin:0;}
@@ -169,3 +170,4 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .dropdown-menu button:disabled .dropdown-option-label{opacity:.55;}
 .dropdown-menu .dropdown-option-row .plan-requirement{position:static;transform:none;margin-left:auto;}
 @media(max-width:700px){.home-account{gap:7px;}}
+@media(max-width:700px){.upgrade-intro{padding-top:10px;}}

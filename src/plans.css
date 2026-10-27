@@ -161,7 +161,7 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .map-context-menu>button .plan-requirement{right:5px;top:50%;transform:translateY(-50%);}
 
 .upgrade-page>.auth-map-background{background-position:center calc(-1 * max(0px, (75vw - 100dvh) / 2));}
-.upgrade-intro{padding-top:4px;}
+.upgrade-intro{padding-top:0;padding-bottom:4px;}
 .upgrade-page .plan-card-heading{display:flex;align-items:center;gap:12px;min-width:0;}
 .upgrade-page .plan-card-heading svg{width:36px;height:36px;flex:none;color:var(--accent);}
 .upgrade-page .plan-card-heading h2{margin:0;}

@@ -1424,11 +1424,12 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   if(user&&(verified===null||verified===true&&(!ready||loadedAccount.current!==user.uid)))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
-  if(user&&ready&&upgrade)return <MotionSurface><UpgradePage onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/></MotionSurface>;
+  if(user&&ready&&upgrade&&(!home||shareTrip))return <MotionSurface><UpgradePage onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/></MotionSurface>;
   return (
     <TripPlanContext.Provider value={practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan}>
     <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
       {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
+      {home&&!shareTrip&&user&&ready&&upgrade&&<MotionSurface><UpgradePage sharedBackground onClose={()=>{setUpgrade(null);history.pushState({},'','/');}}/></MotionSurface>}
       {!home||shareTrip?<>
       <header className="topbar">
         <a className="brand" href="/" onClick={async e=>{if(user){e.preventDefault();++navigationVersion.current;rememberDay();void saveLayout();history.replaceState({},"",location.pathname);setShareTrip(false);setHome(true);setCalendar(false);}}}>

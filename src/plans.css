@@ -142,6 +142,10 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 @media(max-width:700px){.upgrade-page .plan-card{padding:24px;}.upgrade-page .plan-card ul{font-size:13px;line-height:1.6;}}
 
 .symbol-choice-mark{position:relative;display:inline-flex;}
+.symbol-choice-mark,.symbol-choice-icon{align-items:center;justify-content:center;line-height:1;}
+.symbol-choice-icon{display:inline-flex;}
+.symbol-tabs>button{display:flex;align-items:center;justify-content:center;gap:4px;}
+.plan-locked-control:not(:disabled),.symbol-grid button:has(.locked-symbol),.map-context-menu>button:has(.plan-requirement),.locked-home-pin .home-tile-main{pointer-events:none;}
 .symbol-plan-mark{right:-7px;bottom:-5px;}
 
 @media(max-width:700px){

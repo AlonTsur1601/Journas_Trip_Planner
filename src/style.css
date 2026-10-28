@@ -2515,7 +2515,9 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 
 
-.loading-spinner{display:block;flex-shrink:0;box-sizing:border-box;aspect-ratio:1/1;border:3px solid color-mix(in srgb,var(--accent) 20%,transparent);border-top-color:var(--accent);border-radius:50%;background:transparent;transform-origin:50% 50%;animation:startup-spin 800ms linear infinite;}
+.loading-spinner{display:block;flex-shrink:0;box-sizing:border-box;aspect-ratio:1/1;color:var(--accent);transform-box:fill-box;transform-origin:50% 50%;animation:startup-spin 800ms linear infinite;}
+.loading-spinner circle{fill:none;stroke:currentColor;stroke-width:3;}
+.loading-spinner-track{opacity:.2;}.loading-spinner-arc{stroke-dasharray:42 56.5487;stroke-linecap:round;}
 .startup-progress{width:40px;height:40px;align-self:center;margin-inline:auto;}
 @keyframes startup-spin{to{transform:rotate(360deg);}}
 @media(prefers-reduced-motion:reduce){.loading-spinner{animation:none;}}

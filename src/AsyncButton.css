@@ -1,5 +1,5 @@
 .button-spinner{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:16px;height:16px;vertical-align:middle;margin-inline-end:6px;}
-.button-spinner>.loading-spinner{width:14px;height:14px;border-width:2px;border-color:color-mix(in srgb,currentColor 25%,transparent);border-top-color:currentColor;}
+.button-spinner>.loading-spinner{width:14px;height:14px;color:currentColor;}
 .async-button[aria-busy="true"]{cursor:wait;}
 .async-button[aria-busy="true"]>:is(svg,img):first-of-type{display:none;}
 .async-button.icon>.button-spinner{margin:0;}

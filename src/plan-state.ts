@@ -9,4 +9,4 @@ export const resetPlan=()=>acceptPlanResult({billing:{plan:'tourist',source:'fre
 const subscribe=(listener:()=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
 export function usePlan(){const billing=useSyncExternalStore(subscribe,()=>current);return {billing,personal:plans[billing.plan],effective:practiceActive()?plans.adventurer:plans[billing.plan],practice:practiceActive()};}
 export function openUpgrade(feature?:string,requiredPlan?:PlanId){window.dispatchEvent(new CustomEvent('journas-upgrade',{detail:{feature,requiredPlan}}));}
-export function requirePersonal(feature:Feature){if(practiceActive()||plans[current.plan].features[feature])return true;openUpgrade(feature,plans.traveler.features[feature]?'traveler':'adventurer');return false;}
+export function requirePersonal(feature:Feature){return practiceActive()||plans[current.plan].features[feature];}

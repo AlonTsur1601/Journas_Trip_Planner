@@ -35,3 +35,8 @@ Status: IMPLEMENTATION VERIFIED IN ISOLATED STAGING; external provider connectio
 - This setting is scoped to production project `prj_gwUEDAaOWfIF8ihEGiskovutznbU`; it is deliberately not placed in shared vercel.json. The separate staging project, Firebase configuration and deployed application are unchanged.
 - Vercel may show these skipped Git previews as CANCELED rather than removing their deployment records. They must not run the application build or fail its staging environment guard.
 - Production remains `dpl_AxsppyAijfMhLdQqBftpBUpSeA1X`; staging remains `dpl_FojJ8qxY8LgL6PXb3kpajXCSSu1h`. Re-read and verified the production target after saving the setting.
+
+## Staging refinements (28 October)
+- Basic emoji sort first; free accounts cannot open or search the emoji catalog, paid locked actions stay inert, and marked staging demo copies are grouped in the trip selection interfaces while data remains separate.
+- Manual save forces a fresh layout write; spinner geometry uses a square box and centered transform origin.
+- Validation: local tourist and traveler checks, two consecutive manual saves, spinner geometry, grouped trip menus and 30 focused tests. Live staging and production verification follow deployment.

@@ -100,6 +100,8 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 
 /* Unavailable controls dim independently of their non-interactive plan marks. */
 .plan-locked-control{opacity:1;color:color-mix(in srgb,var(--ink) 55%,var(--surface));}
+.plan-locked-control:disabled,.symbol-tabs button:disabled:has(.plan-requirement){opacity:1;}
+.symbol-tabs button:disabled:has(.plan-requirement){color:color-mix(in srgb,var(--ink) 55%,var(--surface));}
 .plan-locked-control>svg{opacity:.55;}
 .locked-symbol,.locked-home-pin{opacity:1;}
 .locked-symbol>:not(.symbol-plan-mark),.locked-home-pin>.home-tile{opacity:.55;}

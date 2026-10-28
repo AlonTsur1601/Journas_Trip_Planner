@@ -1,7 +1,7 @@
 import {DeviceSession,sessionWeek} from './device-session';
 import {ConcurrentReads,isReadAction} from './request-cache';
 import {defaultSettings} from './types';
-import {acceptPlanResult,resetPlan,openUpgrade} from './plan-state';
+import {acceptPlanResult,resetPlan} from './plan-state';
 import {getPracticeSession,practiceRequest,type PracticeData} from "./practice";
 import { initializeApp } from "firebase/app";
 import {actionDescription,beginActivity} from './activity';
@@ -88,7 +88,6 @@ async function request<T = unknown>(
     body: JSON.stringify({ action, screen:JSON.parse(sessionStorage.getItem('journas-current-screen')??'null'), ...data }),
   });
   const result = await response.json();
-  if (!response.ok&&['UPGRADE_REQUIRED','PLAN_READ_ONLY'].includes(result.error?.code))openUpgrade(result.error?.details?.feature,result.error?.details?.requiredPlan);
   if (!response.ok)
     throw Object.assign(
       new Error(

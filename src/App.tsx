@@ -136,7 +136,7 @@ function Input({ label, ...props }: any) {
 }
 function Select({ label, children, entitlementMark, entitlementLocked, entitlementAction, ...props }: any) {
   if(!entitlementMark&&!entitlementLocked)return <div className="field"><span>{label}</span><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>;
-  return <div className="field"><span>{label}{entitlementMark}</span><div className="plan-control"><div {...(entitlementLocked?{inert:true}:{})}><Dropdown aria-label={label} {...props}>{children}</Dropdown></div>{entitlementLocked&&<button type="button" className="plan-gate-hit" aria-label={`Upgrade for ${label}`} onClick={entitlementAction}/>}</div></div>;
+  return <div className="field"><span>{label}{entitlementMark}</span><div className="plan-control"><div {...(entitlementLocked?{inert:true}:{})}><Dropdown aria-label={label} {...props}>{children}</Dropdown></div></div></div>;
 }
 function Modal({ title, children, onClose, inactive=false, locked=false }: any) {
   const box = useRef<HTMLElement>(null);
@@ -679,7 +679,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
     }
     showPlanner(selected,nextDate);
   }
-  function createTrip(){if(!practice&&trips.length>=planState.effective.trips){openUpgrade('trips',planState.personal.plan==='tourist'?'traveler':'adventurer');return;}lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
+  function createTrip(){if(!practice&&trips.length>=planState.effective.trips){return;}lodgingNameEdited.current=false;setLodgingDraft(undefined);setLodgingView({...layout});setModal('new-trip');}
   function editTrip(selected:Trip){lodgingNameEdited.current=isManualLodgingName(selected.lodging);setTrip(selected);setLodgingDraft(selected.lodging);setLodgingView({...layout,center:selected.lodging?[selected.lodging.lng,selected.lodging.lat]:layout.center,zoom:selected.lodging?14:layout.zoom});setModal('edit-trip');}
   async function removeTrip(selected:Trip){
     if(!await confirmAction(selected.ownerId===user?.uid?'Delete this trip for everyone? This permanently deletes the plan and sharing links. This action is irreversible.':'Remove this trip from your account? Other travelers keep it. This action cannot be undone.'))return;
@@ -1015,7 +1015,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   }
   const autosave = useRef<(background?:boolean) => Promise<void>>(async () => {});
   autosave.current = async (background=false) => {
-    await saveLayout();
+    await saveLayout(background);
     if (user && trip && !readonly) {
       const pending = localStorage.getItem(
         `journas-drafts:${user.uid}:${trip.id}:${date}`,
@@ -1446,9 +1446,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             {shareTrip && trip && (
               <option value={trip.id}>{trip.name}</option>
             )}
-            {[...trips].sort((a,b)=>a.name.localeCompare(b.name)).map((t) => (
+            {calendarTripsForDisplay(trips,trip?.id).sort((a,b)=>a.name.localeCompare(b.name)).map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name}
+                {calendarTripName(t)}
               </option>
             ))}
           </Dropdown> : <span className="no-trips">No trips created yet</span>}
@@ -2293,7 +2293,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       </Modal>}
       {modal === "trip" && trip && (
         <Modal title="Trip details" onClose={() => setModal(null)}>
-          <h3>{trip.name}</h3>
+          <h3>{calendarTripName(trip)}</h3>
           <h3>Travelers</h3>
           <div className="travelers-list" role="region" aria-label="Travelers list" tabIndex={0}>{[...travelers.filter(t=>t.owner),...travelers.filter(t=>!t.owner)].map(t=><div className={`member-row${t.owner?" trip-owner-row":""}`} key={t.id}><span className="traveler-profile"><ProfileAvatar plan={t.plan??"tourist"} accent={t.id===user?.uid?settings.accent:t.accent} id={t.id} src={t.id===user?.uid?activePhoto:t.photoURL} name={t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}/><strong>{t.id===user?.uid?accountName(savedProfile.displayName):t.displayName}</strong></span>{!t.owner&&user&&trip.ownerId===user.uid&&<AsyncButton className="button danger" onClick={async()=>{if(!await confirmAction("Remove this traveler’s access?"))return;try{await api("member.remove",{tripId:trip.id,userId:t.id});setTrip({...trip,memberIds:trip.memberIds.filter(id=>id!==t.id)});}catch(e:any){setMessage(e.message);}}}>Remove</AsyncButton>}<span className="owner-badge">{t.permission??(t.owner?"Owner":"Editor")}</span></div>)}</div>
           {(!readonly||trip.ownerId===user?.uid&&Boolean(trip.access?.readonlyReason))&&<AsyncButton className="button" onClick={()=>{lodgingNameEdited.current=isManualLodgingName(trip.lodging);setLodgingDraft(trip.lodging);setLodgingView({...layout,center:trip.lodging?[trip.lodging.lng,trip.lodging.lat]:layout.center,zoom:trip.lodging?14:layout.zoom});setModal("edit-trip");}}>Edit trip dates and lodging</AsyncButton>}

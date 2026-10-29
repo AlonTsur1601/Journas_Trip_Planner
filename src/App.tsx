@@ -521,6 +521,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(()=>{if(layout.timeline&&scroller.current)scroller.current.scrollTop=layoutRef.current.scroll;},[layout.timeline,hourHeight]);
   const calendarBox = useRef<HTMLDivElement>(null);
+  const calendarButton = useRef<HTMLButtonElement>(null);
   const initialTripRequest=useRef<{tripId:string;date:string;promise:Promise<{trip:Trip;day:Day;layout:Layout|null}|null>}|null>(null);
   useEffect(()=>{if(trip&&loadedDay.current===`${trip.id}:${date}`){const key=loadedDay.current;dayCache.current.delete(key);dayCache.current.set(key,{day,layout});if(dayCache.current.size>24)dayCache.current.delete(dayCache.current.keys().next().value!);}},[trip?.id,date,day,layout]);
   const profilePhoto = useRef<HTMLInputElement>(null);
@@ -1424,10 +1425,9 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
   if(user&&(verified===null||verified===true&&(!ready||loadedAccount.current!==user.uid)))return <LoadingScreen startup text="Getting Journas ready…"/>;
   if(user&&verified===false)return <EmailVerification user={user} onVerified={()=>{onVerified();setVerificationRevision(n=>n+1);}} onLogout={logout}/>;
   if(user&&chooseName)return <AccountName initialName={settings.displayName??""} onBack={logout} onSave={async displayName=>{await api("settings.save",{settings:{displayName}});savedAccountName.current=displayName.trim();savedSettings.current={...savedSettings.current,displayName};setSavedProfile(current=>({...current,displayName}));setSettings(current=>({...current,displayName}));setChooseName(false);}}/>;
-  if(user&&ready&&upgrade&&(!home||shareTrip))return <MotionSurface><UpgradePage onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/></MotionSurface>;
   return (
     <TripPlanContext.Provider value={practice?'adventurer':trip?.access?.ownerPlan??planState.personal.plan}>
-    <div className={`app${home&&!shareTrip?" home-app":""}`} inert={!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
+    <div className={`app${home&&!shareTrip?" home-app":""}${upgrade&&(!home||shareTrip)?" planner-upgrade-hidden":""}`} inert={Boolean(upgrade&&(!home||shareTrip))||!ready&&!hasOpenedWorkspace()} aria-busy={!ready} style={!ready&&!hasOpenedWorkspace()?{visibility:"hidden"}:undefined}>
       {home&&!shareTrip&&user&&<HomePage navigationLocked={practice} trips={trips} state={availableHome(homeState,trips)} preferences={settings} name={accountName(savedProfile.displayName)} avatar={<ProfileAvatar accent={settings.accent} id={user.uid} src={activePhoto} name={accountName(savedProfile.displayName)}/>} resume={lastTarget} busy={homeBusy} onOpen={openPlanner} onUpdate={persistHome} onCreate={createTrip} onEdit={editTrip} onDelete={removeTrip} onSettings={()=>setModal('settings')} onLogout={logout} onMessage={setMessage}/>}
       {home&&!shareTrip&&user&&ready&&upgrade&&<MotionSurface><UpgradePage sharedBackground onClose={()=>{setUpgrade(null);history.pushState({},'','/');}}/></MotionSurface>}
       {!home||shareTrip?<>
@@ -1475,7 +1475,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <ChevronLeft size={17} />
           </AsyncButton>
           <AsyncButton
-            className="date-button" aria-expanded={calendar}
+            ref={calendarButton} className="date-button" aria-expanded={calendar}
             onClick={() => {setMonth(date.slice(0,7));setCalendar(!calendar);}}
           >
             <CalendarDays size={17} />
@@ -1897,12 +1897,12 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
 
       </div></WorkspaceMotion>
       {calendar && (
-        <MotionSurface><div className="calendar-popover" ref={calendarBox}>
+        <Popover anchor={calendarButton} width={320} height={400} className="calendar-popover" onClose={()=>setCalendar(false)}><div ref={calendarBox}>
           <MonthCalendar value={date} month={month} onMonthChange={setMonth} onChange={switchDate} max={viewDateMax}
             isDateDisabled={(d:string)=>Boolean((shareTrip||practice)&&trip&&(d<trip.startDate||d>trip.endDate))}
             dayTitle={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).map(calendarTripName).join(', ')}
             dayContent={(d:string)=>calendarTrips.filter(t=>t.startDate<=d&&t.endDate>=d).slice(0,3).map(t=><i key={t.id} style={{background:tripDotColors[t.id]}}/>)}/>
-          <div className="calendar-trips" role="group" aria-label="Trips" tabIndex={0}>
+          <div className="calendar-trips" role="group" aria-label="Trips" tabIndex={0}><strong>Trips</strong>
             {calendarTrips.map((t) => (
                 <AsyncButton
                   key={t.id}
@@ -1914,7 +1914,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                 </AsyncButton>
               ))}
           </div>
-        </div></MotionSurface>
+        </div></Popover>
       )}
       </>} </>:null}
       {(modal === "new-trip" || modal === "edit-trip") && (
@@ -2080,7 +2080,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
                     <option value="earlier">Earlier occurrence</option>
                     <option value="later">Later occurrence</option>
                   </Select>}
-                  <PlanLinkField pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={blockLinkPins} connections={blockLinkConnections} disabled={linkDay!==date&&blockLinkSources?.date!==linkDay} emptyLabel="Independent time block" onChange={(kind,id)=>setEdit({...edit,item:kind==='connections'?changeBlockConnection(edit.item as any,blockLinkConnections.find(connection=>connection.id===id),blockLinkPins):changeBlockPlace(edit.item as any,blockLinkPins.find(pin=>pin.id===id))})}/>
+                  <PlanLinkField groupTabs pinId={edit.item.pinId} connectionId={edit.item.connectionId} pins={blockLinkPins} connections={blockLinkConnections} disabled={linkDay!==date&&blockLinkSources?.date!==linkDay} emptyLabel="Independent time block" onChange={(kind,id)=>setEdit({...edit,item:kind==='connections'?changeBlockConnection(edit.item as any,blockLinkConnections.find(connection=>connection.id===id),blockLinkPins):changeBlockPlace(edit.item as any,blockLinkPins.find(pin=>pin.id===id))})}/>
                 </>
               )}
               {(edit.kind === "pins" || edit.kind === "blocks") && (
@@ -2632,6 +2632,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
       <Toast message={message} onDismiss={() => setMessage("")} />
       {user&&ready&&!shareTrip&&<GuidedTour profileSettings={{...settings,photoURL:activePhoto??""}} practice={practice} seenBefore={tourSeen} userId={user.uid} ready={ready} context={{paidFeatures,mapStart:settings.mapStart,draft:edit?.item??null,lodgingChosen:Boolean(lodgingDraft),home,modal,editKind:edit?.kind??null,editId:edit?.item.id??null,tripId:trip?.id??null,linkedBlocks:day.blocks.filter(b=>b.pinId||b.connectionId).length,linkedTasks:day.tasks.filter(t=>t.pinId||t.connectionId||t.blockId).length,trips:trips.length,pins:day.pins.length,blocks:day.blocks.length,tasks:day.tasks.length,checkedTasks:displayTasks.filter(task=>task.checked).length,connections:visibleDayConnections.length,homePins:homeState.pins.length,checklist:layout.todo,date}} onHome={()=>{++navigationVersion.current;rememberDay();void saveLayout();setModal(null);setEdit(null);setHome(true);}}/>}
     </div>
+    {user&&ready&&upgrade&&(!home||shareTrip)&&<MotionSurface><UpgradePage onClose={()=>{setUpgrade(null);history.pushState({},'', '/');}}/></MotionSurface>}
     {!ready&&<LoadingScreen text="Getting your trips and preferences ready…"/>}
     {ready&&historyBusy&&<BackgroundStatus text="Loading your schedule…"/>}
     </TripPlanContext.Provider>

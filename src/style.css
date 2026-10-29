@@ -2568,7 +2568,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .workspace .map-panel{isolation:isolate;}
 .workspace .map-panel[aria-hidden="true"]:not([data-workspace-exit]){opacity:0;}
 .view-controls button:not(.active):focus-visible{outline-color:var(--muted);}
-.view-controls button:not(.active):is(:hover,:active){background:transparent;color:var(--muted);box-shadow:none;}
+.view-controls button:not(.active):is(:hover,:active){background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent);}
 .workspace[data-map]{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);}
 @media(min-width:701px){
  .workspace[data-map="true"][data-timeline="true"]{grid-template-columns:var(--workspace-split) 6px minmax(0,1fr);}
@@ -2638,7 +2638,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .map-focus-tools>.icon+.icon{border-top:0;border-left:1px solid var(--line);}
 /* Scrollbar space is symmetric, so menu content keeps equal side insets. */
 .modal,.symbol-scroll,.dropdown-scroll-options,.calendar-trips{scrollbar-gutter:auto;}
-.calendar-trips{border:1px solid var(--line);border-radius:5px;padding:4px;margin-top:8px;}
+.calendar-trips{border:0;padding:4px;margin-top:8px;}
 .calendar-trips>button{min-height:32px;gap:9px;width:100%;padding:8px 10px;border-radius:3px;font-size:12px;}
 .calendar-trips>button>span{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .calendar-trips>button:hover,.calendar-trips>button:focus-visible{background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);}
@@ -2687,7 +2687,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .place-search-input>svg{z-index:1;}
 /* Selection color is immediate; only the wheel's size change is animated. */
 .time-wheel>button{transform:scale(.88);transition:transform 110ms ease-out;}
-.time-wheel>button.selected{transform:scale(1.02);}
+.time-wheel>button.selected{transform:scale(1);}
 @media(prefers-reduced-motion:reduce){.time-wheel>button{transition:none;}}
 
 .dropdown-category{padding:8px 10px 5px;font-size:12px;font-weight:700;color:var(--muted);}
@@ -2719,3 +2719,18 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .dropdown-menu .dropdown-scroll-options{scrollbar-gutter:auto;}
 .share-link-permissions{font-weight:600;color:var(--ink);margin-left:8px;align-self:center;flex-shrink:0;font-size:11px;}
 .share-link-row .share-result>.button:last-of-type{border-radius:0 5px 5px 0;}
+
+/* Keep the planner alive beneath the upgrade page. */
+.app.planner-upgrade-hidden{visibility:hidden;pointer-events:none;}
+.bounded-popover.calendar-popover{transform:none;right:auto;max-height:calc(100dvh - 16px);overflow:auto;}
+.time-wheel>button{width:calc(100% - 8px);margin-inline:4px;}
+.map-mode-note{border:1px solid var(--line);text-align:center;}
+:is(.dropdown-menu,.symbol-menu)>.search-input{margin-top:0;}
+:is(.profile-menu,.home-context-menu,.map-context-menu){border-color:color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:5px;box-shadow:0 6px 18px #0003;}
+:is(.profile-menu,.home-context-menu,.map-context-menu)>button{border-radius:3px;}
+:is(.profile-menu,.home-context-menu,.map-context-menu)>button:is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);}
+
+.time-field-row>.segmented-time{flex:1;min-width:0;border-radius:5px 0 0 5px;padding-right:9px;}
+.time-field-row>.time-picker-toggle{display:grid;place-items:center;padding:0;}
+
+.profile-menu>button+button{border-top:0;}

@@ -590,7 +590,7 @@ export class JournasService {
         if(!(await tx.get(statusPath)))tx.set(statusPath,{active:true});
         return share;
     }
-    private async readShare(input: Data) { return this.store.transaction(async (tx) => { const share = await this.share(tx, input.token); const trip = await tx.get(tripPath(identifier(share.tripId))) as Trip; const day = input.date ? date(input.date) : trip.startDate; this.dayWithin(trip, day); return { trip: { ...trip, memberIds: [], ownerId: '' }, day: await this.day(tx, trip.id, day), mode: share.mode }; }); }
+    private async readShare(input: Data) { return this.store.transaction(async (tx) => { const share = await this.share(tx, input.token); const trip = await tx.get(tripPath(identifier(share.tripId))) as Trip; const day = input.date ? date(input.date) : trip.startDate; this.dayWithin(trip, day); return { trip: { id:trip.id, name:trip.name, startDate:trip.startDate, endDate:trip.endDate, lodging:trip.lodging, appearance:trip.appearance, memberIds:[], ownerId:'' }, day: await this.day(tx, trip.id, day), mode: share.mode }; }); }
     private async deleteItem(tx: Transaction, id: string, day: string, item: Item, all: Item[]) {
         tx.delete(`${itemsPath(id, day)}/${item.id}`);
         if(item.kind==='pins'&&item.copyOrigin)tx.delete(pinCopyPath(id,day,item.copyOrigin as Data));
@@ -671,9 +671,17 @@ export class JournasService {
             if (didRemove)
                 removed++;
         }
+        await this.store.purgeExpiredHistory?.(this.now());
         for (const job of await this.store.list('cleanupJobs', 100)) {
             if(Number(job.undoUntil??0)>this.now())continue;
             const uid = identifier(job.uid), tripId = identifier(job.tripId);
+            const historyPending = await this.store.transaction(async tx => {
+                const root = `users/${uid}/planningHistory/${tripId}/actions`;
+                const entries = (await tx.list(root)).filter(entry => Number(entry.recordedAt ?? entry.at) <= Number(job.removedAt));
+                for (const entry of entries.slice(0, 100)) tx.delete(`${root}/${identifier(entry.id)}`);
+                return entries.length > 100;
+            });
+            if (historyPending) continue;
             await this.store.purgeLayouts(uid, tripId, Number(job.removedAt));
             const trip = await this.store.transaction(tx => tx.get(tripPath(tripId)));
             if (trip?.deleted) {

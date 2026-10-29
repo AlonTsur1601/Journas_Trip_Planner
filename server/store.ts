@@ -63,6 +63,12 @@ export function firestoreStore(): Store {
         async pendingRetentionNotices(limit) { return (await db.collection('retentionNotices').where('status', '==', 'pending').limit(limit).get()).docs.map(doc => doc.data()); },
         async scanTrips(after, limit) { const query = db.collection('trips').orderBy(FieldPath.documentId()).limit(limit); return (await (after ? query.startAfter(after) : query).get()).docs.map(doc => doc.data()); },
         async dueMemberships(now, limit) { return (await db.collectionGroup('trips').where('cleanupAt', '<=', now).orderBy('cleanupAt').limit(limit).get()).docs.map(doc => doc.data()); },
+        async purgeExpiredHistory(now) {
+            const snapshot = await db.collectionGroup('actions').where('expiresAt', '<=', new Date(now)).limit(100).get();
+            const writer = db.bulkWriter();
+            const pending = snapshot.docs.filter(doc=>doc.ref.path.includes('/planningHistory/')).map(doc=>writer.delete(doc.ref,{lastUpdateTime:doc.updateTime}).catch(error=>{if(error.code!==9)throw error;}));
+            await writer.close(); await Promise.all(pending);
+        },
         async purgeTrip(id) { await db.recursiveDelete(db.doc(`trips/${id}`)); },
         async purgeLayouts(uid, tripId, before) {
             const writer = db.bulkWriter();

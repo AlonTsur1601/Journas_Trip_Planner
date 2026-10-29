@@ -53,7 +53,7 @@ export async function historyTransaction(store:Store,uid:string,input:Data,now:n
    const nextBranch=recent.some(e=>e.undone)?randomUUID():branch;if(nextBranch!==branch)raw.set(statePath,{branch:nextBranch});
    const trip=result.trip as any;
    const screenAfter=input.action==='trip.create'&&screen?{...(screen as any),tripId:trip.id,date:trip.startDate}:input.action==='trip.remove'&&screen?{...(screen as any),tripId:null}:screen;
-   raw.set(`${root}/${id}`,{id,at:Math.max(now,Number(recent.at(-1)?.at??0)+1),tripId:input.tripId??trip?.id??null,action:input.action,screen,screenAfter,changes,undone:false,branch:nextBranch});
+   raw.set(`${root}/${id}`,{id,recordedAt:now,expiresAt:new Date(now+lifetime),at:Math.max(now,Number(recent.at(-1)?.at??0)+1),tripId:input.tripId??trip?.id??null,action:input.action,screen,screenAfter,changes,undone:false,branch:nextBranch});
    return {...result,historyId:id};
   }
   return result;

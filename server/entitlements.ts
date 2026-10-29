@@ -79,6 +79,7 @@ export function policyStore(store:Store,uid:string,input:Data,now:number):Store{
   const oldAccess=oldTrip&&(oldTrip.memberIds as string[])?.includes(uid)?await accessFor(raw,uid,oldTrip,user,now):null;
   const action=String(input.action),reducing=['trip.remove','member.remove','trip.update','trip.select-active','share.revoke'].includes(action);
   if(oldAccess?.expired&&!['trip.remove'].includes(action))throw new ApiError(410,'TRIP_EXPIRED','This trip has reached its retention deadline.');
+  if(action==='item.copy-pin'&&typeof input.sourceTripId==='string'&&input.sourceTripId!==tripId){const source=await raw.get(`trips/${input.sourceTripId}`);if(source&&(source.memberIds as string[])?.includes(uid)&&(await accessFor(raw,uid,source,user,now)).expired)throw new ApiError(410,'TRIP_EXPIRED','The source trip has reached its retention deadline.');}
   if(oldAccess?.readonlyReason&&action==='trip.update'&&(oldAccess.readonlyReason==='trips'||input.startDate===oldTrip?.startDate&&input.endDate===oldTrip?.endDate))throw new ApiError(403,'PLAN_READ_ONLY','Resolve the trip limit before changing this trip.',{feature:oldAccess.readonlyReason,requiredPlan:status.plan==='tourist'?'traveler':'adventurer'});
   if(oldAccess?.readonlyReason&&!reducing&&!['trip.get','trip.members','layout.save','history.status'].includes(action))throw new ApiError(403,'PLAN_READ_ONLY','This trip is read-only until its plan limits are resolved.',{feature:oldAccess.readonlyReason,requiredPlan:status.plan==='tourist'?'traveler':'adventurer'});
   const tx:Transaction={

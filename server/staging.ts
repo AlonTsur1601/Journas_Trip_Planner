@@ -6,7 +6,9 @@ export function assertStaging(){
  if(project!=='journas-monetization-2026'||process.env.BILLING_ENV!=='sandbox'||process.env.ADS_MODE!=='mock')throw new ApiError(503,'UNSAFE_ENVIRONMENT','Staging must use its isolated Firebase project, sandbox billing and mock ads.');
  if(process.env.VERCEL_PROJECT_PRODUCTION_URL==='journas-trip-planner.vercel.app')throw new ApiError(503,'UNSAFE_ENVIRONMENT','The regular production project cannot run this build.');
 }
-export async function assertStagingAccount(email:string|undefined){
+export function stagingAccountAllowed(email:string|undefined){
  const allowed=(process.env.STAGING_ALLOWED_EMAILS??'').split(',').map(value=>value.trim().toLowerCase()).filter(Boolean);
- if(!email||!allowed.includes(email.toLowerCase()))throw new ApiError(403,'STAGING_ACCOUNT_REQUIRED','This staging environment is restricted to authorized test accounts.');
+ return Boolean(email&&allowed.includes(email.toLowerCase()));
 }
+
+export async function assertStagingAccount(email:string|undefined){if(!stagingAccountAllowed(email))throw new ApiError(403,'STAGING_ACCOUNT_REQUIRED','This staging environment is restricted to authorized test accounts.');}

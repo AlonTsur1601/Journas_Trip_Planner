@@ -41,6 +41,7 @@ export interface Store {
     pendingRetentionNotices?(limit: number): Promise<Data[]>;
     scanTrips(after: string, limit: number): Promise<Data[]>;
     dueMemberships(now: number, limit: number): Promise<Data[]>;
+    purgeExpiredHistory?(now: number): Promise<void>;
     purgeTrip(id: string): Promise<void>;
     purgeLayouts(uid: string, tripId: string, before: number): Promise<void>;
 }

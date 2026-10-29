@@ -9,7 +9,7 @@ import {practiceExecute} from './practice.js';
 import {verificationStatus,confirmVerification} from './verification-campaign.js';
 import {places} from './places.js';
 import {sendVerificationEmail} from './verification-email.js';
-import {assertStaging,assertStagingAccount} from './staging.js';
+import {stagingAccountAllowed,assertStaging,assertStagingAccount} from './staging.js';
 import {billingAction,reconcileBilling} from './billing.js';
 import {billingNotices} from './billing-mail.js';
 import {retentionNotices} from './retention-notices.js';
@@ -54,7 +54,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json'))
             throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json');
         const input = await body(req);
-        if(input.action==='auth.password-reset'){if(process.env.VERCEL||process.env.NODE_ENV!=='test')await assertStagingAccount(typeof input.email==='string'?input.email:undefined);const address=process.env.VERCEL?String(req.headers['x-forwarded-for']??'').split(',')[0]:req.socket.remoteAddress??'unknown';return send(res,200,await sendPasswordReset(input.email,address));}
+        if(input.action==='auth.password-reset'){const allowed=!(process.env.VERCEL||process.env.NODE_ENV!=='test')||stagingAccountAllowed(typeof input.email==='string'?input.email:undefined);const address=process.env.VERCEL?String(req.headers['x-forwarded-for']??'').split(',')[0]:req.socket.remoteAddress??'unknown';return send(res,200,await sendPasswordReset(input.email,address,allowed));}
         if(input.action==='auth.confirm-verification')return send(res,200,await confirmVerification(input.proof));
         let uid: string | null = null;
         let authTime=NaN;

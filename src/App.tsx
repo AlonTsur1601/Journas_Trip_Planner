@@ -1753,7 +1753,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           </section></MotionSurface>
         )}
         {layout.todo && (
-          <FloatingChecklist layout={layout} onChange={changeLayout}>{({x,y,topbar}:any)=><>
+          <FloatingChecklist layout={layout} hidden={Boolean(upgrade)} onChange={changeLayout}>{({x,y,topbar}:any)=><>
             <div
               className="panel-heading todo-drag"
               onPointerDown={(e) => {

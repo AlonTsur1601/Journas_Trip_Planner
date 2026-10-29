@@ -51,3 +51,12 @@ it('restores appearance before app startup only for a matching unexpired persist
   expect(result.appearanceUser).toBeUndefined();expect(result['--accent']).toBeUndefined();expect(result.icon).toContain('stroke="#7c5ce7"');
  }
 });
+
+it('recovers a truly empty page only once when it becomes visible',()=>{
+ const handlers:Record<string,()=>void>={},timers:(()=>void)[]=[],values:Record<string,string>={};let reloads=0;
+ const root={dataset:{},style:{getPropertyValue:()=>''},childNodes:[]};const icon={getAttribute:()=>'',setAttribute:()=>{}};
+ const document={documentElement:root,querySelector:()=>icon,getElementById:()=>root,hidden:false,addEventListener:(name:string,fn:()=>void)=>{handlers[name]=fn;}};
+ const window={addEventListener:(name:string,fn:()=>void)=>{handlers[name]=fn;},setTimeout:(fn:()=>void)=>timers.push(fn)};
+ runInNewContext(boot,{document,window,navigator:{onLine:true},location:{reload:()=>reloads++},sessionStorage:{getItem:(key:string)=>values[key]??null,setItem:(key:string,value:string)=>{values[key]=value;}},matchMedia:()=>({matches:false}),MutationObserver:class{observe(){}}});
+ handlers.pageshow();timers.shift()!();handlers.visibilitychange();timers.shift()!();expect(reloads).toBe(1);
+});

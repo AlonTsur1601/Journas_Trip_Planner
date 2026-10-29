@@ -65,7 +65,7 @@ export function MotionSurface({children}:{children:ReactNode}){
       // Preserve the visible itinerary rather than jumping to its first hour.
       const originalNodes=[surface,...Array.from(surface.querySelectorAll<HTMLElement>('*'))];
       const copiedNodes=[copy,...Array.from(copy.querySelectorAll<HTMLElement>('*'))];
-      copy.inert=true;copy.setAttribute('aria-hidden','true');
+      copy.inert=true;copy.setAttribute('aria-hidden','true');if(surface.classList.contains('map-mode-note'))copy.style.transform='none';
       copy.dataset.motionExit='';
       copy.removeAttribute('id');copy.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
       Object.assign(copy.style,{position:'fixed',left:`${rect.left}px`,top:`${rect.top}px`,right:'auto',bottom:'auto',width:`${rect.width}px`,height:`${rect.height}px`,margin:'0',maxHeight:'none',minHeight:'0',pointerEvents:'none',zIndex:style.zIndex==='auto'?'20':style.zIndex,opacity,translate:'none',transition:'none'});

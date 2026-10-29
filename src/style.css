@@ -2734,3 +2734,14 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .time-field-row>.time-picker-toggle{display:grid;place-items:center;padding:0;}
 
 .profile-menu>button+button{border-top:0;}
+
+.calendar-trips>strong{display:block;font-size:12px;margin:0 0 6px;}
+.search-input>.search-clear>svg{position:static;transform:none;translate:none;margin:0;}
+.dropdown-empty{text-align:center;color:var(--muted);font-size:12px;padding:16px 10px;margin:0;}
+.profile-menu{border-color:var(--line);box-shadow:0 6px 18px #0003;}
+.task-row.nearby-now{border-radius:5px;align-items:stretch;}
+.task-row.nearby-now:has(>input:hover){outline:none;box-shadow:none;}
+.todo-add{flex-shrink:0;width:calc(100% - 12px);border:1px solid var(--line);border-radius:6px;}
+
+.profile-menu>button{width:100%;display:flex;align-items:center;gap:9px;padding:8px 10px;border:0;border-radius:3px;background:transparent;text-align:left;font-size:12px;}
+.profile-menu>button:is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);}

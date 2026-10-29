@@ -45,7 +45,7 @@ export function Dropdown({ children, value, onChange, disabled, placeholder = "C
       {searchable&&<SearchInput aria-label={`Search ${props["aria-label"]??'options'}`} placeholder="Search…" value={search} onValueChange={setSearch}/>}
       {groupTabs&&<div className="symbol-tabs" role="tablist" aria-label="Link category">{groups.map(name=><button type="button" role="tab" aria-selected={name===group} className={name===group?"selected":""} key={name} onClick={()=>setActiveGroup(name)}>{name}</button>)}</div>}
       <div className="dropdown-scroll-options">{optionButtons}</div>
-      {!filtered.length&&<p>No matching options</p>}
+      {!filtered.length&&<p className="dropdown-empty">No results found. Try another search.</p>}
     </Popover>}
   </div>;
 }

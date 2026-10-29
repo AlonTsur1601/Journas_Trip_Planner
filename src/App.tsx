@@ -57,7 +57,7 @@ import {
   Share2,
   Info,
   Trash2,
-  ArrowUpRight,
+
   Compass,
   LogOut,
   Check,
@@ -362,7 +362,7 @@ const AuthScreen = memo(function AuthScreen({ onError }: { onError: (s: string) 
                   : register
                     ? "Create account"
                     : "Sign in"}
-                <ArrowUpRight size={17} />
+
               </AsyncButton>
             </form>
             <AsyncButton
@@ -1462,7 +1462,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             <Plus size={18} />
           </AsyncButton>
         </div>
-        <button className="button upgrade-topbar" title="Upgrade plan" aria-label="Upgrade plan" onClick={()=>openUpgrade()}>Upgrade plan</button><div className="date-picker">
+        {planState.personal.plan!=="adventurer"&&<button className="button upgrade-topbar" title="Upgrade plan" aria-label="Upgrade plan" onClick={()=>openUpgrade()}>Upgrade plan</button>}<div className="date-picker">
           <AsyncButton
             className="icon"
             aria-label="Next day" pending={pendingDayNavigation?.direction==='next'&&pendingDayNavigation.tripId===trip?.id&&pendingDayNavigation.date===date}
@@ -1968,7 +1968,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
               className="button primary full"
               pending={tripSaving} disabled={tripSaving||(modal === "new-trip" && trips.length >= planState.effective.trips)||lodgingDraft?.lng===undefined||(tripLook.mode==='image'&&!tripLook.image)}
             >
-              {modal === "edit-trip" ? "Save changes" : "Create trip"} <ArrowUpRight size={17} />
+              {modal === "edit-trip" ? "Save changes" : "Create trip"}
             </AsyncButton>
             {modal==='new-trip'&&<small className="saved-trips-count">{trips.length}/{planState.effective.trips} saved trips</small>}
           </form>

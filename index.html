@@ -39,6 +39,22 @@
       };
       updateFavicon();
       new MutationObserver(updateFavicon).observe(document.documentElement, {attributes:true,attributeFilter:['style']});
+      const recoverEmptyPage = () => {
+        window.setTimeout(() => {
+          const root = document.getElementById('root');
+          if (!root || root.childNodes.length || !navigator.onLine) return;
+          try {
+            const previous = Number(sessionStorage.getItem('journas-empty-recovery') || 0);
+            if (Date.now() - previous < 60000) return;
+            sessionStorage.setItem('journas-empty-recovery', String(Date.now()));
+            location.reload();
+          } catch {}
+        }, 10000);
+      };
+      if (typeof window !== 'undefined') {
+        window.addEventListener('pageshow', recoverEmptyPage);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) recoverEmptyPage(); });
+      }
     })();
 </script>
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />

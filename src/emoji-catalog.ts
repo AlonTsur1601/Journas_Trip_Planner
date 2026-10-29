@@ -1,8 +1,8 @@
 export type EmojiEntry={unicode:string;label:string;group?:number;order?:number;tags?:string[];skins?:EmojiEntry[]};
-export type EmojiChoice={unicode:string;label:string;group:number;order:number;tags:string[];version?:number};
+export type EmojiChoice={unicode:string;label:string;group:number;order:number;tags:string[];version?:number;baseUnicode?:string};
 export function completeEmojiCatalog(entries:ReadonlyArray<EmojiEntry>){
  const found=new Map<string,EmojiChoice>();
- const add=(entry:EmojiEntry,parent?:EmojiEntry)=>{if(!found.has(entry.unicode))found.set(entry.unicode,{unicode:entry.unicode,label:entry.label,group:entry.group??parent?.group??-1,order:entry.order??Number.MAX_SAFE_INTEGER,tags:[...new Set([...(parent?.tags??[]),...(entry.tags??[])])]});for(const skin of entry.skins??[])add(skin,entry);};
+ const add=(entry:EmojiEntry,parent?:EmojiEntry)=>{if(!found.has(entry.unicode))found.set(entry.unicode,{unicode:entry.unicode,label:entry.label,group:entry.group??parent?.group??-1,order:entry.order??Number.MAX_SAFE_INTEGER,tags:[...new Set([...(parent?.tags??[]),...(entry.tags??[])])],...(parent?{baseUnicode:parent.unicode}:{})});for(const skin of entry.skins??[])add(skin,parent??entry);};
  for(const entry of entries)add(entry);
  return [...found.values()].sort((a,b)=>a.order-b.order);
 }

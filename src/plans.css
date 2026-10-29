@@ -142,6 +142,9 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 @media(max-width:700px){.upgrade-page .plan-card{padding:24px;}.upgrade-page .plan-card ul{font-size:13px;line-height:1.6;}}
 
 .symbol-choice-mark{position:relative;display:inline-flex;}
+.skin-tone-popover{padding:6px;}
+.skin-tone-options{display:flex;gap:2px;overflow-x:auto;}
+.skin-tone-options button{flex:0 0 34px;width:34px;height:34px;display:grid;place-items:center;border-radius:5px;font-size:22px;}
 .symbol-choice-mark,.symbol-choice-icon{align-items:center;justify-content:center;line-height:1;}
 .symbol-choice-icon{display:inline-flex;}
 .symbol-tabs>button{display:flex;align-items:center;justify-content:center;gap:4px;}

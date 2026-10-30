@@ -26,7 +26,7 @@ export function MotionSurface({children}:{children:ReactNode}){
     const card=shaded?surface.querySelector<HTMLElement>('.modal'):null;
     const enter=surface.animate([{opacity:plannerPanel?1:0},{opacity:1}],{duration:fadeDuration,easing:shaded?'linear':easing});
     const upgrade=surface.classList.contains('upgrade-page');
-    const childLifts=upgrade?Array.from(surface.children).map(child=>child.animate([{translate:'0 8px'},{translate:'0 0'}],{duration,easing})):[];
+    const childLifts=upgrade?Array.from(surface.children).map(child=>child.animate([{translate:'0 8px'},{translate:'0 0'}],{duration,easing,fill:'both'})):[];
     const lift=(card??surface).animate([{translate:upgrade?'none':plannerPanel?`${panelOffset}px 0`:'0 8px'},{translate:upgrade?'none':'0 0'}],{duration,easing});
     let firstFrame=0,secondFrame=0;
     if(surface.classList.contains('upgrade-page')){enter.pause();lift.pause();childLifts.forEach(a=>a.pause());firstFrame=requestAnimationFrame(()=>{secondFrame=requestAnimationFrame(()=>{enter.play();lift.play();childLifts.forEach(a=>a.play());});});}

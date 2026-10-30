@@ -196,3 +196,6 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .symbol-choice-mark:has(.symbol-plan-mark) .symbol-plan-mark{right:-5px;bottom:-6px;transform:none;}
 
 .upgrade-page>.auth-map-background{position:fixed;inset:0;height:100dvh;background-repeat:no-repeat;}
+
+/* Keep the fixed SVG on the same compositing layer after its entrance. */
+.upgrade-page>.auth-map-background{translate:0 0;will-change:transform;backface-visibility:hidden;}

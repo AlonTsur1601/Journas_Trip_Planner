@@ -35,10 +35,11 @@ export function firestoreStore(): Store {
             return db.runTransaction(async (firebaseTx: FirebaseTransaction) => {
                 // Firestore requires all reads before writes. Buffer mutations until the domain operation completes.
                 const writes = new Map<string, Data | null>();
+                const reads=new Map<string,Promise<Data|undefined>>(),collections=new Map<string,Promise<Map<string,Data>>>();
                 const tx: Transaction = {
                     async get(path) { if (writes.has(path))
-                        return writes.get(path) ?? undefined; return (await firebaseTx.get(db.doc(path))).data(); },
-                    async list(path) { const snapshot = await firebaseTx.get(db.collection(path)); const found = new Map(snapshot.docs.map(doc => [doc.ref.path, path==='users'?{...doc.data(),id:doc.id}:doc.data()])); for (const [key, value] of writes) {
+                        return writes.get(path) ?? undefined; if(!reads.has(path))reads.set(path,firebaseTx.get(db.doc(path)).then(snapshot=>snapshot.data()));return structuredClone(await reads.get(path)); },
+                    async list(path) { if(!collections.has(path))collections.set(path,firebaseTx.get(db.collection(path)).then(snapshot=>new Map(snapshot.docs.map(doc=>{if(!reads.has(doc.ref.path))reads.set(doc.ref.path,Promise.resolve(doc.data()));return [doc.ref.path,path==='users'?{...doc.data(),id:doc.id}:doc.data()];})))); const found = new Map([...(await collections.get(path))!].map(([key,value])=>[key,structuredClone(value)])); for (const [key, value] of writes) {
                         if (key.slice(0, key.lastIndexOf('/')) === path) {
                             if (value)
                                 found.set(key, value);

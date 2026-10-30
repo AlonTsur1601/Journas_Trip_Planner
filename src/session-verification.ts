@@ -24,7 +24,8 @@ export function useSessionVerification(){
    }).then(verified=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified});})
    .catch(()=>{if(live&&generation.current===request){cache.invalidate(key);setError(true);}});
   };
-  const stop=auth?observeAuthSession(check):()=>{};
+  let observedKey:string|null|undefined;
+  const stop=auth?observeAuthSession(()=>{const user=auth.currentUser,key=user?keyFor(user):null;if(observedKey===key)return;observedKey=key;check();}):()=>{};
   const refresh=()=>{const user=auth?.currentUser;if(user&&!cache.has(keyFor(user)))cache.invalidate(keyFor(user));check();};
   window.addEventListener('journas-email-confirmed',refresh);
   return()=>{live=false;stop();window.removeEventListener('journas-email-confirmed',refresh);};

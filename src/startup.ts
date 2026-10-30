@@ -10,7 +10,7 @@ export function initialScreen(uid:string){
  return {date:restore?saved.date:today(),...(restore&&saved.tripId?{tripId:saved.tripId}:token?{tripId:null}:{})};
 }
 export async function startSession(uid:string){
- const result=await api<ProfileStartup&{verified:boolean}>('auth.session',initialScreen(uid),undefined,true,null);
+ const result=await api<ProfileStartup&{verified:boolean}>('auth.session',initialScreen(uid),AbortSignal.timeout(12000),true,null);
  if(result.verified)profiles.set(uid,result);
  return result.verified;
 }

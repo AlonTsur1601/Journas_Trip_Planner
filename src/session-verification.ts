@@ -8,11 +8,12 @@ const keyFor=(user:User)=>`${user.uid}:${user.email?.toLowerCase()??''}`;
 /** Share confirmed identity across screen remounts until the page is closed. */
 export function useSessionVerification(){
  const [identity,setIdentity]=useState(()=>{const user=auth?.currentUser;return {key:user?keyFor(user):null,accountId:user?.uid??null,verified:user&&cache.has(keyFor(user))?true:null as boolean|null};});
+ const [error,setError]=useState(false);
  const generation=useRef(0);
  useEffect(()=>{
   let live=true;
   const check=()=>{
-   const user=auth?.currentUser,request=++generation.current;
+   const user=auth?.currentUser,request=++generation.current;setError(false);
    if(!user){setIdentity({key:null,accountId:null,verified:null});return;}
    const key=keyFor(user);
    setIdentity(current=>({key,accountId:user.uid,verified:cache.has(key)?true:current.key===key?current.verified:null}));
@@ -21,12 +22,12 @@ export function useSessionVerification(){
     if(verified&&!user.emailVerified)await user.getIdToken(true);
     return verified;
    }).then(verified=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified});})
-   .catch(()=>{if(live&&generation.current===request)setIdentity({key,accountId:user.uid,verified:false});});
+   .catch(()=>{if(live&&generation.current===request){cache.invalidate(key);setError(true);}});
   };
   const stop=auth?observeAuthSession(check):()=>{};
   const refresh=()=>{const user=auth?.currentUser;if(user&&!cache.has(keyFor(user)))cache.invalidate(keyFor(user));check();};
   window.addEventListener('journas-email-confirmed',refresh);
   return()=>{live=false;stop();window.removeEventListener('journas-email-confirmed',refresh);};
  },[]);
- return {...identity,confirm:()=>{const user=auth?.currentUser;if(user){++generation.current;cache.confirm(keyFor(user));setIdentity({key:keyFor(user),accountId:user.uid,verified:true});}}};
+ return {...identity,error,retry:()=>window.dispatchEvent(new Event('journas-email-confirmed')),confirm:()=>{const user=auth?.currentUser;if(user){++generation.current;cache.confirm(keyFor(user));setIdentity({key:keyFor(user),accountId:user.uid,verified:true});}}};
 }

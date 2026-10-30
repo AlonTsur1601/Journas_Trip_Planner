@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <style>html{background:#f4f3f8}html[data-theme="dark"]{background:#17151f}</style>
     <link rel="icon" type="image/svg+xml"  />
     <script>(() => {
   let saved = {};
@@ -42,7 +43,9 @@
       const recoverEmptyPage = () => {
         window.setTimeout(() => {
           const root = document.getElementById('root');
-          if (!root || root.childNodes.length || !navigator.onLine) return;
+          if (!root || !navigator.onLine) return;
+          const content = root.querySelector?.('#site-content');
+          if (root.childNodes.length && (!content || content.childNodes.length)) return;
           try {
             const previous = Number(sessionStorage.getItem('journas-empty-recovery') || 0);
             if (Date.now() - previous < 60000) return;

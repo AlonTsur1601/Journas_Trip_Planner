@@ -60,3 +60,13 @@ it('recovers a truly empty page only once when it becomes visible',()=>{
  runInNewContext(boot,{document,window,navigator:{onLine:true},location:{reload:()=>reloads++},sessionStorage:{getItem:(key:string)=>values[key]??null,setItem:(key:string,value:string)=>{values[key]=value;}},matchMedia:()=>({matches:false}),MutationObserver:class{observe(){}}});
  handlers.pageshow();timers.shift()!();handlers.visibilitychange();timers.shift()!();expect(reloads).toBe(1);
 });
+
+it('recovers an empty React content shell without reloading a populated app',()=>{
+ const handlers:Record<string,()=>void>={},timers:(()=>void)[]=[],values:Record<string,string>={};let reloads=0;const content={childNodes:[] as string[]};
+ const root={dataset:{},style:{getPropertyValue:()=>''},childNodes:[content],querySelector:()=>content};const icon={getAttribute:()=>'',setAttribute:()=>{}};
+ const document={documentElement:root,querySelector:()=>icon,getElementById:()=>root,hidden:false,addEventListener:(name:string,fn:()=>void)=>{handlers[name]=fn;}};const window={addEventListener:(name:string,fn:()=>void)=>{handlers[name]=fn;},setTimeout:(fn:()=>void)=>timers.push(fn)};
+ runInNewContext(boot,{document,window,navigator:{onLine:true},location:{reload:()=>reloads++},sessionStorage:{getItem:(key:string)=>values[key]??null,setItem:(key:string,value:string)=>{values[key]=value;}},matchMedia:()=>({matches:false}),MutationObserver:class{observe(){}}});
+ content.childNodes.push('ready');handlers.pageshow();timers.shift()!();expect(reloads).toBe(0);content.childNodes.length=0;handlers.visibilitychange();timers.shift()!();expect(reloads).toBe(1);
+});
+
+it('sets the initial light and dark backgrounds before application CSS loads',()=>{const html=readFileSync('index.html','utf8');const style=html.indexOf('<style>html{background:#f4f3f8}html[data-theme="dark"]{background:#17151f}</style>');expect(style).toBeGreaterThan(-1);expect(style).toBeLessThan(html.indexOf('<script>'));});

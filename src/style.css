@@ -2749,3 +2749,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .task-row:hover:not(:has(>input:hover)){background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-radius:6px;box-shadow:inset 0 0 0 1px var(--accent);}
 .task-row>button:hover{background:transparent!important;box-shadow:none!important;outline:none!important;}
 .upgrade-page footer{margin-top:20px;}
+
+/* Rotate inside the SVG, leaving its layout box stationary. */
+.loading-spinner{animation:none;transform:none;}
+.task-row{padding-inline:7px;}

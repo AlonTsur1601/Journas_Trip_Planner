@@ -194,3 +194,5 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .symbol-choice-mark.locked-symbol{opacity:1;}
 .symbol-choice-mark.locked-symbol .symbol-choice-icon{opacity:.45;}
 .symbol-choice-mark:has(.symbol-plan-mark) .symbol-plan-mark{right:-5px;bottom:-6px;transform:none;}
+
+.upgrade-page>.auth-map-background{position:fixed;inset:0;height:100dvh;background-repeat:no-repeat;}

@@ -1519,7 +1519,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           )}
           <div className="profile-control" ref={profileAnchor}>
             <AsyncButton className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(savedProfile.displayName)}/><span>{accountName(savedProfile.displayName)}</span><ChevronDown size={14}/></AsyncButton>
-            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu dropdown-menu" role="menu" onClose={()=>setProfileOpen(false)}><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</Popover>}
+            {profileOpen&&<Popover anchor={profileAnchor} width={220} height={112} className="dropdown-menu" role="menu" onClose={()=>setProfileOpen(false)}><div className="dropdown-scroll-options"><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</div></Popover>}
           </div>
         </div>
       </header>
@@ -1817,7 +1817,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
             </div>
             <div className="task-list">
               <SearchInput aria-label="Search tasks" placeholder="Search tasks…" value={taskSearch} onValueChange={setTaskSearch}/>
-              {visibleTasks.map((t) => (
+              {taskSearch.trim()&&!visibleTasks.length&&<p className="dropdown-empty" role="status">No results found</p>}{visibleTasks.map((t) => (
                 <div className={`task-row${taskIsCurrent(t)?" due-now":""}${nearbyTodo.taskIds.includes(t.id)?" nearby-now":""}`} key={t.id}>
                   <input
                     type="checkbox"

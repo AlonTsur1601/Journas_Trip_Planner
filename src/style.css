@@ -2736,6 +2736,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .profile-menu>button+button{border-top:0;}
 
 .calendar-trips>strong{display:block;font-size:12px;margin:0 0 6px;}
+.search-input>.search-clear{justify-content:center;align-content:center;}
 .search-input>.search-clear>svg{position:static;transform:none;translate:none;margin:0;}
 .dropdown-empty{text-align:center;color:var(--muted);font-size:12px;padding:16px 10px;margin:0;}
 .profile-menu{border-color:var(--line);box-shadow:0 6px 18px #0003;}

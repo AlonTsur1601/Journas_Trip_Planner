@@ -41,7 +41,7 @@ const devicePersistenceReady=auth?setPersistence(auth,browserLocalPersistence).c
 const sessionListeners=new Set<(user:User|null)=>void>();
 const deviceSession=new DeviceSession(window.localStorage);
 let sessionUser:User|null=null,sessionReady=false,expiryTimer:ReturnType<typeof setTimeout>|undefined;
-function publishSession(user:User|null){if(user)document.documentElement.dataset.appearanceUser=user.uid;else delete document.documentElement.dataset.appearanceUser;sessionUser=user;sessionReady=true;for(const listener of sessionListeners)listener(user);}
+function publishSession(user:User|null){if(user)document.documentElement.dataset.appearanceUser=user.uid;else delete document.documentElement.dataset.appearanceUser;sessionUser=user;sessionReady=true;setTimeout(()=>{if(sessionUser!==user)return;for(const listener of sessionListeners)listener(user);},0);}
 async function refreshDeviceSession(user:User|null){
  await devicePersistenceReady;
  if(user!==auth?.currentUser)return;

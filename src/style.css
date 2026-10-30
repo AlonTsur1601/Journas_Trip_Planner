@@ -2753,3 +2753,5 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 /* Rotate inside the SVG, leaving its layout box stationary. */
 .loading-spinner{animation:none;transform:none;}
 .task-row{padding-inline:7px;}
+
+.profile-dropdown{min-width:0;}

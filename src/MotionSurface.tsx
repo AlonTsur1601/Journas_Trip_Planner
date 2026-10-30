@@ -25,9 +25,11 @@ export function MotionSurface({children}:{children:ReactNode}){
     const fadeDuration=shaded?120:duration;
     const card=shaded?surface.querySelector<HTMLElement>('.modal'):null;
     const enter=surface.animate([{opacity:plannerPanel?1:0},{opacity:1}],{duration:fadeDuration,easing:shaded?'linear':easing});
-    const lift=(card??surface).animate([{translate:plannerPanel?`${panelOffset}px 0`:'0 8px'},{translate:'0 0'}],{duration,easing});
+    const upgrade=surface.classList.contains('upgrade-page');
+    const childLifts=upgrade?Array.from(surface.children).map(child=>child.animate([{translate:'0 8px'},{translate:'0 0'}],{duration,easing})):[];
+    const lift=(card??surface).animate([{translate:upgrade?'none':plannerPanel?`${panelOffset}px 0`:'0 8px'},{translate:upgrade?'none':'0 0'}],{duration,easing});
     let firstFrame=0,secondFrame=0;
-    if(surface.classList.contains('upgrade-page')){enter.pause();lift.pause();firstFrame=requestAnimationFrame(()=>{secondFrame=requestAnimationFrame(()=>{enter.play();lift.play();});});}
+    if(surface.classList.contains('upgrade-page')){enter.pause();lift.pause();childLifts.forEach(a=>a.pause());firstFrame=requestAnimationFrame(()=>{secondFrame=requestAnimationFrame(()=>{enter.play();lift.play();childLifts.forEach(a=>a.play());});});}
     registerSurfaceMotion(card??surface,lift);
     const dividerEnter=splitter?.animate([{translate:`${panelOffset}px 0`},{translate:'0 0'}],{duration,easing});
     let layoutMotion:Animation|undefined;
@@ -46,7 +48,7 @@ export function MotionSurface({children}:{children:ReactNode}){
     });
     observer.observe(surface);
     return()=>{
-      cancelAnimationFrame(firstFrame);cancelAnimationFrame(secondFrame);
+      cancelAnimationFrame(firstFrame);cancelAnimationFrame(secondFrame);childLifts.forEach(a=>a.cancel());
       observer.disconnect();
       if(!surface.isConnected)return;
       if(matchMedia('(prefers-reduced-motion: reduce)').matches){enter.cancel();lift.cancel();layoutMotion?.cancel();return;}

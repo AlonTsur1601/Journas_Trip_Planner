@@ -2515,7 +2515,7 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 
 
 
-.loading-spinner{display:block;flex-shrink:0;box-sizing:border-box;aspect-ratio:1/1;color:var(--accent);transform-box:fill-box;transform-origin:50% 50%;animation:startup-spin 800ms linear infinite;}
+.loading-spinner{display:block;flex-shrink:0;box-sizing:border-box;aspect-ratio:1/1;color:var(--accent);transform-box:view-box;transform-origin:50% 50%;animation:startup-spin 800ms linear infinite;}
 .loading-spinner circle{fill:none;stroke:currentColor;stroke-width:3;}
 .loading-spinner-track{opacity:.2;}.loading-spinner-arc{stroke-dasharray:42 56.5487;stroke-linecap:round;}
 .startup-progress{width:40px;height:40px;align-self:center;margin-inline:auto;}
@@ -2739,10 +2739,13 @@ body[data-tour-mobile="true"] .todo-panel{max-height:calc(var(--tour-site-height
 .search-input>.search-clear{justify-content:center;align-content:center;}
 .search-input>.search-clear>svg{position:static;transform:none;translate:none;margin:0;}
 .dropdown-empty{text-align:center;color:var(--muted);font-size:12px;padding:16px 10px;margin:0;}
-.profile-menu{border-color:var(--line);box-shadow:0 6px 18px #0003;}
 .task-row.nearby-now{border-radius:5px;align-items:stretch;}
 .task-row.nearby-now:has(>input:hover){outline:none;box-shadow:none;}
 .todo-add{flex-shrink:0;width:calc(100% - 12px);border:1px solid var(--line);border-radius:6px;}
 
 .profile-menu>button{width:100%;display:flex;align-items:center;gap:9px;padding:8px 10px;border:0;border-radius:3px;background:transparent;text-align:left;font-size:12px;}
 .profile-menu>button:is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);}
+
+.task-row:hover:not(:has(>input:hover)){background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-radius:6px;box-shadow:inset 0 0 0 1px var(--accent);}
+.task-row>button:hover{background:transparent!important;box-shadow:none!important;outline:none!important;}
+.upgrade-page footer{margin-top:20px;}

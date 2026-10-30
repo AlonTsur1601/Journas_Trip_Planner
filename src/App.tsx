@@ -1519,7 +1519,7 @@ function PlannerApp({practice,verified,onVerified}:{practice:boolean;verified:bo
           )}
           <div className="profile-control" ref={profileAnchor}>
             <AsyncButton className="profile-trigger" aria-label="Account menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(!profileOpen)}><ProfileAvatar accent={settings.accent} id={user?.uid??"guest"} src={activePhoto} name={accountName(savedProfile.displayName)}/><span>{accountName(savedProfile.displayName)}</span><ChevronDown size={14}/></AsyncButton>
-            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu" role="menu" onClose={()=>setProfileOpen(false)}><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</Popover>}
+            {profileOpen&&<Popover anchor={profileAnchor} width={180} height={112} className="profile-menu dropdown-menu" role="menu" onClose={()=>setProfileOpen(false)}><AsyncButton role="menuitem" onClick={()=>{setProfileOpen(false);setModal('settings');}}><SettingsIcon size={16}/>Settings</AsyncButton>{user&&<AsyncButton role="menuitem" onClick={logout}><LogOut size={16}/>Sign out</AsyncButton>}</Popover>}
           </div>
         </div>
       </header>

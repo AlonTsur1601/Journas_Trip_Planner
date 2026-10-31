@@ -56,3 +56,11 @@ Supersedes the blocked-cadence investigation above. The workflow persists an int
 Live Sandbox round-trip PASSED: traveler/month to adventurer/year quoted $0 now and $99.99 at the original renewal, confirmed at Paddle, then restored via traveler/month quoted $0 now and $4.99 at the same boundary. Final account has its original plan, cadence, periodEnd, lastPaidTransactionId and no pending change. No real payment or production service was used. Actual collection at a future renewal remains untested.
 
 428 automated tests passed (22 skipped), including switches in both directions, upgrades/downgrades, lost provider responses, recovery after step two fails, replay rejection, paid-entitlement gating and duplicate transaction reconciliation. UI quote includes amount due now, next payment and date.
+
+## End-of-paid-period policy and change emails - 31 October 2026
+
+Latest user policy supersedes immediate/prorated upgrades: ALL existing-subscription plan and cadence changes take effect only at the paid boundary. Every paid-plan change uses do_not_bill, a verified zero-immediate-charge quote and the recoverable scheduling workflow, even when cadence is unchanged. Cancellation retains access until paid expiry.
+
+Dated scheduled-change notices are queued atomically only after successful scheduling, with previous/new plan, cadence, UTC effective date, no-charge-now statement, quoted next amount and management links. Restoring the current plan generates a scheduled-change-canceled notice. Receipts also explain the end-of-paid-period policy. Successful confirmations attempt mail dispatch; cron retries failed sends. SMTP is still not configured, so actual delivery is NOT verified.
+
+Live Sandbox same-cadence round trip PASSED: traveler/month to adventurer/month quoted $0 now, $9.99 at the original 30 November renewal, preserving current traveler access, then restored traveler/month ($4.99) with no pending change and original paid transaction. Read back both generated mail records and verified dates, amounts and text; records remain pending because SMTP is disconnected. Automated suite: 434 passed plus an additional passing cancellation case (435 total expected on next full run).

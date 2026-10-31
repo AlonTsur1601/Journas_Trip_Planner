@@ -67,15 +67,20 @@ async function upgradeCredit(billing:BillingStatus,change:Data,preview:any){
  if(subscription.items?.some((item:any)=>item.previously_billed_at))return {change,preview};
  const paidId=(billing as unknown as Data).lastPaidTransactionId;
  if(typeof paidId!=='string')throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
- const paid=await paddle(`/transactions/${paidId}`),currency=preview.immediate_transaction?.details?.totals?.currency_code;
- if(paid.status!=='completed'||paid.subscription_id!==billing.subscriptionId||paid.currency_code!==currency)throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
+ const paid=await paddle(`/transactions/${paidId}?include=adjustments`),currency=preview.immediate_transaction?.details?.totals?.currency_code;
+ if(subscription.discount||paid.adjustments?.some((a:any)=>a.status!=='rejected')||paid.status!=='completed'||paid.subscription_id!==billing.subscriptionId||paid.currency_code!==currency)throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
  const paidPrice=price(billing.plan,String(billing.interval));let credit=0,found=false;
  for(const line of paid.details?.line_items??[]){if(line.price_id!==paidPrice)continue;const period=line.billing_period??paid.billing_period,start=Date.parse(period?.starts_at),end=Date.parse(period?.ends_at),base=Number(line.totals?.subtotal)-Number(line.totals?.discount??0);if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||!Number.isFinite(base)||base<=0)continue;found=true;credit+=Math.round(base*Math.max(0,Math.min(1,(Math.min(end,Number(billing.periodEnd))-Date.now())/(end-start))));}
- if(!found||credit>Number(preview.immediate_transaction?.details?.totals?.subtotal))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
+ if(!found||credit>Number(preview.immediate_transaction?.details?.totals?.subtotal)-Number(preview.immediate_transaction?.details?.totals?.discount??0))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
  if(credit<=0)return {change,preview};
  const discount=await paddle('/discounts','POST',{description:'Journas unused paid-period credit',type:'flat',amount:String(credit),currency_code:currency,recur:false,usage_limit:1,enabled_for_checkout:false,restrict_to:[(change.items as Data[])[0].price_id],expires_at:new Date(Date.now()+10*60000).toISOString()});
  const credited={...change,discount:{id:discount.id,effective_from:'immediately'}};
- return {change:credited,preview:await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',credited)};
+ let checked=await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',credited);
+ const initial=preview.immediate_transaction.details.totals,expected=Number(initial.subtotal)-Number(initial.discount??0)-credit;
+ let actual=Number(checked.immediate_transaction?.details?.totals?.subtotal)-Number(checked.immediate_transaction?.details?.totals?.discount??0);
+ if(Math.abs(actual-expected)>1){const applied=Number(initial.subtotal)-Number(initial.discount??0)-actual;if(applied>0){await paddle(`/discounts/${discount.id}`,'PATCH',{amount:String(Math.round(credit*credit/applied))});checked=await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',credited);actual=Number(checked.immediate_transaction?.details?.totals?.subtotal)-Number(checked.immediate_transaction?.details?.totals?.discount??0);}}
+ if(Math.abs(actual-expected)>1||!Number.isFinite(actual)||Number(checked.recurring_transaction_details?.totals?.grand_total??checked.recurring_transaction_details?.totals?.total)!==Number(preview.recurring_transaction_details?.totals?.grand_total??preview.recurring_transaction_details?.totals?.total))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
+ return {change:credited,preview:checked};
 }
 async function recoverUpgrade(store:Store,uid:string){
  const lock=await store.transaction(tx=>tx.get(`billingChanges/${uid}`));if(lock?.kind!=='upgrade')return false;

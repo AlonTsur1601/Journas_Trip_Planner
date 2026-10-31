@@ -64,3 +64,13 @@ Latest user policy supersedes immediate/prorated upgrades: ALL existing-subscrip
 Dated scheduled-change notices are queued atomically only after successful scheduling, with previous/new plan, cadence, UTC effective date, no-charge-now statement, quoted next amount and management links. Restoring the current plan generates a scheduled-change-canceled notice. Receipts also explain the end-of-paid-period policy. Successful confirmations attempt mail dispatch; cron retries failed sends. SMTP is still not configured, so actual delivery is NOT verified.
 
 Live Sandbox same-cadence round trip PASSED: traveler/month to adventurer/month quoted $0 now, $9.99 at the original 30 November renewal, preserving current traveler access, then restored traveler/month ($4.99) with no pending change and original paid transaction. Read back both generated mail records and verified dates, amounts and text; records remain pending because SMTP is disconnected. Automated suite: 434 passed plus an additional passing cancellation case (435 total expected on next full run).
+
+## Immediate paid upgrades - 31 October 2026 (current policy)
+
+Supersedes the all-deferred policy above: higher-tier upgrades charge the unused-period difference immediately and grant the new tier only after verified successful payment. Downgrades, cancellations and same-tier cadence-only changes retain paid access until the original period ends. Combined higher-tier and cadence upgrades are supported.
+
+Fallback for previously modified Sandbox subscriptions without Paddle proration metadata uses a verified paid-transaction unused-period credit, restricted to the target price and one billing interval; it is removed after the paid upgrade so renewals retain their normal price. Discounts read/write permission is configured. No public coupon is exposed.
+
+Live staging Paddle Sandbox previews verified: traveler/month to traveler/year $0 now / $49.99 renewal at original boundary; adventurer/month $4.98 now / $9.99 renewal; adventurer/year $95.02 now / $99.99 renewal. Current subscription plan, cadence and paid boundary remained unchanged. These were previews only; no payment was submitted in this check. Automated suite previously passed 438 tests (22 skipped); final focused billing run passed 16 tests and build succeeded.
+
+Top overview card features follow the same relative order across plans. Code commit 9d3fde7 is deployed READY to journas-monetization-staging.vercel.app (dpl_AejMPYr9mVruozoDiz2X431Y7agp). Production remains outside this work. SMTP remains unconfigured; actual email delivery is unresolved.

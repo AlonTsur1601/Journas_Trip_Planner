@@ -15,7 +15,7 @@ async function paddle(path:string,method='GET',body?:unknown){
  if(!response.ok){
   const result=await response.json().catch(()=>null),error=result?.error;
   const safe=(value:unknown)=>typeof value==='string'&&/^[a-zA-Z0-9_.:-]{1,160}$/.test(value)?value:undefined;
-  const details={provider:'paddle',status:response.status,providerCode:safe(error?.code),requestId:safe(result?.meta?.request_id),fields:Array.isArray(error?.errors)?error.errors.map((entry:any)=>safe(entry.field)).filter(Boolean):[]};
+  const details={provider:'paddle',status:response.status,providerCode:safe(error?.code),requestId:safe(result?.meta?.request_id),reason:typeof error?.detail==='string'?error.detail.split(key).join('[redacted]').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]').slice(0,500):undefined,fields:Array.isArray(error?.errors)?error.errors.map((entry:any)=>safe(entry.field)).filter(Boolean):[]};
   console.warn('Paddle request rejected',details);
   throw new ApiError(502,'BILLING_UNAVAILABLE','Paddle could not complete the request. Your plan has not been changed.',details);
  }return (await response.json()).data;

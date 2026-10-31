@@ -4,7 +4,7 @@ import {billingStatus} from '../shared/plans';
 import {PracticeStore} from '../server/practice';
 const day=86400000;
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
-function setup(from='traveler',cadence='month',to='adventurer',interval='year'){
+function setup(from='traveler',cadence='month',to='traveler',interval='year'){
  const end=Date.now()+30*day,renewal=new Date(end).toISOString(),source=`pri_${from}${cadence}`,target=`pri_${to}${interval}`;
  for(const [key,value]of Object.entries({JOURNAS_ENV:'monetization-staging',FIREBASE_PROJECT_ID:'journas-monetization-2026',BILLING_ENV:'sandbox',ADS_MODE:'mock',STAGING_PUBLIC_URL:'https://journas-monetization-staging.vercel.app',PADDLE_API_KEY:'unit_sdbx_mock',['PADDLE_PRICE_'+to.toUpperCase()+'_'+interval.toUpperCase()]:target}))vi.stubEnv(key,value);
  let subscription:any={id:'sub_test',status:'active',items:[{price:{id:source},quantity:1}],next_billed_at:renewal,scheduled_change:null};
@@ -26,7 +26,7 @@ function setup(from='traveler',cadence='month',to='adventurer',interval='year'){
 async function preview(f:ReturnType<typeof setup>){return billingAction(f.store,'alice',{action:'billing.preview-change',plan:f.to,interval:f.interval});}
 async function confirm(f:ReturnType<typeof setup>,p:any){return billingAction(f.store,'alice',{action:'billing.change-plan',plan:f.to,interval:f.interval,previewId:p.previewId});}
 describe('combined plan and cadence workflow',()=>{
- it.each([['traveler','month','adventurer','year'],['adventurer','month','traveler','year'],['traveler','year','adventurer','month'],['adventurer','year','traveler','month'],['traveler','month','traveler','year'],['traveler','month','adventurer','month'],['adventurer','month','traveler','month'],['traveler','year','adventurer','year']])('schedules %s/%s to %s/%s at the paid boundary',async(from,cadence,to,interval)=>{
+ it.each([['adventurer','month','traveler','year'],['adventurer','year','traveler','month'],['traveler','month','traveler','year'],['adventurer','month','traveler','month'],['traveler','year','traveler','month']])('schedules %s/%s to %s/%s at the paid boundary',async(from,cadence,to,interval)=>{
   const f=setup(from,cadence,to,interval),p=await preview(f);
   expect(p).toMatchObject({effectiveAt:f.end,preview:null,quote:{dueNow:0,renewsAt:f.end,currency:'USD'}});
   expect(f.calls.filter(c=>c.method==='PATCH'&&!c.url.endsWith('/preview'))).toHaveLength(0);
@@ -41,7 +41,7 @@ describe('combined plan and cadence workflow',()=>{
   await expect(confirm(f,p)).rejects.toMatchObject({code:'BILLING_CHANGE_PENDING'});
   expect((await f.store.transaction(tx=>tx.get('billingChanges/alice')))?.stage).toBe('items-applied');expect(await f.store.list('billingNotices')).toHaveLength(0);
   await expect(billingAction(f.store,'alice',{action:'billing.change-plan',plan:'traveler',interval:'month',previewId:'other'})).rejects.toBeDefined();
-  await expect(billingAction(f.store,'alice',{action:'billing.status'})).resolves.toMatchObject({changeProcessing:false,billing:{pendingPlan:'adventurer',pendingInterval:'year'}});
+  await expect(billingAction(f.store,'alice',{action:'billing.status'})).resolves.toMatchObject({changeProcessing:false,billing:{pendingPlan:'traveler',pendingInterval:'year'}});
   expect(f.subscription.next_billed_at).toBe(f.renewal);expect(await f.store.list('billingNotices')).toHaveLength(1);await billingAction(f.store,'alice',{action:'billing.status'});expect(await f.store.list('billingNotices')).toHaveLength(1);
   expect(f.calls.filter(c=>c.body?.items&&!c.url.endsWith('/preview'))).toHaveLength(1);
  });
@@ -60,7 +60,7 @@ it('preserves the scheduled change when reconciliation repeats the last paid tra
  const f=setup(),p=await preview(f);await confirm(f,p);
  await f.store.transaction(async tx=>{const user=await tx.get('users/alice');tx.set('users/alice',{...user,billing:{...(user!.billing as any),lastPaidTransactionId:'txn_original'}});});
  await applyBillingEvent(f.store,{event_id:'evt_repeated',event_type:'transaction.completed',occurred_at:new Date().toISOString(),data:{id:'txn_original',subscription_id:'sub_test',custom_data:{uid:'alice',environment:'monetization-staging'},items:[{price_id:f.source,quantity:1}],billing_period:{ends_at:f.renewal}}});
- expect(billingStatus(await f.store.transaction(tx=>tx.get('users/alice')))).toMatchObject({plan:'traveler',interval:'month',pendingPlan:'adventurer',pendingInterval:'year'});
+ expect(billingStatus(await f.store.transaction(tx=>tx.get('users/alice')))).toMatchObject({plan:'traveler',interval:'month',pendingPlan:'traveler',pendingInterval:'year'});
 });
 it('queues cancellation only after the provider accepts it, preserving paid access until expiry',async()=>{
  const f=setup();vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({data:{scheduled_change:{action:'cancel'}}})})));

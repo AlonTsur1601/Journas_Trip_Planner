@@ -10,7 +10,7 @@ function subscriptionLinks(plan:string){
  return {html:`${button(cancel,'Cancel future payments')}${plan==='adventurer'?button(downgrade,'Switch to traveler'):''}`,text:`Cancel future payments: ${cancel}${plan==='adventurer'?`\nSwitch to traveler: ${downgrade}`:''}`};
 }
 export function billingMailContent(plan:string){
- const links=subscriptionLinks(plan),timing='All plan and billing-period changes take effect only at the end of the paid period. Your current paid access continues until then.';
+ const links=subscriptionLinks(plan),timing='Upgrades start after successful payment of the prorated difference. Downgrades, cancellations and billing-period-only changes take effect at the end of the paid period.';
  return {subject:'Journas: manage your subscription payment',html:`<h1>Your Journas payment</h1><p>Paddle sends your payment receipt separately. Manage future charges below. Changes require sign-in and confirmation; opening a link never cancels a subscription.</p>${links.html}<p>${timing} This is the isolated Sandbox environment.</p>`,text:`Paddle sends your receipt separately. ${links.text}\nSign in and confirm the change. ${timing} Sandbox only.`};
 }
 export async function queueChangeNotice(tx:Transaction,uid:string,id:string,billing:Data,plan:string,interval:string,quote?:Data){
@@ -26,10 +26,15 @@ export function changeMailContent(notice:Data){
  const amount=Number(notice.nextTotal),charge=Number.isFinite(amount)&&amount>=0?new Intl.NumberFormat('en-US',{style:'currency',currency}).format(amount/100):null;
  const title=notice.keepCurrent?'Your scheduled change was canceled':'Your subscription change is scheduled';
  const message=notice.keepCurrent?`Your current ${previous} plan stays unchanged.`:plan==='tourist'?`Your subscription will end on ${date}. You will move to tourist then; no further subscription payments are scheduled.`:`Your change to ${plan} with ${interval} billing takes effect on ${date}.`;
- const timing=notice.keepCurrent?'':`Until ${date}, your current ${previous} ${previousInterval} plan and its access stay active. All plan and billing-period changes take effect only at the end of the paid period.`;
+ const timing=notice.keepCurrent?'':`Until ${date}, your current ${previous} ${previousInterval} plan and its access stay active. Downgrades and billing-period-only changes take effect only at the end of the paid period.`;
  const payment=plan==='tourist'?'You were not charged for this change.':`You were not charged for this change. ${charge?`Your next payment is ${charge} on ${date}, then every ${notice.interval==='year'?'year':'month'}. Applicable taxes are based on the renewal details.`:'Your next payment is due at renewal.'}`;
  const base=subscriptionLinks(plan);
  return {subject:notice.keepCurrent?'Journas: scheduled change canceled':'Journas: subscription change scheduled',html:`<h1>${title}</h1><p>${message}</p><p>${timing}</p><p>${payment}</p>${base.html}<p>Sign in to manage your subscription. Opening a link never changes it. Sandbox only.</p>`,text:`${title}\n${message}\n${timing}\n${payment}\n${base.text}\nSign in to manage your subscription. Sandbox only.`};
+}
+export function upgradeMailContent(notice:Data){
+ const base=billingMailContent(String(notice.plan)),plan=['traveler','adventurer'].includes(String(notice.plan))?String(notice.plan):'paid';
+ const message=`Your ${plan} upgrade is active. Paddle has confirmed payment. Your new plan starts now; you do not need to wait until the previous paid period ends.`;
+ return {subject:'Journas: your upgrade is active',html:`<h1>Your upgrade is active</h1><p>${message}</p>${base.html}`,text:`${message}\n${base.text}`};
 }
 type Delivery={enabled:boolean;email:(uid:string)=>Promise<string|undefined>;send:(email:string,content:ReturnType<typeof billingMailContent>)=>Promise<unknown>};
 const delivery=():Delivery=>({enabled:Boolean(process.env.SMTP_HOST||process.env.BREVO_SMTP_KEY),email:async uid=>(await adminAuth().getUser(uid)).email,send:(email,c)=>deliverAccountMail(email,c.subject,c.html,c.text)});
@@ -42,7 +47,7 @@ export async function billingNotices(store:Store,mail=delivery(),now=Date.now())
   const notice=await store.transaction(async tx=>{const n=await tx.get(path);if(!n||n.status!=='pending'||Number(n.leaseUntil??0)>now)return null;tx.set(path,{...n,leaseUntil:now+600000,leaseToken:token});return n;});
   if(!notice)continue;
   let status='pending';
-  try{const email=await mail.email(String(notice.uid));if(email?.endsWith('.test'))status='test-only';else if(email){await mail.send(email,notice.kind==='scheduled-change'?changeMailContent(notice):billingMailContent(String(notice.plan)));status='sent';sent++;}}catch{/* Preserve the queue for retry. */}
+  try{const email=await mail.email(String(notice.uid));if(email?.endsWith('.test'))status='test-only';else if(email){await mail.send(email,notice.kind==='scheduled-change'?changeMailContent(notice):notice.kind==='paid-upgrade'?upgradeMailContent(notice):billingMailContent(String(notice.plan)));status='sent';sent++;}}catch{/* Preserve the queue for retry. */}
   await store.transaction(async tx=>{const current=await tx.get(path);if(current?.leaseToken===token)tx.set(path,{...current,status,leaseUntil:0,leaseToken:null,...(status==='sent'?{sentAt:now}:{})});});
  }
  return {sent};

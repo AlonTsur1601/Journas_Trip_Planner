@@ -12,7 +12,13 @@ async function paddle(path:string,method='GET',body?:unknown){
  assertStaging();const key=process.env.PADDLE_API_KEY;
  if(!key||!key.includes('_sdbx'))throw new ApiError(503,'BILLING_NOT_CONFIGURED','Paddle Sandbox is not connected. Follow the setup guide.');
  const response=await fetch(apiRoot+path,{method,headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(12000)});
- if(!response.ok)throw new ApiError(502,'BILLING_UNAVAILABLE','Paddle could not complete the request. Your plan has not been changed.');return (await response.json()).data;
+ if(!response.ok){
+  const result=await response.json().catch(()=>null),error=result?.error;
+  const safe=(value:unknown)=>typeof value==='string'&&/^[a-zA-Z0-9_.:-]{1,160}$/.test(value)?value:undefined;
+  const details={provider:'paddle',status:response.status,providerCode:safe(error?.code),requestId:safe(result?.meta?.request_id),fields:Array.isArray(error?.errors)?error.errors.map((entry:any)=>safe(entry.field)).filter(Boolean):[]};
+  console.warn('Paddle request rejected',details);
+  throw new ApiError(502,'BILLING_UNAVAILABLE','Paddle could not complete the request. Your plan has not been changed.',details);
+ }return (await response.json()).data;
 }
 export async function refreshMemberships(store:Store,uid:string){await store.transaction(async tx=>{const user=await tx.get(`users/${uid}`);for(const ref of await tx.list(`users/${uid}/trips`)){const trip=await tx.get(`trips/${ref.id}`);if(trip){const cleanupAt=retentionDeadline(trip,user,Date.now());tx.set(`users/${uid}/trips/${ref.id}`,{...ref,cleanupAt});if(trip.ownerId===uid)tx.set(`trips/${trip.id}`,{...trip,ownerCleanupAt:cleanupAt});}}});}
 export async function billingAction(store:Store,uid:string,input:Data){

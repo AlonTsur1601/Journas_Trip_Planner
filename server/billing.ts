@@ -17,13 +17,53 @@ async function paddle(path:string,method='GET',body?:unknown){
   const safe=(value:unknown)=>typeof value==='string'&&/^[a-zA-Z0-9_.:-]{1,160}$/.test(value)?value:undefined;
   const details={provider:'paddle',status:response.status,providerCode:safe(error?.code),requestId:safe(result?.meta?.request_id),reason:typeof error?.detail==='string'?error.detail.split(key).join('[redacted]').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]').slice(0,500):undefined,fields:Array.isArray(error?.errors)?error.errors.map((entry:any)=>safe(entry.field)).filter(Boolean):[]};
   console.warn('Paddle request rejected',details);
-  throw new ApiError(502,'BILLING_UNAVAILABLE','Paddle could not complete the request. Your plan has not been changed.',details);
+  throw new ApiError(502,'BILLING_UNAVAILABLE','Paddle could not complete the request. Please check your subscription before retrying.',details);
  }return (await response.json()).data;
 }
 export async function refreshMemberships(store:Store,uid:string){await store.transaction(async tx=>{const user=await tx.get(`users/${uid}`);for(const ref of await tx.list(`users/${uid}/trips`)){const trip=await tx.get(`trips/${ref.id}`);if(trip){const cleanupAt=retentionDeadline(trip,user,Date.now());tx.set(`users/${uid}/trips/${ref.id}`,{...ref,cleanupAt});if(trip.ownerId===uid)tx.set(`trips/${trip.id}`,{...trip,ownerCleanupAt:cleanupAt});}}});}
-export async function billingAction(store:Store,uid:string,input:Data){
- const user=await store.transaction(tx=>tx.get(`users/${uid}`)),billing=billingStatus(user),action=String(input.action);
- if(action==='billing.status')return {billing,entitlements:plans[billing.plan],configured:Boolean(process.env.PADDLE_API_KEY)&&Boolean(process.env.PADDLE_CLIENT_TOKEN?.startsWith('test_'))&&configuredPrices().length===4};
+const itemPrices=(items:any)=>Array.isArray(items)?items.map(item=>({price_id:item.price?.id??item.price_id,quantity:item.quantity})):[];
+const sameItems=(a:any,b:any)=>JSON.stringify(itemPrices(a).sort((x:any,y:any)=>String(x.price_id).localeCompare(String(y.price_id))))===JSON.stringify(itemPrices(b).sort((x:any,y:any)=>String(x.price_id).localeCompare(String(y.price_id))));
+const sameDate=(a:any,b:any)=>Math.abs(Date.parse(String(a))-Date.parse(String(b)))<1000;
+/** Resume the two provider updates from durable intent; never bill during either update. */
+export async function resumeCadenceChange(store:Store,uid:string){
+ const attempt=randomUUID(),job=await store.transaction(async tx=>{
+  const job=await tx.get(`billingChanges/${uid}`);if(job?.kind!=='cadence')return null;
+  if(Number(job.leaseUntil)>Date.now())throw new ApiError(409,'BILLING_CHANGE_PENDING','Your change is still processing. Check your subscription shortly.');
+  tx.set(`billingChanges/${uid}`,{...job,attempt,leaseUntil:Date.now()+60000});return job;
+ });
+ if(!job)return false;
+ let mutationAttempted=job.stage==='items-applied';
+ try{
+  let subscription=await paddle(`/subscriptions/${job.subscriptionId}`);
+  if(subscription.status!=='active'||subscription.scheduled_change)throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed. Review it before trying again.');
+  if(sameItems(subscription.items,(job.change as Data).items))mutationAttempted=true;
+  else{
+   if(!sameItems(subscription.items,job.originalItems)||!sameDate(subscription.next_billed_at,job.renewalAt))throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed. Preview it again.');
+   if(Date.parse(String(job.renewalAt))<Date.now()+1800000)throw new ApiError(409,'BILLING_RENEWAL_CLOSE','Your renewal is being prepared. Please try after it completes.');
+   mutationAttempted=true;
+   subscription=await paddle(`/subscriptions/${job.subscriptionId}`,'PATCH',job.change);
+  }
+  await store.transaction(async tx=>{const current=await tx.get(`billingChanges/${uid}`);if(current?.attempt!==attempt)throw new ApiError(409,'BILLING_CHANGE_PENDING','Your change is still processing.');tx.set(`billingChanges/${uid}`,{...current,stage:'items-applied',leaseUntil:Date.now()+60000});});
+  if(!sameDate(subscription.next_billed_at,job.renewalAt))subscription=await paddle(`/subscriptions/${job.subscriptionId}`,'PATCH',{next_billed_at:job.renewalAt,proration_billing_mode:'do_not_bill',on_payment_failure:'prevent_change'});
+  if(!sameItems(subscription.items,(job.change as Data).items)||!sameDate(subscription.next_billed_at,job.renewalAt))throw new ApiError(502,'BILLING_SCHEDULE_MISMATCH','Your change is being recovered. Check your subscription shortly.');
+  await store.transaction(async tx=>{
+   const currentJob=await tx.get(`billingChanges/${uid}`),user=await tx.get(`users/${uid}`);
+   if(currentJob?.attempt!==attempt||!user||((user.billing as Data)?.subscriptionId!==job.subscriptionId))throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed.');
+   tx.set(`users/${uid}`,{...user,billing:{...(user.billing as Data),pendingPlan:(user.billing as Data)?.plan===job.plan&&(user.billing as Data)?.interval===job.interval?null:job.plan,pendingInterval:(user.billing as Data)?.plan===job.plan&&(user.billing as Data)?.interval===job.interval?null:job.interval}});
+   tx.delete(`billingChanges/${uid}`);tx.delete(`billingPreviews/${job.previewId}`);
+  });
+  return true;
+ }catch(error){
+  await store.transaction(async tx=>{const current=await tx.get(`billingChanges/${uid}`);if(current?.attempt!==attempt)return;if(!mutationAttempted){tx.delete(`billingChanges/${uid}`);const preview=await tx.get(`billingPreviews/${job.previewId}`);if(preview)tx.set(`billingPreviews/${job.previewId}`,{...preview,processing:false});}else tx.set(`billingChanges/${uid}`,{...current,leaseUntil:0,lastErrorCode:error instanceof ApiError?error.code:'NETWORK_ERROR'});});
+  if(mutationAttempted)throw new ApiError(503,'BILLING_CHANGE_PENDING','Your change is still processing. Reopen this page shortly to finish it; do not start another purchase.');
+  throw error;
+ }
+}
+export async function billingAction(store:Store,uid:string,input:Data):Promise<Data>{
+ const action=String(input.action);let changeProcessing=false;
+ if(action==='billing.status')try{await resumeCadenceChange(store,uid);}catch(error){changeProcessing=true;console.warn('Billing recovery pending',{code:error instanceof ApiError?error.code:'NETWORK_ERROR'});}
+ const user=await store.transaction(tx=>tx.get(`users/${uid}`)),billing=billingStatus(user);
+ if(action==='billing.status')return {changeProcessing,billing,entitlements:plans[billing.plan],configured:Boolean(process.env.PADDLE_API_KEY)&&Boolean(process.env.PADDLE_CLIENT_TOKEN?.startsWith('test_'))&&configuredPrices().length===4};
  if(billing.source==='test')throw new ApiError(409,'TEST_PLAN_FIXED','This account has a fixed test plan. Use a billing test account to test purchases.');
  if(action==='billing.checkout-config')return {token:checkoutToken(),environment:'sandbox'};
  if(action==='billing.portal'){
@@ -45,24 +85,33 @@ export async function billingAction(store:Store,uid:string,input:Data){
   }catch(error){await store.transaction(async tx=>{const current=await tx.get(`billingCheckouts/${uid}`);if(current?.id===reservation)tx.delete(`billingCheckouts/${uid}`);});throw error;}
  }
  if(!billing.subscriptionId)throw new ApiError(409,'NO_SUBSCRIPTION','Subscribe before changing a plan');
- const cadenceChange=interval!==billing.interval;
+ const cadenceChange=plan!=='tourist'&&(interval!==billing.interval||Boolean(billing.pendingInterval&&interval!==billing.pendingInterval));
  const immediate=planIds.indexOf(plan)>planIds.indexOf(billing.plan)&&!cadenceChange;
  const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:immediate?'prorated_immediately':cadenceChange?'do_not_bill':'full_next_billing_period',on_payment_failure:'prevent_change'};
  if(action==='billing.preview-change'){
   const preview=plan==='tourist'?null:await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',change);
-  const cadenceVerified=!cadenceChange||Boolean(preview&&Math.abs(Date.parse(String(preview.next_billed_at))-Number(billing.periodEnd))<1000&&!preview.immediate_transaction&&Math.abs(Date.parse(String(preview.next_transaction?.billing_period?.starts_at))-Number(billing.periodEnd))<1000);
-  if(!cadenceVerified)throw new ApiError(409,'BILLING_SCHEDULE_MISMATCH','This billing-period change would move your renewal date unexpectedly. Your current subscription is unchanged. Please keep your current billing period for now.');
-  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified,expiresAt:Date.now()+5*60000,change});});
-  return {previewId:id,preview,effectiveAt:immediate?'after successful payment':billing.periodEnd};
+  let renewalAt:string|undefined,originalItems:unknown,quote:Data|undefined;
+  if(cadenceChange){
+   const current=await paddle(`/subscriptions/${billing.subscriptionId}`);
+   if(current.status!=='active'||current.scheduled_change||!sameDate(current.next_billed_at,new Date(Number(billing.periodEnd)).toISOString()))throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed. Reopen this page before trying again.');
+   if(Date.parse(current.next_billed_at)<Date.now()+1800000)throw new ApiError(409,'BILLING_RENEWAL_CLOSE','Your renewal is being prepared. Please try after it completes.');
+   const totals=preview?.recurring_transaction_details?.totals;
+   if(preview?.immediate_transaction||!totals||!/^\d+$/.test(String(totals.grand_total??totals.total)))throw new ApiError(502,'BILLING_QUOTE_UNAVAILABLE','Could not verify the renewal amount. Please try again.');
+   renewalAt=current.next_billed_at;originalItems=itemPrices(current.items);
+   quote={dueNow:0,nextTotal:Number(totals.grand_total??totals.total),currency:totals.currency_code,renewsAt:Date.parse(current.next_billed_at)};
+  }
+  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified:!cadenceChange,workflowVersion:2,...(cadenceChange?{renewalAt,originalItems,quote}:{}),expiresAt:Date.now()+5*60000,change});});
+  return {previewId:id,preview:cadenceChange?null:preview,...(quote?{quote}:{}),effectiveAt:immediate?'after successful payment':billing.periodEnd};
  }
  if(action==='billing.change-plan'){
   const preview=await store.transaction(async tx=>{
    const preview=await tx.get(`billingPreviews/${String(input.previewId)}`),current=billingStatus(await tx.get(`users/${uid}`)),lock=await tx.get(`billingChanges/${uid}`);
    if(!preview||preview.processing||preview.uid!==uid||preview.plan!==plan||preview.interval!==interval||preview.subscriptionId!==current.subscriptionId||preview.revision!==billingRevision(current)||Number(preview.expiresAt)<Date.now())throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
-   if(interval!==current.interval&&preview.cadenceVerified!==true)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
-   if(lock&&Number(lock.expiresAt)>Date.now())throw new ApiError(409,'BILLING_CHANGE_PENDING','A plan change is already processing. Please check your subscription before trying again.');
-   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,{previewId:input.previewId,expiresAt:Date.now()+5*60000});return preview;
+   if(plan!=='tourist'&&interval!==current.interval&&preview.workflowVersion!==2)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
+   if(lock&&(lock.kind==='cadence'||Number(lock.expiresAt)>Date.now()))throw new ApiError(409,'BILLING_CHANGE_PENDING','A plan change is already processing. Please check your subscription before trying again.');
+   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,cadenceChange?{kind:'cadence',stage:'prepared',uid,plan,interval,subscriptionId:current.subscriptionId,previewId:input.previewId,renewalAt:preview.renewalAt,originalItems:preview.originalItems,change:preview.change,leaseUntil:0}:{previewId:input.previewId,expiresAt:Date.now()+5*60000});return preview;
   });
+  if(cadenceChange){await resumeCadenceChange(store,uid);return {pending:true};}
   if(plan==='tourist')await paddle(`/subscriptions/${billing.subscriptionId}/cancel`,'POST',{effective_from:'next_billing_period'});
   else await paddle(`/subscriptions/${billing.subscriptionId}`,'PATCH',preview.change);
   await store.transaction(async tx=>{const current=await tx.get(`users/${uid}`)??{};if(!preview.immediate)tx.set(`users/${uid}`,{...current,billing:{...(current.billing as Data),pendingPlan:plan,pendingInterval:interval}});tx.delete(`billingPreviews/${String(input.previewId)}`);tx.delete(`billingChanges/${uid}`);});
@@ -89,6 +138,7 @@ export async function applyBillingEvent(store:Store,event:Data){
   const user=await tx.get(`users/${uid}`)??{},stored=user.billing as Data??{},paid=stored.paidChange as Data|undefined;
   const old=paid&&Number(paid.startsAt)<=Date.now()?{...stored,...billingStatus(user)}:stored;
   if(old.source==='test'){tx.set(`billingEvents/${id}`,{id,at,ignored:true});return;}
+  if(type==='transaction.completed'&&data.id&&data.id===old.lastPaidTransactionId){tx.set(`billingEvents/${id}`,{id,at,ignored:true});return;}
   const clock=type.startsWith('subscription.')?'subscriptionEventAt':type.startsWith('transaction.')?'transactionEventAt':'adjustmentEventAt';
   const subscription=type.startsWith('subscription.')?data.id:data.subscription_id;
   const mismatchedSubscription=subscription&&old.subscriptionId&&old.subscriptionId!==subscription&&Number(old.periodEnd)>Date.now();
@@ -123,7 +173,8 @@ export async function reconcileBilling(store:Store){
  let checked=0;
  for(const user of await store.list('users',100)){
   const state=user.billing as Data|undefined;if(state?.source!=='sandbox'||!state.subscriptionId||typeof user.id!=='string')continue;
-  const subscription=await paddle(`/subscriptions/${state.subscriptionId}`),uid=user.id;
+  const uid=user.id;try{await resumeCadenceChange(store,uid);}catch(error){console.warn('Billing reconciliation pending',{code:error instanceof ApiError?error.code:'NETWORK_ERROR'});continue;}
+  const subscription=await paddle(`/subscriptions/${state.subscriptionId}`);
   const event={event_id:`evt_reconcile${createHmac('sha256','reconcile').update(`${state.subscriptionId}:${subscription.updated_at}`).digest('hex').slice(0,26)}`,event_type:`subscription.${subscription.status==='canceled'?'canceled':subscription.status==='past_due'?'past_due':'updated'}`,occurred_at:subscription.updated_at,data:{...subscription,custom_data:{uid,environment:'monetization-staging'}}};
   await applyBillingEvent(store,event);
   const transactions=await paddle(`/transactions?subscription_id=${state.subscriptionId}&status=completed&order_by=created_at[DESC]&per_page=1`);

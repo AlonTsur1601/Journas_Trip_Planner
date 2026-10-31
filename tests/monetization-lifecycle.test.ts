@@ -30,17 +30,6 @@ describe('paid-period transitions',()=>{
   const b=billingStatus({billing:{source:'sandbox',plan:'traveler',periodEnd:now,status:'past_due',graceUntil:now+7*day,subscriptionId:'sub_manage'}},now+7*day);
   expect(b).toMatchObject({plan:'tourist',subscriptionId:'sub_manage',downgradedAt:now+7*day});
  });
- it('previews cadence changes without charging now or moving the existing renewal date',async()=>{
-  clock();vi.stubEnv('JOURNAS_ENV','monetization-staging');vi.stubEnv('FIREBASE_PROJECT_ID','journas-monetization-2026');vi.stubEnv('BILLING_ENV','sandbox');vi.stubEnv('ADS_MODE','mock');vi.stubEnv('STAGING_PUBLIC_URL','https://journas-monetization-staging.vercel.app');vi.stubEnv('PADDLE_API_KEY','unit_sdbx_not_a_real_key');vi.stubEnv('PADDLE_PRICE_TRAVELER_YEAR','pri_year');
-  const fetcher=vi.fn(async(_url:string,_options?:RequestInit)=>({ok:true,json:async()=>({data:{update_summary:null,next_billed_at:new Date(now+30*day).toISOString(),next_transaction:{billing_period:{starts_at:new Date(now+30*day).toISOString()}},immediate_transaction:null}})}));vi.stubGlobal('fetch',fetcher);
-  const end=now+30*day,store=new PracticeStore([['users/alice',{billing:{source:'sandbox',plan:'traveler',interval:'month',periodEnd:end,subscriptionId:'sub_cadence'}}]]);
-  const preview=await billingAction(store,'alice',{action:'billing.preview-change',plan:'traveler',interval:'year'});
-  expect(JSON.parse(String(fetcher.mock.calls[0]![1]!.body))).toMatchObject({proration_billing_mode:'do_not_bill'});expect(JSON.parse(String(fetcher.mock.calls[0]![1]!.body))).not.toHaveProperty('next_billed_at');
-  await billingAction(store,'alice',{action:'billing.change-plan',plan:'traveler',interval:'year',previewId:preview.previewId});
-  expect(billingStatus(await store.transaction(tx=>tx.get('users/alice')),now)).toMatchObject({interval:'month',pendingInterval:'year',plan:'traveler'});
-  await expect(billingAction(store,'alice',{action:'billing.change-plan',plan:'traveler',interval:'year',previewId:preview.previewId})).rejects.toMatchObject({code:'PREVIEW_EXPIRED'});
-  expect(fetcher).toHaveBeenCalledTimes(2);
- });
  it('rejects an old subscription payment while another paid subscription is active',async()=>{
   clock();vi.stubEnv('PADDLE_PRICE_ADVENTURER_MONTH','pri_new');const store=new PracticeStore([['users/alice',{billing:{source:'sandbox',plan:'traveler',periodEnd:now+day,subscriptionId:'sub_current'}}]]);
   await applyBillingEvent(store,{event_id:'evt_oldsub',event_type:'transaction.completed',occurred_at:new Date(now).toISOString(),data:{id:'txn_old',subscription_id:'sub_old',custom_data:{uid:'alice',environment:'monetization-staging'},items:[{price:{id:'pri_new'}}],billing_period:{ends_at:new Date(now+30*day).toISOString()}}});

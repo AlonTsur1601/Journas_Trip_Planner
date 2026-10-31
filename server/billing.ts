@@ -50,13 +50,16 @@ export async function billingAction(store:Store,uid:string,input:Data){
  const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:immediate?'prorated_immediately':cadenceChange?'do_not_bill':'full_next_billing_period',on_payment_failure:'prevent_change'};
  if(action==='billing.preview-change'){
   const preview=plan==='tourist'?null:await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',change);
-  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,expiresAt:Date.now()+5*60000,change});});
+  const cadenceVerified=!cadenceChange||Boolean(preview&&Math.abs(Date.parse(String(preview.next_billed_at))-Number(billing.periodEnd))<1000&&!preview.immediate_transaction&&Math.abs(Date.parse(String(preview.next_transaction?.billing_period?.starts_at))-Number(billing.periodEnd))<1000);
+  if(!cadenceVerified)throw new ApiError(409,'BILLING_SCHEDULE_MISMATCH','This billing-period change would move your renewal date unexpectedly. Your current subscription is unchanged. Please keep your current billing period for now.');
+  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified,expiresAt:Date.now()+5*60000,change});});
   return {previewId:id,preview,effectiveAt:immediate?'after successful payment':billing.periodEnd};
  }
  if(action==='billing.change-plan'){
   const preview=await store.transaction(async tx=>{
    const preview=await tx.get(`billingPreviews/${String(input.previewId)}`),current=billingStatus(await tx.get(`users/${uid}`)),lock=await tx.get(`billingChanges/${uid}`);
    if(!preview||preview.processing||preview.uid!==uid||preview.plan!==plan||preview.interval!==interval||preview.subscriptionId!==current.subscriptionId||preview.revision!==billingRevision(current)||Number(preview.expiresAt)<Date.now())throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
+   if(interval!==current.interval&&preview.cadenceVerified!==true)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
    if(lock&&Number(lock.expiresAt)>Date.now())throw new ApiError(409,'BILLING_CHANGE_PENDING','A plan change is already processing. Please check your subscription before trying again.');
    tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,{previewId:input.previewId,expiresAt:Date.now()+5*60000});return preview;
   });

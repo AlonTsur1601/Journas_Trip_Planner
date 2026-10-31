@@ -48,3 +48,11 @@ Status: IMPLEMENTATION VERIFIED IN ISOLATED STAGING; external provider connectio
 - Sandbox preview matrix: traveler/year and adventurer/year expose that schedule mismatch; adventurer/month previews a $5 prorated charge and $9.99 renewal, with the existing renewal boundary retained. These were PREVIEWS ONLY: no subscription change, charge, cancellation or provider update was executed. Billing state checked unchanged afterward.
 - Safe provider error code/reason/request ID diagnostics are now retained; credentials and email strings are redacted.
 - Pending: implement and verify a provider-compatible deferred cadence-change workflow. Do not claim cadence switching or future actual renewal billing is working. Sandbox preview success alone is not end-to-end payment acceptance.
+
+## Combined cadence implementation - 31 October 2026
+
+Supersedes the blocked-cadence investigation above. The workflow persists an intent and performs two separate do_not_bill provider updates: items first, then the original next_billed_at. It verifies both target items and renewal boundary before recording pendingPlan/pendingInterval. Leased jobs resume ambiguous failures from billing.status or reconciliation without repeating an applied item update. Paid access stays unchanged until payment confirmation. Reconciliation of the last paid transaction cannot clear the scheduled change.
+
+Live Sandbox round-trip PASSED: traveler/month to adventurer/year quoted $0 now and $99.99 at the original renewal, confirmed at Paddle, then restored via traveler/month quoted $0 now and $4.99 at the same boundary. Final account has its original plan, cadence, periodEnd, lastPaidTransactionId and no pending change. No real payment or production service was used. Actual collection at a future renewal remains untested.
+
+428 automated tests passed (22 skipped), including switches in both directions, upgrades/downgrades, lost provider responses, recovery after step two fails, replay rejection, paid-entitlement gating and duplicate transaction reconciliation. UI quote includes amount due now, next payment and date.

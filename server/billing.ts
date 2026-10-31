@@ -47,7 +47,7 @@ export async function billingAction(store:Store,uid:string,input:Data){
  if(!billing.subscriptionId)throw new ApiError(409,'NO_SUBSCRIPTION','Subscribe before changing a plan');
  const cadenceChange=interval!==billing.interval;
  const immediate=planIds.indexOf(plan)>planIds.indexOf(billing.plan)&&!cadenceChange;
- const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:immediate?'prorated_immediately':cadenceChange?'do_not_bill':'full_next_billing_period',...(cadenceChange?{next_billed_at:new Date(Number(billing.periodEnd)).toISOString()}:{}),on_payment_failure:'prevent_change'};
+ const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:immediate?'prorated_immediately':cadenceChange?'do_not_bill':'full_next_billing_period',on_payment_failure:'prevent_change'};
  if(action==='billing.preview-change'){
   const preview=plan==='tourist'?null:await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',change);
   const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,expiresAt:Date.now()+5*60000,change});});

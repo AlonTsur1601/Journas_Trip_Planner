@@ -1,3 +1,4 @@
+import {queueChangeNotice} from './billing-mail.js';
 import {createHmac,timingSafeEqual,randomUUID} from 'node:crypto';
 import {billingStatus,isPlan,planIds,plans,type PlanId,type BillingStatus} from '../shared/plans.js';
 import {ApiError,type Data,type Store} from './types.js';
@@ -50,6 +51,7 @@ export async function resumeCadenceChange(store:Store,uid:string){
    const currentJob=await tx.get(`billingChanges/${uid}`),user=await tx.get(`users/${uid}`);
    if(currentJob?.attempt!==attempt||!user||((user.billing as Data)?.subscriptionId!==job.subscriptionId))throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed.');
    tx.set(`users/${uid}`,{...user,billing:{...(user.billing as Data),pendingPlan:(user.billing as Data)?.plan===job.plan&&(user.billing as Data)?.interval===job.interval?null:job.plan,pendingInterval:(user.billing as Data)?.plan===job.plan&&(user.billing as Data)?.interval===job.interval?null:job.interval}});
+   await queueChangeNotice(tx,uid,String(job.previewId),user.billing as Data,String(job.plan),String(job.interval),job.quote as Data|undefined);
    tx.delete(`billingChanges/${uid}`);tx.delete(`billingPreviews/${job.previewId}`);
   });
   return true;
@@ -85,9 +87,9 @@ export async function billingAction(store:Store,uid:string,input:Data):Promise<D
   }catch(error){await store.transaction(async tx=>{const current=await tx.get(`billingCheckouts/${uid}`);if(current?.id===reservation)tx.delete(`billingCheckouts/${uid}`);});throw error;}
  }
  if(!billing.subscriptionId)throw new ApiError(409,'NO_SUBSCRIPTION','Subscribe before changing a plan');
- const cadenceChange=plan!=='tourist'&&(interval!==billing.interval||Boolean(billing.pendingInterval&&interval!==billing.pendingInterval));
- const immediate=planIds.indexOf(plan)>planIds.indexOf(billing.plan)&&!cadenceChange;
- const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:immediate?'prorated_immediately':cadenceChange?'do_not_bill':'full_next_billing_period',on_payment_failure:'prevent_change'};
+ const cadenceChange=plan!=='tourist';
+ const immediate=false;
+ const change=plan==='tourist'?{scheduled_change:{action:'cancel',effective_at:'next_billing_period'}}:{items:[{price_id:price(plan,interval),quantity:1}],proration_billing_mode:'do_not_bill',on_payment_failure:'prevent_change'};
  if(action==='billing.preview-change'){
   const preview=plan==='tourist'?null:await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',change);
   let renewalAt:string|undefined,originalItems:unknown,quote:Data|undefined;
@@ -100,21 +102,21 @@ export async function billingAction(store:Store,uid:string,input:Data):Promise<D
    renewalAt=current.next_billed_at;originalItems=itemPrices(current.items);
    quote={dueNow:0,nextTotal:Number(totals.grand_total??totals.total),currency:totals.currency_code,renewsAt:Date.parse(current.next_billed_at)};
   }
-  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified:!cadenceChange,workflowVersion:2,...(cadenceChange?{renewalAt,originalItems,quote}:{}),expiresAt:Date.now()+5*60000,change});});
+  const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified:!cadenceChange,workflowVersion:3,...(cadenceChange?{renewalAt,originalItems,quote}:{}),expiresAt:Date.now()+5*60000,change});});
   return {previewId:id,preview:cadenceChange?null:preview,...(quote?{quote}:{}),effectiveAt:immediate?'after successful payment':billing.periodEnd};
  }
  if(action==='billing.change-plan'){
   const preview=await store.transaction(async tx=>{
    const preview=await tx.get(`billingPreviews/${String(input.previewId)}`),current=billingStatus(await tx.get(`users/${uid}`)),lock=await tx.get(`billingChanges/${uid}`);
    if(!preview||preview.processing||preview.uid!==uid||preview.plan!==plan||preview.interval!==interval||preview.subscriptionId!==current.subscriptionId||preview.revision!==billingRevision(current)||Number(preview.expiresAt)<Date.now())throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
-   if(plan!=='tourist'&&interval!==current.interval&&preview.workflowVersion!==2)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
+   if(preview.workflowVersion!==3)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
    if(lock&&(lock.kind==='cadence'||Number(lock.expiresAt)>Date.now()))throw new ApiError(409,'BILLING_CHANGE_PENDING','A plan change is already processing. Please check your subscription before trying again.');
-   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,cadenceChange?{kind:'cadence',stage:'prepared',uid,plan,interval,subscriptionId:current.subscriptionId,previewId:input.previewId,renewalAt:preview.renewalAt,originalItems:preview.originalItems,change:preview.change,leaseUntil:0}:{previewId:input.previewId,expiresAt:Date.now()+5*60000});return preview;
+   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,cadenceChange?{kind:'cadence',stage:'prepared',uid,plan,interval,subscriptionId:current.subscriptionId,previewId:input.previewId,renewalAt:preview.renewalAt,originalItems:preview.originalItems,change:preview.change,quote:preview.quote,leaseUntil:0}:{previewId:input.previewId,expiresAt:Date.now()+5*60000});return preview;
   });
   if(cadenceChange){await resumeCadenceChange(store,uid);return {pending:true};}
   if(plan==='tourist')await paddle(`/subscriptions/${billing.subscriptionId}/cancel`,'POST',{effective_from:'next_billing_period'});
   else await paddle(`/subscriptions/${billing.subscriptionId}`,'PATCH',preview.change);
-  await store.transaction(async tx=>{const current=await tx.get(`users/${uid}`)??{};if(!preview.immediate)tx.set(`users/${uid}`,{...current,billing:{...(current.billing as Data),pendingPlan:plan,pendingInterval:interval}});tx.delete(`billingPreviews/${String(input.previewId)}`);tx.delete(`billingChanges/${uid}`);});
+  await store.transaction(async tx=>{const current=await tx.get(`users/${uid}`)??{};if(!preview.immediate)tx.set(`users/${uid}`,{...current,billing:{...(current.billing as Data),pendingPlan:plan,pendingInterval:interval}});await queueChangeNotice(tx,uid,String(input.previewId),current.billing as Data,plan,interval);tx.delete(`billingPreviews/${String(input.previewId)}`);tx.delete(`billingChanges/${uid}`);});
   return {pending:!immediate};
  }
  throw new ApiError(400,'UNKNOWN_ACTION','Unknown billing operation');

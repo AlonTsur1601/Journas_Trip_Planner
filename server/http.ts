@@ -112,7 +112,7 @@ export async function journasHandler(req: Request, res: ServerResponse) {
         }
         if(input.action==='tour.status'||input.action==='tour.seen'){const store=firestoreStore();return send(res,200,await store.transaction(async tx=>{const path=`users/${uid}`,user=await tx.get(path)??{};if(input.action==='tour.seen')tx.set(path,{...user,tourVersion,tourAcknowledged:true});return {seen:input.action==='tour.seen'||hasAcknowledgedTour(user)};}));}
         if('practiceDocuments' in input)return send(res,200,await practiceExecute(uid!,input));
-        if(String(input.action).startsWith('billing.'))return send(res,200,await billingAction(store,uid!,input));
+        if(String(input.action).startsWith('billing.')){const result=await billingAction(store,uid!,input);if(input.action==='billing.change-plan')await billingNotices(store).catch(()=>{});return send(res,200,result);}
         const result=await new JournasService(firestoreStore()).execute(uid,input);
         send(res,200,startup?{...result,verified:true}:result);
     }

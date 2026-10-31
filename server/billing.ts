@@ -116,7 +116,7 @@ export async function billingAction(store:Store,uid:string,input:Data):Promise<D
   if(cadenceChange){await resumeCadenceChange(store,uid);return {pending:true};}
   if(plan==='tourist')await paddle(`/subscriptions/${billing.subscriptionId}/cancel`,'POST',{effective_from:'next_billing_period'});
   else await paddle(`/subscriptions/${billing.subscriptionId}`,'PATCH',preview.change);
-  await store.transaction(async tx=>{const current=await tx.get(`users/${uid}`)??{};if(!preview.immediate)tx.set(`users/${uid}`,{...current,billing:{...(current.billing as Data),pendingPlan:plan,pendingInterval:interval}});await queueChangeNotice(tx,uid,String(input.previewId),current.billing as Data,plan,interval);tx.delete(`billingPreviews/${String(input.previewId)}`);tx.delete(`billingChanges/${uid}`);});
+  await store.transaction(async tx=>{const current=await tx.get(`users/${uid}`)??{};if(!preview.immediate)tx.set(`users/${uid}`,{...current,billing:{...(current.billing as Data),pendingPlan:plan,pendingInterval:plan==='tourist'?null:interval}});await queueChangeNotice(tx,uid,String(input.previewId),current.billing as Data,plan,interval);tx.delete(`billingPreviews/${String(input.previewId)}`);tx.delete(`billingChanges/${uid}`);});
   return {pending:!immediate};
  }
  throw new ApiError(400,'UNKNOWN_ACTION','Unknown billing operation');

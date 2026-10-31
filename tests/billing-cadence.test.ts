@@ -62,3 +62,10 @@ it('preserves the scheduled change when reconciliation repeats the last paid tra
  await applyBillingEvent(f.store,{event_id:'evt_repeated',event_type:'transaction.completed',occurred_at:new Date().toISOString(),data:{id:'txn_original',subscription_id:'sub_test',custom_data:{uid:'alice',environment:'monetization-staging'},items:[{price_id:f.source,quantity:1}],billing_period:{ends_at:f.renewal}}});
  expect(billingStatus(await f.store.transaction(tx=>tx.get('users/alice')))).toMatchObject({plan:'traveler',interval:'month',pendingPlan:'adventurer',pendingInterval:'year'});
 });
+it('queues cancellation only after the provider accepts it, preserving paid access until expiry',async()=>{
+ const f=setup();vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({data:{scheduled_change:{action:'cancel'}}})})));
+ const p=await billingAction(f.store,'alice',{action:'billing.preview-change',plan:'tourist',interval:'year'});
+ await billingAction(f.store,'alice',{action:'billing.change-plan',plan:'tourist',interval:'year',previewId:p.previewId});
+ expect(billingStatus(await f.store.transaction(tx=>tx.get('users/alice')))).toMatchObject({plan:'traveler',interval:'month',periodEnd:f.end,pendingPlan:'tourist',pendingInterval:null});
+ expect(await f.store.list('billingNotices')).toEqual([expect.objectContaining({kind:'scheduled-change',plan:'tourist',previousPlan:'traveler',effectiveAt:f.end})]);
+});

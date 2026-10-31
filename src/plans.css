@@ -199,3 +199,6 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 
 /* Keep the fixed SVG on the same compositing layer after its entrance. */
 .upgrade-page>.auth-map-background{translate:0 0;will-change:transform;backface-visibility:hidden;}
+
+.upgrade-dialog{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;}
+.upgrade-dialog-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;}

@@ -73,14 +73,22 @@ async function upgradeCredit(billing:BillingStatus,change:Data,preview:any){
  for(const line of paid.details?.line_items??[]){if(line.price_id!==paidPrice)continue;const period=line.billing_period??paid.billing_period,start=Date.parse(period?.starts_at),end=Date.parse(period?.ends_at),base=Number(line.totals?.subtotal)-Number(line.totals?.discount??0);if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||!Number.isFinite(base)||base<=0)continue;found=true;credit+=Math.round(base*Math.max(0,Math.min(1,(Math.min(end,Number(billing.periodEnd))-Date.now())/(end-start))));}
  if(!found||credit>Number(preview.immediate_transaction?.details?.totals?.subtotal)-Number(preview.immediate_transaction?.details?.totals?.discount??0))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
  if(credit<=0)return {change,preview};
- const discount=await paddle('/discounts','POST',{description:'Journas unused paid-period credit',type:'flat',amount:String(credit),currency_code:currency,recur:false,usage_limit:1,enabled_for_checkout:false,restrict_to:[(change.items as Data[])[0].price_id],expires_at:new Date(Date.now()+10*60000).toISOString()});
+ const discount=await paddle('/discounts','POST',{description:'Journas unused paid-period credit',type:'flat',amount:String(credit),currency_code:currency,recur:true,maximum_recurring_intervals:1,usage_limit:1,enabled_for_checkout:false,restrict_to:[(change.items as Data[])[0].price_id],expires_at:new Date(Date.now()+10*60000).toISOString()});
  const credited={...change,discount:{id:discount.id,effective_from:'immediately'}};
  let checked=await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',credited);
  const initial=preview.immediate_transaction.details.totals,expected=Number(initial.subtotal)-Number(initial.discount??0)-credit;
  let actual=Number(checked.immediate_transaction?.details?.totals?.subtotal)-Number(checked.immediate_transaction?.details?.totals?.discount??0);
  if(Math.abs(actual-expected)>1){const applied=Number(initial.subtotal)-Number(initial.discount??0)-actual;if(applied>0){await paddle(`/discounts/${discount.id}`,'PATCH',{amount:String(Math.round(credit*credit/applied))});checked=await paddle(`/subscriptions/${billing.subscriptionId}/preview`,'PATCH',credited);actual=Number(checked.immediate_transaction?.details?.totals?.subtotal)-Number(checked.immediate_transaction?.details?.totals?.discount??0);}}
- if(Math.abs(actual-expected)>1||!Number.isFinite(actual)||Number(checked.recurring_transaction_details?.totals?.grand_total??checked.recurring_transaction_details?.totals?.total)!==Number(preview.recurring_transaction_details?.totals?.grand_total??preview.recurring_transaction_details?.totals?.total))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
- return {change:credited,preview:checked};
+ if(Math.abs(actual-expected)>1||!Number.isFinite(actual))throw new ApiError(409,'BILLING_CREDIT_UNVERIFIED','We could not verify your unused payment credit. Your subscription has not changed.');
+ return {change:credited,preview:{...checked,renewalAfterCreditRemoval:preview.recurring_transaction_details?.totals}};
+}
+async function finishUpgradeCredit(store:Store,uid:string){
+ const state=await store.transaction(async tx=>({lock:await tx.get(`billingChanges/${uid}`),user:await tx.get(`users/${uid}`)})),lock=state.lock,billing=billingStatus(state.user);
+ if(lock?.kind!=='upgrade'||!lock.creditDiscountId||billing.plan!==lock.plan||billing.interval!==lock.interval)return;
+ const subscription=await paddle(`/subscriptions/${lock.subscriptionId}`);
+ if(subscription.discount?.id&&subscription.discount.id!==lock.creditDiscountId)throw new ApiError(409,'SUBSCRIPTION_CHANGED','Your subscription has changed.');
+ if(subscription.discount)await paddle(`/subscriptions/${lock.subscriptionId}`,'PATCH',{discount:null,proration_billing_mode:'do_not_bill',on_payment_failure:'prevent_change'});
+ await store.transaction(async tx=>{const current=await tx.get(`billingChanges/${uid}`);if(current?.previewId===lock.previewId)tx.delete(`billingChanges/${uid}`);});
 }
 async function recoverUpgrade(store:Store,uid:string){
  const lock=await store.transaction(tx=>tx.get(`billingChanges/${uid}`));if(lock?.kind!=='upgrade')return false;
@@ -90,6 +98,7 @@ async function recoverUpgrade(store:Store,uid:string){
   if(!itemPrices(transaction.items).some((item:any)=>item.price_id===target)||Date.parse(String(transaction.created_at??transaction.updated_at))<Number(lock.createdAt)-1000)continue;
   await applyBillingEvent(store,{event_id:`evt_recover${String(transaction.id).replace(/^txn_/,'')}`,event_type:'transaction.completed',occurred_at:transaction.updated_at,data:{...transaction,custom_data:{uid,environment:'monetization-staging'}}});
  }
+ await finishUpgradeCredit(store,uid);
  return (await store.transaction(tx=>tx.get(`billingChanges/${uid}`)))?.kind==='upgrade';
 }
 export async function billingAction(store:Store,uid:string,input:Data):Promise<Data>{
@@ -136,7 +145,7 @@ export async function billingAction(store:Store,uid:string,input:Data):Promise<D
    renewalAt=current.next_billed_at;originalItems=itemPrices(current.items);
    quote={dueNow:0,nextTotal:Number(totals.grand_total??totals.total),currency:totals.currency_code,renewsAt:Date.parse(current.next_billed_at)};
   }
-  if(immediate){const due=preview?.immediate_transaction?.details?.totals,next=preview?.recurring_transaction_details?.totals;if(!due||!next||!Number.isFinite(Number(due.grand_total))||!Number.isFinite(Date.parse(preview.next_billed_at)))throw new ApiError(502,'BILLING_QUOTE_UNAVAILABLE','Could not verify the upgrade amount. Please try again.');quote={dueNow:Number(due.grand_total),nextTotal:Number(next.grand_total??next.total),currency:due.currency_code,renewsAt:Date.parse(preview.next_billed_at),immediate:true};}
+  if(immediate){const due=preview?.immediate_transaction?.details?.totals,next=preview?.recurring_transaction_details?.totals;if(!due||!next||!Number.isFinite(Number(due.grand_total))||!Number.isFinite(Date.parse(preview.next_billed_at)))throw new ApiError(502,'BILLING_QUOTE_UNAVAILABLE','Could not verify the upgrade amount. Please try again.');quote={dueNow:Number(due.grand_total),nextTotal:Number(preview.renewalAfterCreditRemoval?.grand_total??preview.renewalAfterCreditRemoval?.total??next.grand_total??next.total),currency:due.currency_code,renewsAt:Date.parse(preview.next_billed_at),immediate:true};}
   const id=randomUUID();await store.transaction(async tx=>{tx.set(`billingPreviews/${id}`,{uid,plan,interval,subscriptionId:billing.subscriptionId,revision:billingRevision(billing),immediate,cadenceVerified:!cadenceChange,workflowVersion:4,...(cadenceChange?{renewalAt,originalItems,quote}:{}),expiresAt:Date.now()+5*60000,change});});
   return {previewId:id,preview:cadenceChange?null:preview,...(quote?{quote}:{}),effectiveAt:immediate?'after successful payment':billing.periodEnd};
  }
@@ -146,7 +155,7 @@ export async function billingAction(store:Store,uid:string,input:Data):Promise<D
    if(!preview||preview.processing||preview.uid!==uid||preview.plan!==plan||preview.interval!==interval||preview.subscriptionId!==current.subscriptionId||preview.revision!==billingRevision(current)||Number(preview.expiresAt)<Date.now())throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
    if(preview.workflowVersion!==4||preview.immediate!==immediate)throw new ApiError(409,'PREVIEW_EXPIRED','Preview the change again before confirming.');
    if(lock&&(lock.kind==='cadence'||lock.kind==='upgrade'||Number(lock.expiresAt)>Date.now()))throw new ApiError(409,'BILLING_CHANGE_PENDING','A plan change is already processing. Please check your subscription before trying again.');
-   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,cadenceChange?{kind:'cadence',stage:'prepared',uid,plan,interval,subscriptionId:current.subscriptionId,previewId:input.previewId,renewalAt:preview.renewalAt,originalItems:preview.originalItems,change:preview.change,quote:preview.quote,leaseUntil:0}:{kind:immediate?'upgrade':'cancel',previewId:input.previewId,subscriptionId:current.subscriptionId,plan,interval,createdAt:Date.now(),expiresAt:Date.now()+5*60000});return preview;
+   tx.set(`billingPreviews/${String(input.previewId)}`,{...preview,processing:true});tx.set(`billingChanges/${uid}`,cadenceChange?{kind:'cadence',stage:'prepared',uid,plan,interval,subscriptionId:current.subscriptionId,previewId:input.previewId,renewalAt:preview.renewalAt,originalItems:preview.originalItems,change:preview.change,quote:preview.quote,leaseUntil:0}:{kind:immediate?'upgrade':'cancel',previewId:input.previewId,subscriptionId:current.subscriptionId,plan,interval,...(preview.change&&((preview.change as Data).discount as Data)?.id?{creditDiscountId:((preview.change as Data).discount as Data).id}:{}),createdAt:Date.now(),expiresAt:Date.now()+5*60000});return preview;
   });
   if(cadenceChange){await resumeCadenceChange(store,uid);return {pending:true};}
   if(plan==='tourist')await paddle(`/subscriptions/${billing.subscriptionId}/cancel`,'POST',{effective_from:'next_billing_period'});
@@ -199,13 +208,13 @@ export async function applyBillingEvent(store:Store,event:Data){
    if(data.id)tx.set(`billingTransactions/${data.id}`,{uid,subscriptionId:data.subscription_id});
    tx.delete(`billingCheckouts/${uid}`);
    const immediateUpgrade=!delayed&&isPlan(old.plan)&&planIds.indexOf(matched.plan)>planIds.indexOf(old.plan);
-   const changeLock=await tx.get(`billingChanges/${uid}`);if(changeLock?.kind==='upgrade'&&changeLock.subscriptionId===data.subscription_id&&changeLock.plan===matched.plan&&changeLock.interval===matched.interval)tx.delete(`billingChanges/${uid}`);
+   const changeLock=await tx.get(`billingChanges/${uid}`);if(changeLock?.kind==='upgrade'&&changeLock.subscriptionId===data.subscription_id&&changeLock.plan===matched.plan&&changeLock.interval===matched.interval){if(changeLock.creditDiscountId)tx.set(`billingChanges/${uid}`,{...changeLock,stage:'paid'});else tx.delete(`billingChanges/${uid}`);}
    if(data.id&&!await tx.get(`billingNotices/${data.id}`))tx.set(`billingNotices/${data.id}`,{id:data.id,uid,plan:matched.plan,kind:immediateUpgrade?'paid-upgrade':'payment',interval:matched.interval,periodEnd:end,status:typeof user.verifiedEmail==='string'&&user.verifiedEmail.endsWith('.test')?'test-only':'pending',createdAt:Date.now()});
   }
   if(type==='adjustment.updated'&&data.status==='approved'&&data.action==='refund'&&data.type==='full'&&data.transaction_id===old.lastPaidTransactionId)next={...next,source:'free',plan:'tourist',status:'refunded',periodEnd:0,paidChange:null,downgradedAt:Date.now(),canceledAt:at};
   tx.set(`users/${uid}`,{...user,billing:{...next,[clock]:at}});tx.set(`billingEvents/${id}`,{id,at,uid});
  });
- await refreshMemberships(store,uid);
+ await refreshMemberships(store,uid);await finishUpgradeCredit(store,uid);
 }
 export async function reconcileBilling(store:Store){
  if(!process.env.PADDLE_API_KEY)return {checked:0,configured:false};

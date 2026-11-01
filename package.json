@@ -7,6 +7,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "postinstall": "node patch-minimatch.cjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
@@ -47,7 +48,9 @@
     "gaxios": {
       "uuid": "^11.1.1"
     },
-    "@opentelemetry/core": "^2.8.0"
+    "@opentelemetry/core": "^2.8.0",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   },
   "allowScripts": {
     "@firebase/util@1.15.3": true,

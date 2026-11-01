@@ -203,3 +203,5 @@ body:has(.modal-shade,.bounded-popover:not([inert]),.home-context-menu:not([iner
 .upgrade-dialog{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;}
 .upgrade-dialog p{font-size:15px;line-height:1.65;color:var(--ink);}
 .upgrade-dialog-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;}
+
+:is(.upgrade-home,.upgrade-topbar)[data-change-plan]::before{content:none;}
